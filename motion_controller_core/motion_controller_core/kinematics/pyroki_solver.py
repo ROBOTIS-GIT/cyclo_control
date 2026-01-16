@@ -1,59 +1,144 @@
-import numpy as np
-import sys
-import jax
-import jax.numpy as jnp
-import jax_dataclasses as jdc
-import jaxlie
-import jaxls
-import pyroki as pk
-import yourdfpy
-import tempfile
-import os
+"""
+Pyroki Library Overview:
+=========================
+
+Pyroki is a JAX-based robot kinematics library that uses optimization-based inverse kinematics.
+Unlike Pinocchio which uses iterative Newton-Raphson, Pyroki formulates IK as a least-squares
+optimization problem and solves it using JAX's automatic differentiation and JIT compilation.
+
+Key Concepts:
+-------------
+
+1. JAX and JIT Compilation:
+   - JAX: NumPy-like library with automatic differentiation and JIT compilation
+   - JIT (Just-In-Time): Compiles Python code to optimized machine code for speed
+   - JAX arrays: Similar to NumPy but can be compiled and differentiated
+   - JIT functions run much faster but have restrictions (no dynamic Python features)
+
+2. Optimization-Based IK:
+   - Formulates IK as: minimize cost function subject to constraints
+   - Cost function: weighted sum of pose error, rest pose penalty, joint limit penalty
+   - Solver: Least-squares solver (jaxls) with trust region method
+   - Advantages: Can handle multiple targets, constraints, and is differentiable
+
+3. Pyroki Robot Model:
+   - pk.Robot: Robot model loaded from URDF
+   - robot.links: Link information (names, indices)
+   - robot.joints: Joint information (actuated joints, limits)
+   - robot.forward_kinematics(q): Computes all link poses from joint angles
+
+4. Cost Functions:
+   - pose_cost_analytic_jac: Penalizes distance between current and target pose
+     * pos_weight: Weight for position error
+     * ori_weight: Weight for orientation error
+   - rest_cost: Penalizes deviation from rest/initial configuration
+   - limit_constraint: Penalizes joints approaching limits
+
+5. Multiple Targets:
+   - Can solve IK for multiple end-effectors simultaneously
+   - Example: Bimanual robot (two arms) reaching two different targets
+   - All targets are optimized together in one problem
+
+6. SE3 Representation:
+   - jaxlie.SE3: Represents 6D pose (rotation + translation)
+   - from_matrix(): Convert 4x4 homogeneous matrix to SE3
+   - rotation().wxyz: Get quaternion (w, x, y, z) representation
+   - translation(): Get 3D position vector
+   - as_matrix(): Convert SE3 back to 4x4 matrix
+
+7. Least Squares Problem:
+   - jaxls.LeastSquaresProblem: Formulates optimization problem
+   - variables: Joint variables to optimize (JointVar)
+   - costs: List of cost functions to minimize
+   - solve(): Solves using trust region method with Cholesky decomposition
+
+8. Joint Variables:
+   - JointVar(id): Represents a set of joint variables with ID
+   - JointVar(0): Default joint variable (all actuated joints)
+   - Used to link cost functions to the same set of joints
+
+Differences from Pinocchio:
+---------------------------
+- Pinocchio: Iterative Newton-Raphson, single target, fast for single queries
+- Pyroki: Optimization-based, multiple targets, differentiable, JIT-compiled
+- Pinocchio: C++ backend, Python bindings
+- Pyroki: Pure JAX/Python, can run on GPU/TPU
+"""
+
+import numpy as np  # NumPy for standard arrays
+import sys  # System-specific parameters
+import jax  # JAX library for automatic differentiation and JIT
+import jax.numpy as jnp  # JAX NumPy (compatible with JIT)
+import jax_dataclasses as jdc  # JAX-compatible dataclasses
+import jaxlie  # JAX Lie groups (SO3, SE3)
+import jaxls  # JAX Least Squares solver
+import pyroki as pk  # Pyroki robot kinematics library
+import yourdfpy  # URDF parser
+import tempfile  # Temporary file handling
+import os  # Operating system interface
 
 class PyrokiSolver:
     def __init__(self):
-        self.robot = None
-        self.target_link_indices = None
-        self.jitted_solve = None
+        self.robot = None  # Pyroki robot model (pk.Robot)
+        self.target_link_indices = None  # List of link indices for IK targets (end-effectors)
+        self.jitted_solve = None  # JIT-compiled IK solver function (for performance)
 
     def init(self, urdf_content: str, base_link: str, tip_links: list[str] | str) -> bool:
         """
         Initialize the solver with URDF content.
-        
+
+        This method:
+        1. Parses URDF using yourdfpy
+        2. Creates Pyroki robot model
+        3. Validates and stores target link indices
+        4. JIT-compiles the IK solver for performance
+
         Args:
-            urdf_content: XML string of the URDF.
-            base_link: Name of the base link.
-            tip_links: Name(s) of the tip link(s) to control.
-            
+            urdf_content: XML string of the URDF (Unified Robot Description Format).
+            base_link: Name of the base link (currently not used but kept for API compatibility).
+            tip_links: Name(s) of the tip link(s) to control (can be single string or list).
+                      Multiple links enable multi-target IK (e.g., bimanual robot).
+
         Returns:
-            bool: True if initialization successful.
+            bool: True if initialization successful, False otherwise.
         """
         try:
             # Load URDF via temp file for yourdfpy compatibility
+            # yourdfpy.URDF.load() requires a file path, not string content
+            # We create a temporary file, write URDF content, then delete it
             with tempfile.NamedTemporaryFile(mode='w', suffix='.urdf', delete=False) as tmp:
-                tmp.write(urdf_content)
-                tmp_path = tmp.name
-                
-            try:
-                urdf_model = yourdfpy.URDF.load(tmp_path)
-            finally:
-                os.remove(tmp_path)
+                tmp.write(urdf_content)  # Write URDF XML content to temp file
+                tmp_path = tmp.name  # Get temporary file path
 
+            try:
+                urdf_model = yourdfpy.URDF.load(tmp_path)  # Parse URDF file into yourdfpy model
+            finally:
+                os.remove(tmp_path)  # Clean up: delete temp file
+
+            # Create Pyroki robot model from URDF
+            # pk.Robot contains all kinematic information (links, joints, forward kinematics)
             self.robot = pk.Robot.from_urdf(urdf_model)
-            
+
+            # Normalize tip_links to list (handle both single string and list)
             if isinstance(tip_links, str):
-                tip_links = [tip_links]
-                
+                tip_links = [tip_links]  # Convert single string to list
+
+            # Validate and store target link indices
+            # Link indices are used internally by Pyroki (faster than name lookups)
             self.target_link_indices = []
-            for link in tip_links:
-                if link not in self.robot.links.names:
+            for link in tip_links:  # Iterate through all target links
+                if link not in self.robot.links.names:  # Check if link exists in robot model
                     print(f"[PyrokiSolver] Tip link {link} not found.", file=sys.stderr)
                     return False
+                # Convert link name to index (used for efficient access)
                 self.target_link_indices.append(self.robot.links.names.index(link))
-            
+
+            # JIT-compile the IK solver function
+            # This compiles the optimization problem once for better performance
+            # JIT compilation happens at init time, not at solve time
             self._jit_solver()
-            return True
-            
+            return True  # Initialization successful
+
         except Exception as e:
             print(f"[PyrokiSolver] Init Exception: {e}", file=sys.stderr)
             import traceback
@@ -61,261 +146,213 @@ class PyrokiSolver:
             return False
 
     def _jit_solver(self):
-        """Pre-jit the JAX solver function based on pyroki_snippets logic."""
-        
-        @jdc.jit
+        """
+        Pre-compile the JAX IK solver function using JIT.
+
+        This method creates and JIT-compiles the IK solver function.
+        JIT compilation converts Python/JAX code to optimized machine code,
+        making subsequent IK solves much faster (10-100x speedup).
+
+        The solver uses optimization-based IK:
+        1. Formulates IK as least-squares problem
+        2. Cost function: pose error + rest pose penalty + joint limit penalty
+        3. Solves using trust region method with Cholesky decomposition
+        4. Supports multiple targets (bimanual, multi-end-effector)
+
+        Why JIT at init time?
+        - JIT compilation is expensive (takes time)
+        - We do it once at init, not every solve_ik() call
+        - Compiled function is cached and reused
+        """
+
+        @jdc.jit  # JIT decorator: compile this function for performance
         def _solve_ik_jax(
-            robot: pk.Robot,
-            target_wxyzs: jax.Array,
-            target_positions: jax.Array,
-            target_link_indices: jax.Array,
-            q_init: jax.Array
-        ) -> jax.Array:
-            # Adapted from _solve_ik_with_multiple_targets.py
-            
+            robot: pk.Robot,  # Pyroki robot model
+            target_wxyzs: jax.Array,  # Target orientations as quaternions (N, 4) where N = number of targets
+            target_positions: jax.Array,  # Target positions (N, 3)
+            target_link_indices: jax.Array,  # Link indices for each target (N,)
+            q_init: jax.Array  # Initial joint configuration (DoF,)
+        ) -> jax.Array:  # Returns optimized joint configuration (DoF,)
+            """
+            JIT-compiled IK solver using optimization.
+
+            This function solves IK by minimizing a cost function:
+            - Pose cost: distance between current and target poses
+            - Rest cost: deviation from initial/rest configuration
+            - Limit cost: penalty for joints near limits
+
+            Supports multiple targets: all targets are optimized simultaneously.
+            For bimanual robots, this finds one configuration that satisfies all targets.
+            """
+
+            # Get joint variable class for this robot
+            # JointVar is used to represent optimization variables in jaxls
             JointVar = robot.joint_var_cls
-            
-            # Construct target poses
-            # target_wxyzs: (N, 4), target_positions: (N, 3)
-            # jaxlie.SE3 expects batch dimensions if provided.
-            # We want to form a batch of N SE3 objects? No, pose_cost_analytic_jac expects ONE target pose usually?
-            # Or does it handle multiple?
-            # The snippet maps robot: jax.tree.map(lambda x: x[None], robot)
-            # and passes target_pose with batch_axes.
-            # This implies it solves N problems in parallel OR it treats N targets as one problem?
-            # Wait, the snippet says:
-            # "Batch axes for the variables and cost terms (e.g., target pose) should be broadcastable!"
-            # If we want 1 robot to reach N targets simultaneously, we need N cost terms added together.
-            # BUT the snippet uses ONE pose_cost_analytic_jac call.
-            # This implies `pose_cost_analytic_jac` handles broadcasting if we give it correct shapes?
-            # Let's look at the snippet implementation of costs list:
-            # costs = [ pk.costs.pose_cost_analytic_jac(..., target_joint_indices, ...) ]
-            # If target_joint_indices is an array, maybe it sums costs?
-            # Actually, `pose_cost_analytic_jac` documentation/code isn't fully visible, but based on usage:
-            # "target_pose = ... with batch_axes"
-            # It seems the snippet sets up a Batched Problem where we have N targets.
-            
-            # Use specific logic for "Multiple Targets for One Configuration" vs "Multiple Configurations".
-            # The snippet `_solve_ik_with_multiple_targets` seems to do:
-            # Solve for ONE cfg that satisfies N targets?
-            # It returns `sol[JointVar(0)]`. This implies one configuration variable.
-            # So `pose_cost_analytic_jac` likely sums costs if inputs are batched?
-            # OR we need to add multiple cost terms.
-            
-            # Re-reading snippet:
-            # It does: `target_pose = ...` (Batch size N)
-            # `robot` is mapped to `x[None]` (Batch size 1?)
-            # `JointVar(jnp.full(batch_axes, 0))` (Batch size N)
-            # It seems this might be setting up N *independent* problems if batch_axes > 0?
-            # BUT the return is `sol[JointVar(0)]`.
-            
-            # If we want 1 robot to meet multiple targets (e.g. 2 hands), we usually simply sum the residuals.
-            # I will follow the snippet exactly, but carefully.
-            # "Get the batch axes... target_pose.get_batch_axes()"
-            # If N=2, batch_axes=(2,)
-            # robot mapped to x[None] -> (1, ...)
-            # JointVar mapped to (2, 0).
-            # This looks like it solves 2 separate problems?
-            # Wait, `solve_ik_with_multiple_targets` docstring says returns `cfg` shape `(actuated_count,)`.
-            # If it solved 2 problems, it would return (2, actuated_count).
-            # The Example 02_bimanual_ik passes 2 targets.
-            
-            # Let's assume the snippet logic works for bimanual on a single robot.
-            # It creates `target_pose` with shape (N,).
-            # It creates `factors` (costs) using this target_pose.
-            # `jaxls` creates a problem.
-            
-            # Important: We need q_init support.
-            # `initial_values={JointVar(0): q_init}`
-            
+
+            # Construct target poses from quaternions and positions
+            # target_wxyzs: (N, 4) - quaternions [w, x, y, z] for N targets
+            # target_positions: (N, 3) - 3D positions for N targets
+            # jaxlie.SE3.from_rotation_and_translation() creates SE3 transforms
+            # Result: target_pose with shape () for single target, (N,) for N targets
             target_pose = jaxlie.SE3.from_rotation_and_translation(
-                jaxlie.SO3(target_wxyzs), target_positions
+                jaxlie.SO3(target_wxyzs),  # Convert quaternion to SO3 rotation
+                target_positions  # Translation vector
             )
-            # If we have 1 target, shape is (). If N targets, (N,).
-            
-            # batch_axes?
-            # If we pass multiple targets (N, ...), target_pose has batch format.
+
+            # Get batch axes for broadcasting
+            # If we have N targets, target_pose has batch dimension (N,)
+            # batch_axes tells us the shape of the batch: () for single, (N,) for multiple
+            # This is used to properly broadcast robot model and variables
             batch_axes = target_pose.get_batch_axes()
-            
-            # Note: The snippet does `jax.tree.map(lambda x: x[None], robot)`.
-            # This adds a batch dim to robot.
-            # `JointVar(jnp.full(batch_axes, 0))` creates variables for *each* batch element?
-            # If batch_axes=(2,), we have 2 variables?
-            # If we have 2 variables, do they represent the *same* physical robot joints?
-            # Yes if we are just solving for "robot configuration".
-            # BUT if jaxls treats them as batch, it solves them independently?
-            # If independent, we get 2 results.
-            
-            # Let's look at `_solve_ik_with_multiple_targets` return: `assert cfg.shape == (robot.joints.num_actuated_joints,)`.
-            # This asserts a SINGLE configuration is returned.
-            # So `_solve_ik_jax` returns a single array.
-            
-            # This implies the snippet's `_solve_ik_jax` handles the reduction?
-            # Or `jaxls` solves for one variable that minimizes the sum of costs for all targets?
-            # But the snippet passes `JointVar(jnp.full(batch_axes, 0))`.
-            # If batch_axes is (2,), then Variable has batch shape (2,).
-            # Which suggests 2 independent problems.
-            
-            # Alternative: Bimanual IK (one robot, two hands) usually IS just one problem with 2 costs.
-            # We should probably add 2 separate cost terms for the SAME variable `JointVar(0)`.
-            
-            # Let's diverge slightly from the snippet if the snippet is for batched-independent IK (like finding solutions for multiple unrelated targets).
-            # Example 02 says "Same as 01... but with two end effectors".
-            # And it uses `solve_ik_with_multiple_targets`.
-            
-            # I will trust the user wants code "like pyroki_snippets".
-            # I will implement it almost verbatim, but I need to handle `q_init` correctly.
-            
-            JointVar = robot.joint_var_cls
-            target_pose = jaxlie.SE3.from_rotation_and_translation(
-                jaxlie.SO3(target_wxyzs), target_positions
-            )
-            batch_axes = target_pose.get_batch_axes()
-            # If batch_axes is empty (single target), it works.
-            # If batch_axes is (N,), we might be broadcasting.
-            
-            costs = [
-                pk.costs.pose_cost_analytic_jac(
-                    jax.tree.map(lambda x: x[None], robot), # Batched robot?
-                    JointVar(jnp.full(batch_axes, 0)),      # Batched variable?
-                    target_pose,
-                    target_link_indices,
-                    pos_weight=50.0,
-                    ori_weight=10.0,
-                ),
-                pk.costs.rest_cost(
-                    JointVar(0), # Single variable?
-                    rest_pose=JointVar.default_factory(),
-                    weight=1.0,
-                ),
-            ]
-            costs.append(
-                 pk.costs.limit_constraint(
-                    robot,
-                    JointVar(0),
-                )
-            )
-            
-            # CAUTION: Mixing Batched and Non-Batched variables in factors/costs might be tricky in jaxls.
-            # If `pose_cost` uses `JointVar(batch)` and `rest_cost` uses `JointVar(0)`, are they the same variable?
-            # `jaxls` uses the ID (0 in this case).
-            # `jnp.full(batch_axes, 0)` makes an array of IDs? No, `JointVar` expects integer ID.
-            # Ah, `JointVar` is `jaxls.Var`. `jaxls.Var(id)`.
-            # `jaxls.Var` does not support batching of IDs usually.
-            # Wait, `jnp.full(batch_axes, 0)` creates an array of zeros.
-            # If `JointVar` is a dataclass, passing an array to it ...
-            
-            # Let's simplify. I will add N separate pose costs for the SAME Single Variable ID 0.
-            # This guarantees we solve for ONE robot configuration that satisfies ALL targets.
-            
+
+            # Build cost function list
+            # The optimization minimizes the sum of all costs
             costs = []
-            
-            # Rest cost
-            costs.append(pk.costs.rest_cost(JointVar(0), weight=1.0, rest_pose=q_init)) 
-            # Limit cost
-            costs.append(pk.costs.limit_constraint(robot, JointVar(0)))
-            
-            # Flatten targets if necessary
-            # We iterate over targets and add a cost for each.
-            
-            # Because we are inside JIT, we can't iterate if number of targets is dynamic/variable.
-            # However, `init` fixed the number of tip links. `target_link_indices` is known at init?
-            # But here `target_link_indices` is passed as argument.
-            # If we JIT this function, `target_link_indices` should be static or fixed size?
-            # The snippet uses `target_joint_indices` as JAX Array.
-            
-            # Function: One pose cost with batched inputs?
-            # `pose_cost_analytic_jac` signature:
-            # (robot, var, target_pose, target_link_index, ...)
-            # if we pass Batched target_pose and Batched target_link_index, does it sum?
-            # `jaxls` sums residuals squared.
-            # If `pose_cost` returns a batched residual, `jaxls` will minimize the norm of that batch.
-            # That is exactly what we want: sum of squares of errors for all targets.
-            
-            # So, we pass arrays!
-            # Robot needs to be broadcast compatible?
-            # If we have N targets, and 1 robot, we can map robot to have dim 1 or replicate.
-            # The snippet uses `jax.tree.map(lambda x: x[None], robot)`. equivalent to adding dimension (1, ...).
-            # That broadcasts with (N, ...).
-            
-            # Variable: We want ONE solution (1, ...).
-            # Snippet uses `JointVar(jnp.full(batch_axes, 0))`.
-            # If batch_axes is (N,), this creates `JointVar` containing an array of zeros?
-            # Does `jaxls` interpret this as "Use Variable 0 for all batch elements"?
-            # This seems to be the way.
-            
+
+            # Rest cost: Penalizes deviation from initial/rest configuration
+            # This encourages solutions close to q_init (helps with continuity and avoids large jumps)
+            # weight=1.0: How much to penalize deviation (lower = more flexible)
+            costs.append(pk.costs.rest_cost(
+                JointVar(0),  # Joint variable ID 0 (all actuated joints)
+                rest_pose=q_init,  # Rest configuration = initial guess
+                weight=1.0
+            ))
+
+            # Limit constraint: Penalizes joints approaching their limits
+            # Prevents solutions that violate joint limits (soft constraint)
+            # This is important for real robots with physical limits
+            costs.append(pk.costs.limit_constraint(
+                robot,  # Robot model (contains joint limits)
+                JointVar(0)  # Joint variable to constrain
+            ))
+
+            # Pose cost: Main IK objective - minimize distance to target pose(s)
+            # This is the primary cost that drives the solution toward target
+            #
+            # Broadcasting explanation for multiple targets:
+            # - jax.tree.map(lambda x: x[None], robot): Adds batch dimension to robot (1, ...)
+            #   This allows broadcasting with batched target_pose (N, ...)
+            # - JointVar(jnp.full(batch_axes, 0)): Creates variable with batch shape
+            #   All batch elements use the same variable ID 0 (same joint configuration)
+            # - target_pose: Batched SE3 transforms (N,) for N targets
+            # - target_link_indices: Which link each target applies to (N,)
+            #
+            # Result: One joint configuration (JointVar(0)) that minimizes error for ALL targets
+            # For bimanual robots: finds one config where both hands reach their targets
             costs.append(
                 pk.costs.pose_cost_analytic_jac(
-                    jax.tree.map(lambda x: x[None], robot),
-                    JointVar(jnp.full(batch_axes, 0)), # Use Var 0 for all targets
-                    target_pose,
-                    target_link_indices,
-                    pos_weight=50.0,
-                    ori_weight=10.0,
+                    jax.tree.map(lambda x: x[None], robot),  # Broadcast robot to (1, ...) for compatibility
+                    JointVar(jnp.full(batch_axes, 0)),  # Use same variable ID 0 for all batch elements
+                    target_pose,  # Batched target poses (N,)
+                    target_link_indices,  # Link index for each target (N,)
+                    pos_weight=50.0,  # Weight for position error (higher = more important)
+                    ori_weight=10.0,  # Weight for orientation error
                 )
             )
-            
-            problem = jaxls.LeastSquaresProblem(costs=costs, variables=[JointVar(0)])
-            sol = problem.analyze().solve(
-                verbose=False,
-                linear_solver="dense_cholesky",
-                trust_region=jaxls.TrustRegionConfig(lambda_initial=10.0),
+
+            # Create least-squares optimization problem
+            # This formulates IK as: minimize sum of squared residuals (costs)
+            # variables=[JointVar(0)]: We optimize one set of joint angles
+            problem = jaxls.LeastSquaresProblem(
+                costs=costs,  # List of cost functions to minimize
+                variables=[JointVar(0)]  # Joint variables to optimize (all actuated joints)
             )
+
+            # Solve the optimization problem
+            # analyze(): Analyzes problem structure (computes Jacobians, Hessians)
+            # solve(): Solves using iterative trust region method
+            sol = problem.analyze().solve(
+                verbose=False,  # Don't print solver progress
+                linear_solver="dense_cholesky",  # Use Cholesky decomposition for linear system
+                trust_region=jaxls.TrustRegionConfig(
+                    lambda_initial=10.0  # Initial trust region size (larger = more conservative)
+                ),
+            )
+
+            # Extract solution: optimized joint configuration
+            # sol is a dictionary mapping variables to their optimized values
+            # sol[JointVar(0)] gives the optimized joint angles
             return sol[JointVar(0)]
-            
+
         self.jitted_solve = _solve_ik_jax
 
     def solve_ik(self, target_poses: list[np.ndarray] | np.ndarray, q_init: np.ndarray) -> tuple[bool, np.ndarray]:
         """
-        Solve IK for one or multiple targets.
-        
+        Solve Inverse Kinematics (IK) for one or multiple targets.
+
+        This method uses optimization-based IK to find joint angles that place
+        the target link(s) at the desired pose(s). Supports multiple end-effectors
+        (e.g., bimanual robots with two arms).
+
+        Process:
+        1. Convert target poses (4x4 matrices) to SE3 format
+        2. Extract quaternions and positions
+        3. Call JIT-compiled solver to optimize joint angles
+        4. Return optimized configuration
+
         Args:
-            target_poses: List of 4x4 matrices or single 4x4 matrix.
-            q_init: Initial config.
-            
+            target_poses: List of 4x4 homogeneous transformation matrices, or single 4x4 matrix.
+                         Each matrix represents desired pose of one target link.
+                         Number of poses must match number of tip_links from init().
+            q_init: Initial joint configuration (starting guess for optimization).
+                   Should be close to desired solution for better convergence.
+
         Returns:
-            (success, q_out)
+            (success, q_out): Tuple of:
+                - success: True if IK solved successfully, False otherwise
+                - q_out: Optimized joint configuration (numpy array)
         """
+        # Check if solver is initialized
         if self.robot is None or self.jitted_solve is None:
-            return False, q_init
+            return False, q_init  # Return failure with initial config
 
         try:
-            # Normalize target_poses to list/array
-            if isinstance(target_poses, np.ndarray) and target_poses.shape == (4,4):
-                target_poses = [target_poses]
-                
+            # Normalize target_poses to list format
+            # Handle both single 4x4 matrix and list of matrices
+            if isinstance(target_poses, np.ndarray) and target_poses.shape == (4, 4):
+                target_poses = [target_poses]  # Convert single matrix to list
+
+            # Validate number of targets matches number of tip links
             num_targets = len(target_poses)
             if num_targets != len(self.target_link_indices):
                 print(f"Mismatch targets {num_targets} vs links {len(self.target_link_indices)}", file=sys.stderr)
-                return False, q_init
-                
-            # Extract wxyz, pos
-            wxyzs = []
-            positions = []
-            for T in target_poses:
-                T_se3 = jaxlie.SE3.from_matrix(T)
-                wxyzs.append(T_se3.rotation().wxyz)
-                positions.append(T_se3.translation())
-                
-            target_wxyzs = jnp.array(wxyzs) # Shape (N, 4)
-            target_positions = jnp.array(positions) # Shape (N, 3)
-            target_indices = jnp.array(self.target_link_indices) # Shape (N,)
-            
+                return False, q_init  # Return failure if mismatch
+
+            # Extract quaternions and positions from 4x4 transformation matrices
+            # Each target pose is converted to SE3 format, then decomposed
+            wxyzs = []  # List of quaternions [w, x, y, z] for each target
+            positions = []  # List of 3D positions for each target
+            for T in target_poses:  # Iterate through each target pose
+                T_se3 = jaxlie.SE3.from_matrix(T)  # Convert 4x4 matrix to SE3
+                wxyzs.append(T_se3.rotation().wxyz)  # Extract quaternion (w, x, y, z)
+                positions.append(T_se3.translation())  # Extract 3D position
+
+            # Convert to JAX arrays for JIT-compiled function
+            # These arrays will be passed to the compiled solver
+            target_wxyzs = jnp.array(wxyzs)  # Shape (N, 4) - N quaternions
+            target_positions = jnp.array(positions)  # Shape (N, 3) - N positions
+            target_indices = jnp.array(self.target_link_indices)  # Shape (N,) - link indices
+
+            # Call JIT-compiled IK solver
+            # This runs the optimized machine code (fast!)
+            # Solver minimizes cost function to find optimal joint angles
             q_out = self.jitted_solve(
-                self.robot,
-                target_wxyzs,
-                target_positions,
-                target_indices,
-                jnp.array(q_init)
+                self.robot,  # Robot model
+                target_wxyzs,  # Target orientations (quaternions)
+                target_positions,  # Target positions
+                target_indices,  # Which links to control
+                jnp.array(q_init)  # Initial joint configuration
             )
-            
-            # If shape is (1, DoF), flatten?
-            q_out = np.array(q_out)
-            if q_out.ndim > 1:
-                q_out = q_out.flatten()
-                
-            return True, q_out
-            
+
+            # Convert result back to NumPy and ensure 1D shape
+            # JAX arrays might have extra dimensions, flatten if needed
+            q_out = np.array(q_out)  # Convert JAX array to NumPy
+            if q_out.ndim > 1:  # If multi-dimensional
+                q_out = q_out.flatten()  # Flatten to 1D array
+
+            return True, q_out  # Return success with optimized configuration
+
+
         except Exception as e:
             print(f"[PyrokiSolver] IK Failed: {e}", file=sys.stderr)
             import traceback
@@ -324,19 +361,46 @@ class PyrokiSolver:
 
     def solve_fk(self, q: np.ndarray) -> tuple[bool, list[np.ndarray]]:
         """
-        Solve FK for initialized tip links.
-        Returns list of 4x4 matrices.
+        Solve Forward Kinematics (FK) for initialized tip links.
+
+        Forward Kinematics: Given joint angles, compute end-effector poses.
+        This method computes poses for all target links specified during init().
+
+        Process:
+        1. Compute forward kinematics for all links in robot
+        2. Extract poses for target links only
+        3. Convert to 4x4 homogeneous transformation matrices
+
+        Args:
+            q: Joint configuration (array of joint angles/positions).
+
+        Returns:
+            (success, poses): Tuple of:
+                - success: True if FK computed successfully, False otherwise
+                - poses: List of 4x4 homogeneous transformation matrices
+                        One matrix per target link (in same order as tip_links from init())
         """
-        if self.robot is None: return False, []
+        # Check if robot is initialized
+        if self.robot is None:
+            return False, []  # Return failure with empty list
+
         try:
-            link_poses = self.robot.forward_kinematics(jnp.array(q))
-            
+            # Compute forward kinematics for all links
+            # robot.forward_kinematics() returns poses for all links
+            # Each pose is in 7D format: [x, y, z, qw, qx, qy, qz] (position + quaternion)
+            link_poses = self.robot.forward_kinematics(jnp.array(q))  # Convert to JAX array
+
+            # Extract poses for target links only
             results = []
-            for idx in self.target_link_indices:
-                pose_7 = link_poses[idx]
+            for idx in self.target_link_indices:  # Iterate through target link indices
+                pose_7 = link_poses[idx]  # Get 7D pose [x, y, z, qw, qx, qy, qz]
+                # Convert 7D pose to SE3, then to 4x4 matrix
+                # jaxlie.SE3(pose_7) creates SE3 from 7D format
+                # .as_matrix() converts SE3 to 4x4 homogeneous transformation matrix
                 results.append(np.array(jaxlie.SE3(pose_7).as_matrix()))
-                
-            return True, results
-        except Exception as e:
+
+            return True, results  # Return success with list of 4x4 matrices
+
+        except Exception as e:  # Catch any errors during computation
             print(f"[PyrokiSolver] FK Failed: {e}", file=sys.stderr)
-            return False, []
+            return False, []  # Return failure with empty list

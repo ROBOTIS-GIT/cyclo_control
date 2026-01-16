@@ -1,0 +1,10 @@
+# Goal
+geometry_msgs/PoseStamped target_pose
+float64 duration  # Desired duration in seconds. If 0.0, uses default velocity profile.
+---
+# Result
+bool success
+string message
+---
+# Feedback
+float64 distance_remaining

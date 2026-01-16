@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'motion_node = motion_controller_ros.motion_node:main',
+            'motion_control_node = motion_controller_ros.motion_control_node:main',
         ],
     },
 )

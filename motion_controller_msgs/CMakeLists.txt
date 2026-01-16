@@ -7,9 +7,12 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(action_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  # Add msg/srv/action files here later
+  "action/MoveCartesian.action"
+  DEPENDENCIES geometry_msgs action_msgs
 )
 
 ament_export_dependencies(rosidl_default_runtime)
