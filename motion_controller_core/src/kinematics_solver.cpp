@@ -16,17 +16,26 @@ namespace motion_controller_core
         pinocchio::urdf::buildModel(urdf_path, model_, /*verbose=*/false);
         data_ = pinocchio::Data(model_);
 
-        dof_ = model_.joints.size() - 1; // except world joint
+        // Use nq to match position vector size in Pinocchio
+        dof_ = static_cast<int>(model_.nq);
 
         // Initialize joint space state
         q_.setZero(dof_);
         qdot_.setZero(dof_);
 
-        // Set joint state limits
-        q_lb_ = model_.lowerPositionLimit;
-        q_ub_ = model_.upperPositionLimit;
-        qdot_lb_ = -model_.velocityLimit;
-        qdot_ub_ = model_.velocityLimit;
+        // // Set joint state limits (truncate to nq)
+        // if (static_cast<int>(model_.lowerPositionLimit.size()) < dof_ ||
+        //     static_cast<int>(model_.upperPositionLimit.size()) < dof_) {
+        //     throw std::runtime_error("Position limit size is smaller than model nq.");
+        // }
+        q_lb_ = model_.lowerPositionLimit.head(dof_);
+        q_ub_ = model_.upperPositionLimit.head(dof_);
+
+        // if (static_cast<int>(model_.velocityLimit.size()) < dof_) {
+        //     throw std::runtime_error("Velocity limit size is smaller than model nq.");
+        // }
+        qdot_ub_ = model_.velocityLimit.head(dof_);
+        qdot_lb_ = -qdot_ub_;
 
         // Clear frame collections
         link_frame_names_.clear();
@@ -79,6 +88,10 @@ namespace motion_controller_core
 
     bool KinematicsSolver::updateState(const VectorXd& q, const VectorXd& qdot)
     {
+        // if (q.size() != q_.size() || qdot.size() != qdot_.size())
+        // {
+        //     throw std::runtime_error("updateState: size mismatch for q/qdot.");
+        // }
         q_ = q;
         qdot_ = qdot;
         
@@ -184,9 +197,17 @@ namespace motion_controller_core
 
     std::vector<std::string> KinematicsSolver::getJointNames() const
     {
-        // Return the joint frame names we collected from the URDF
-        // These should match the joint names in the joint_states topic
-        return joint_frame_names_;
+        // Return joint names in the order of the generalized coordinates (q)
+        std::vector<std::string> joint_names;
+        joint_names.reserve(static_cast<size_t>(dof_));
+        for (pinocchio::JointIndex i = 1; i < model_.joints.size(); ++i)
+        {
+            const auto& joint = model_.joints[i];
+            if (joint.nq() > 0) {
+                joint_names.push_back(model_.names[i]);
+            }
+        }
+        return joint_names;
     }
 
     Affine3d KinematicsSolver::getPose(const std::string& link_name) const

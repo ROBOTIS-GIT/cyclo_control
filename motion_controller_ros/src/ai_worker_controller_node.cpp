@@ -1,4 +1,4 @@
-#include "motion_controller_ros/ai_worker_controller.hpp"
+#include "motion_controller_ros/ai_worker_controller_node.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <algorithm>
@@ -17,19 +17,12 @@ namespace motion_controller_ros
         RCLCPP_INFO(this->get_logger(), "========================================");
 
         // Initialize subscribers
-        goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            GOAL_POSE_TOPIC, 10,
+        r_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            R_GOAL_POSE_TOPIC, 10,
             std::bind(&AIWorkerController::goalPoseCallback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "Subscribed to /goal_pose");
-
-        // Use sensor data QoS profile which is standard for joint_states
-        // This profile uses BestEffort reliability and Volatile durability
-        rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
-        qos_profile.keep_last(10);
         
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-            JOINT_STATES_TOPIC,
-            qos_profile,
+            JOINT_STATES_TOPIC, 10,
             std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
         
         if (!joint_state_sub_) {
@@ -37,8 +30,8 @@ namespace motion_controller_ros
         }
 
         // Initialize publishers
-        lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            LIFT_TRAJ_TOPIC, 10);
+        // lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
+        //     LIFT_TRAJ_TOPIC, 10);
 
         arm_r_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             RIGHT_TRAJ_TOPIC, 10);
@@ -46,8 +39,8 @@ namespace motion_controller_ros
         arm_l_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             LEFT_TRAJ_TOPIC, 10);
 
-        ee_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-            EE_POSE_TOPIC, 10);
+        r_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+            R_GRIPPER_POSE_TOPIC, 10);
 
         // Initialize motion controller
         std::string urdf_path;
@@ -72,9 +65,9 @@ namespace motion_controller_ros
 
             // Initialize state variables
             int dof = kinematics_solver_->getDof();
-            current_joint_positions_.setZero(dof);
-            current_joint_velocities_.setZero(dof);
-            accumulated_positions_.setZero(dof);
+            q_.setZero(dof);
+            qdot_.setZero(dof);
+            q_desired_.setZero(dof);
 
             RCLCPP_INFO(this->get_logger(), "Motion controller initialized (DOF: %d)", dof);
         } catch (const std::exception& e) {
@@ -103,14 +96,8 @@ namespace motion_controller_ros
         RCLCPP_INFO(this->get_logger(), 
             "  - Control loop: %.1f Hz (period: %d ms)", DEFAULT_CONTROL_FREQUENCY, timer_period_ms);
         RCLCPP_INFO(this->get_logger(), 
-            "  - Subscriptions: goal_pose=%s, joint_states=%s",
-            goal_pose_sub_ ? "OK" : "FAILED",
+            "  - Subscriptions: joint_states=%s",
             joint_state_sub_ ? "OK" : "FAILED");
-        RCLCPP_INFO(this->get_logger(), 
-            "  - Publishers: lift=%s, arm_r=%s, arm_l=%s",
-            lift_pub_ ? "OK" : "FAILED",
-            arm_r_pub_ ? "OK" : "FAILED",
-            arm_l_pub_ ? "OK" : "FAILED");
         RCLCPP_INFO(this->get_logger(), "========================================");
         RCLCPP_INFO(this->get_logger(), "Node is ready! Waiting for messages...");
     }
@@ -132,7 +119,7 @@ namespace motion_controller_ros
         
         left_arm_joints_.clear();
         right_arm_joints_.clear();
-        lift_joint_.clear();
+        // lift_joint_.clear();
         
         // Parse joint names: expect arm_l_joint*, arm_r_joint*, lift_joint
         // Note: gripper joints are fixed in URDF, so Pinocchio doesn't include them in the model
@@ -141,9 +128,10 @@ namespace motion_controller_ros
                 left_arm_joints_.push_back(joint_name);
             } else if (joint_name.find("arm_r_joint") != std::string::npos) {
                 right_arm_joints_.push_back(joint_name);
-            } else if (joint_name.find("lift_joint") != std::string::npos) {
-                lift_joint_ = joint_name;
-            }
+            } 
+            // else if (joint_name.find("lift_joint") != std::string::npos) {
+            //     lift_joint_ = joint_name;
+            // }
         }
         
         // Sort to ensure correct ordering
@@ -155,14 +143,6 @@ namespace motion_controller_ros
         left_gripper_joint_ = LEFT_GRIPPER_JOINT;
         right_gripper_joint_ = RIGHT_GRIPPER_JOINT;
         
-        RCLCPP_INFO(this->get_logger(), 
-            "Joint configuration from model: left_arm=%zu, right_arm=%zu, lift=%s",
-            left_arm_joints_.size(), 
-            right_arm_joints_.size(), 
-            lift_joint_.empty() ? "none" : lift_joint_.c_str());
-        RCLCPP_INFO(this->get_logger(), 
-            "Gripper joints hardcoded: left=%s, right=%s (fixed joints not in Pinocchio model)",
-            left_gripper_joint_.c_str(), right_gripper_joint_.c_str());
         
         // Log the actual joint names for debugging
         std::string left_str, right_str;
@@ -170,9 +150,9 @@ namespace motion_controller_ros
         for (const auto& j : right_arm_joints_) right_str += j + " ";
         RCLCPP_DEBUG(this->get_logger(), "Left arm joints: %s", left_str.c_str());
         RCLCPP_DEBUG(this->get_logger(), "Right arm joints: %s", right_str.c_str());
-        if (!lift_joint_.empty()) {
-            RCLCPP_DEBUG(this->get_logger(), "Lift joint: %s", lift_joint_.c_str());
-        }
+        // if (!lift_joint_.empty()) {
+        //     RCLCPP_DEBUG(this->get_logger(), "Lift joint: %s", lift_joint_.c_str());
+        // }
     }
 
     void AIWorkerController::goalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
@@ -196,10 +176,10 @@ namespace motion_controller_ros
             extractJointStates(msg);
             joint_state_received_ = true;
             
-            // Initialize accumulated_positions_ from current joint positions on first callback
+            // Initialize q_desired_ from current joint positions on first callback
             static bool positions_initialized = false;
             if (!positions_initialized) {
-                accumulated_positions_ = current_joint_positions_;
+                q_desired_ = q_;
                 positions_initialized = true;
             }
         } catch (const std::exception& e) {
@@ -210,8 +190,8 @@ namespace motion_controller_ros
     void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr& msg)
     {
         int dof = kinematics_solver_->getDof();
-        current_joint_positions_.setZero(dof);
-        current_joint_velocities_.setZero(dof);
+        q_.setZero(dof);
+        qdot_.setZero(dof);
 
         // Fill joint positions/velocities in model joint order
         // This is critical for correct kinematics/Jacobian calculations.
@@ -222,10 +202,10 @@ namespace motion_controller_ros
             if (it != joint_index_map_.end()) {
                 int idx = it->second;
                 if (idx < static_cast<int>(msg->position.size())) {
-                    current_joint_positions_[i] = msg->position[idx];
+                    q_[i] = msg->position[idx];
                 }
                 if (idx < static_cast<int>(msg->velocity.size())) {
-                    current_joint_velocities_[i] = msg->velocity[idx];
+                    qdot_[i] = msg->velocity[idx];
                 }
             }
         }
@@ -279,14 +259,14 @@ namespace motion_controller_ros
 
         try {
             // Control loop is executing - update kinematics solver with current state
-            kinematics_solver_->updateState(current_joint_positions_, current_joint_velocities_);
+            kinematics_solver_->updateState(q_, qdot_);
 
             // Get current and goal end-effector poses
-            Affine3d current_ee_pose = kinematics_solver_->computePose(current_joint_positions_, EE_LINK_NAME);
+            Affine3d current_ee_pose = kinematics_solver_->computePose(q_, R_GRIPPER_NAME);
             Affine3d goal_ee_pose = computeGoalPose();
 
             // Publish current end-effector pose
-            if (ee_pose_pub_) {
+            if (r_gripper_pose_pub_) {
                 geometry_msgs::msg::PoseStamped ee_msg;
                 ee_msg.header.stamp = this->now();
                 ee_msg.header.frame_id = BASE_FRAME_ID;
@@ -298,7 +278,7 @@ namespace motion_controller_ros
                 ee_msg.pose.orientation.x = ee_quat.x();
                 ee_msg.pose.orientation.y = ee_quat.y();
                 ee_msg.pose.orientation.z = ee_quat.z();
-                ee_pose_pub_->publish(ee_msg);
+                r_gripper_pose_pub_->publish(ee_msg);
             }
 
             // Compute desired velocity
@@ -310,15 +290,12 @@ namespace motion_controller_ros
             // Set weights for QP solver
             std::map<std::string, Vector6d> weights;
             Vector6d weight_right = Vector6d::Ones();
-            weight_right.head(3) *= DEFAULT_LINEAR_WEIGHT;
-            weight_right.tail(3) *= DEFAULT_ANGULAR_WEIGHT;
             weights["arm_r_link7"] = weight_right;
             
-            int dof = kinematics_solver_->getDof();
-            VectorXd damping_weight = VectorXd::Ones(dof) * DEFAULT_DAMPING_WEIGHT;
+            VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * DEFAULT_KV;
 
             // Set weights and desired task velocities in QP controller
-            qp_controller_->setWeight(weights, damping_weight);
+            qp_controller_->setWeight(weights, damping);
             qp_controller_->setDesiredTaskVel(desired_task_velocities);
 
             // Solve QP to get optimal joint velocities
@@ -329,11 +306,11 @@ namespace motion_controller_ros
                 return;
             }
 
-            // Accumulate velocities to positions
-            accumulated_positions_ += optimal_velocities * dt_;
+            // Compute command from current state (avoid integrating when robot does not move)
+            q_desired_ = q_ + optimal_velocities * dt_;
 
             // Publish trajectory commands
-            publishTrajectory(accumulated_positions_);
+            publishTrajectory(q_desired_);
             
             // Log successful control loop execution (throttled)
             static int success_count = 0;
@@ -365,35 +342,27 @@ namespace motion_controller_ros
 
     Vector6d AIWorkerController::computeDesiredVelocity(const Affine3d& current_pose, const Affine3d& goal_pose) const
     {
-        // Compute position error (proportional control)
+        // Compute position error
         Vector3d pos_error = goal_pose.translation() - current_pose.translation();
         
-        // Compute desired linear velocity using proportional gain
-        Vector3d desired_linear_vel = DEFAULT_KP_LINEAR * pos_error;
-        
-        // Compute orientation error (small angle approximation)
+        // Compute orientation error
         Matrix3d rotation_error = goal_pose.linear() * current_pose.linear().transpose();
-        
-        // Convert rotation matrix to angle-axis representation
         Eigen::AngleAxisd angle_axis_error(rotation_error);
         Vector3d angle_axis = angle_axis_error.axis() * angle_axis_error.angle();
-        
-        // Compute desired angular velocity
-        Vector3d desired_angular_vel = DEFAULT_KP_ANGULAR * angle_axis;
-        
-        // Combine into 6D twist (linear + angular velocities)
+
         Vector6d desired_vel = Vector6d::Zero();
-        desired_vel.head(3) = desired_linear_vel;
-        desired_vel.tail(3) = desired_angular_vel;
+        desired_vel.head(3) = DEFAULT_KP * pos_error;
+        desired_vel.tail(3) = DEFAULT_KP * angle_axis;
         
         return desired_vel;
     }
 
-    void AIWorkerController::publishTrajectory(const VectorXd& joint_positions)
+    void AIWorkerController::publishTrajectory(const VectorXd& q_desired)
     {
         try {
             // Build indices for each arm segment
-            std::vector<int> left_arm_indices, right_arm_indices, lift_indices;
+            // std::vector<int> left_arm_indices, right_arm_indices, lift_indices;
+            std::vector<int> left_arm_indices, right_arm_indices;
             
             for (const auto& joint_name : left_arm_joints_) {
                 auto it = model_joint_index_map_.find(joint_name);
@@ -409,33 +378,33 @@ namespace motion_controller_ros
                 }
             }
             
-            if (!lift_joint_.empty()) {
-                auto it = model_joint_index_map_.find(lift_joint_);
-                if (it != model_joint_index_map_.end()) {
-                    lift_indices.push_back(it->second);
-                }
-            }
+            // if (!lift_joint_.empty()) {
+            //     auto it = model_joint_index_map_.find(lift_joint_);
+            //     if (it != model_joint_index_map_.end()) {
+            //         lift_indices.push_back(it->second);
+            //     }
+            // }
 
             // Publish left arm trajectory (include gripper joint with position 0)
             if (!left_arm_indices.empty()) {
                 auto traj_left = createTrajectoryMsgWithGripper(
-                    left_arm_joints_, joint_positions, left_arm_indices, left_gripper_joint_);
+                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_);
                 arm_l_pub_->publish(traj_left);
             }
 
             // Publish right arm trajectory (include gripper joint with position 0)
             if (!right_arm_indices.empty()) {
                 auto traj_right = createTrajectoryMsgWithGripper(
-                    right_arm_joints_, joint_positions, right_arm_indices, right_gripper_joint_);
+                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_);
                 arm_r_pub_->publish(traj_right);
             }
 
-            // Publish lift trajectory
-            if (!lift_indices.empty() && !lift_joint_.empty()) {
-                std::vector<std::string> lift_names = {lift_joint_};
-                auto traj_lift = createTrajectoryMsg(lift_names, joint_positions, lift_indices);
-                lift_pub_->publish(traj_lift);
-            }
+            // // Publish lift trajectory
+            // if (!lift_indices.empty() && !lift_joint_.empty()) {
+            //     std::vector<std::string> lift_names = {lift_joint_};
+            //     auto traj_lift = createTrajectoryMsg(lift_names, q_desired, lift_indices);
+            //     lift_pub_->publish(traj_lift);
+            // }
 
         } catch (const std::exception& e) {
             RCLCPP_ERROR(this->get_logger(), "Error publishing trajectory: %s", e.what());

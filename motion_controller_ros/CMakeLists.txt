@@ -56,7 +56,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Create executable
 add_executable(ai_worker_controller_node 
-  src/ai_worker_controller.cpp
+  src/ai_worker_controller_node.cpp
 )
 
 # Add include directories to the target

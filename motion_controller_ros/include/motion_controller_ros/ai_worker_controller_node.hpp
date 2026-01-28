@@ -39,37 +39,34 @@ namespace motion_controller_ros
         // Constants
         static constexpr double DEFAULT_CONTROL_FREQUENCY = 100.0;  // Hz
         static constexpr double DEFAULT_TIME_STEP = 0.01;  // seconds (1/100Hz)
-        static constexpr double DEFAULT_TRAJECTORY_TIME = 0.01;  // seconds (time_from_start for trajectory points)
-        static constexpr double DEFAULT_KP_LINEAR = 0.5;
-        static constexpr double DEFAULT_KP_ANGULAR = 0.3;
-        static constexpr double DEFAULT_LINEAR_WEIGHT = 10.0;
-        static constexpr double DEFAULT_ANGULAR_WEIGHT = 5.0;
-        static constexpr double DEFAULT_DAMPING_WEIGHT = 0.01;
+        static constexpr double DEFAULT_TRAJECTORY_TIME = 0.0;  // seconds (time_from_start for trajectory points)
+        static constexpr double DEFAULT_KP = 1000.0;
+        static constexpr double DEFAULT_KV = 10.0;
         static constexpr int DEBUG_LOG_INTERVAL = 100;
-        static constexpr const char* GOAL_POSE_TOPIC = "/goal_pose";
+        static constexpr const char* R_GOAL_POSE_TOPIC = "/r_goal_pose";
         static constexpr const char* JOINT_STATES_TOPIC = "/joint_states";
-        static constexpr const char* LEFT_TRAJ_TOPIC =
-            "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory";
         static constexpr const char* RIGHT_TRAJ_TOPIC =
             "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory";
-        static constexpr const char* LIFT_TRAJ_TOPIC =
-            "/leader/joystick_controller_right/joint_trajectory";
-        static constexpr const char* EE_POSE_TOPIC = "/current_ee_pose";
-        static constexpr const char* EE_LINK_NAME = "arm_r_link7";
+        static constexpr const char* LEFT_TRAJ_TOPIC =
+            "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory";
+        // static constexpr const char* LIFT_TRAJ_TOPIC =
+        //     "/leader/joystick_controller_right/joint_trajectory";
+        static constexpr const char* R_GRIPPER_POSE_TOPIC = "/r_gripper_pose";
+        static constexpr const char* R_GRIPPER_NAME = "arm_r_link7";
         static constexpr const char* BASE_FRAME_ID = "base_link";
         static constexpr const char* TRAJ_FRAME_ID = "";
-        static constexpr const char* LEFT_GRIPPER_JOINT = "gripper_l_joint1";
         static constexpr const char* RIGHT_GRIPPER_JOINT = "gripper_r_joint1";
+        static constexpr const char* LEFT_GRIPPER_JOINT = "gripper_l_joint1";
 
         // Subscribers
-        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_sub_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_goal_pose_sub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
 
         // Publishers
-        rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr lift_pub_;
+        // rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr lift_pub_;
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_r_pub_;
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_l_pub_;
-        rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ee_pose_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr r_gripper_pose_pub_;
 
         // Timer for control loop
         rclcpp::TimerBase::SharedPtr control_timer_;
@@ -79,9 +76,9 @@ namespace motion_controller_ros
         std::shared_ptr<motion_controller_core::QPIK> qp_controller_;
 
         // State variables
-        VectorXd current_joint_positions_;
-        VectorXd current_joint_velocities_;
-        VectorXd accumulated_positions_;
+        VectorXd q_;
+        VectorXd qdot_;
+        VectorXd q_desired_;
         geometry_msgs::msg::PoseStamped goal_pose_;
         bool goal_pose_received_;
         bool joint_state_received_;
@@ -89,7 +86,7 @@ namespace motion_controller_ros
         // Joint configuration
         std::vector<std::string> left_arm_joints_;
         std::vector<std::string> right_arm_joints_;
-        std::string lift_joint_;
+        // std::string lift_joint_;
         std::string left_gripper_joint_;   // gripper_l_joint1
         std::string right_gripper_joint_;  // gripper_r_joint1
         std::map<std::string, int> joint_index_map_;
@@ -106,7 +103,7 @@ namespace motion_controller_ros
 
         // Helper functions
         void initializeJointConfig();
-        void publishTrajectory(const VectorXd& joint_positions);
+        void publishTrajectory(const VectorXd& q_desired);
         trajectory_msgs::msg::JointTrajectory createTrajectoryMsg(
             const std::vector<std::string>& joint_names,
             const VectorXd& positions,
