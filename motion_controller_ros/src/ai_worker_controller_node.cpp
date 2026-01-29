@@ -7,7 +7,8 @@ namespace motion_controller_ros
 {
     AIWorkerController::AIWorkerController()
         : Node("ai_worker_controller"),
-          goal_pose_received_(false),
+          r_goal_pose_received_(false),
+          l_goal_pose_received_(false),
           joint_state_received_(false),
           dt_(DEFAULT_TIME_STEP)
     {
@@ -19,15 +20,15 @@ namespace motion_controller_ros
         // Initialize subscribers
         r_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             R_GOAL_POSE_TOPIC, 10,
-            std::bind(&AIWorkerController::goalPoseCallback, this, std::placeholders::_1));
+            std::bind(&AIWorkerController::rightGoalPoseCallback, this, std::placeholders::_1));
+
+        l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            L_GOAL_POSE_TOPIC, 10,
+            std::bind(&AIWorkerController::leftGoalPoseCallback, this, std::placeholders::_1));        
         
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             JOINT_STATES_TOPIC, 10,
             std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
-        
-        if (!joint_state_sub_) {
-            RCLCPP_FATAL(this->get_logger(), "Failed to create /joint_states subscription!");
-        }
 
         // Initialize publishers
         // lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
@@ -42,16 +43,21 @@ namespace motion_controller_ros
         r_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
             R_GRIPPER_POSE_TOPIC, 10);
 
+        l_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+            L_GRIPPER_POSE_TOPIC, 10);    
+
         // Initialize motion controller
         std::string urdf_path;
+        std::string srdf_path;
         try {
             std::string package_path = ament_index_cpp::get_package_share_directory("ffw_description");
             urdf_path = package_path + "/urdf/ffw_sg2_rev1_follower/ffw_sg2_follower.urdf";
+            srdf_path = package_path + "/urdf/ffw_sg2_rev1_follower/ffw.srdf";
             RCLCPP_INFO(this->get_logger(), "URDF path: %s", urdf_path.c_str());
+            RCLCPP_INFO(this->get_logger(), "SRDF path: %s", srdf_path.c_str());
         } catch (const std::exception& e) {
             RCLCPP_FATAL(this->get_logger(), 
-                "Failed to find ffw_description package: %s\n"
-                "Make sure ffw_description package is installed and sourced.",
+                "Failed to find ffw_description package: %s\n",
                 e.what());
             rclcpp::shutdown();
             return;
@@ -59,7 +65,7 @@ namespace motion_controller_ros
         
         try {
             RCLCPP_INFO(this->get_logger(), "Loading URDF and initializing kinematics solver...");
-            kinematics_solver_ = std::make_shared<motion_controller_core::KinematicsSolver>(urdf_path);
+            kinematics_solver_ = std::make_shared<motion_controller_core::KinematicsSolver>(urdf_path, srdf_path);
             RCLCPP_INFO(this->get_logger(), "Initializing QP controller...");
             qp_controller_ = std::make_shared<motion_controller_core::QPIK>(kinematics_solver_, dt_);
 
@@ -155,11 +161,21 @@ namespace motion_controller_ros
         // }
     }
 
-    void AIWorkerController::goalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    void AIWorkerController::rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-        goal_pose_ = *msg;
-        goal_pose_received_ = true;
-        RCLCPP_DEBUG(this->get_logger(), "Goal pose received: [%.3f, %.3f, %.3f]", 
+        // geometry_msgs::msg::PoseStamped r_goal_pose_msg = *msg;
+        r_goal_pose_ = computePoseMat(*msg);
+        r_goal_pose_received_ = true;
+        RCLCPP_DEBUG(this->get_logger(), "Right goal pose received: [%.3f, %.3f, %.3f]", 
+            msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    }
+
+    void AIWorkerController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    {
+        // geometry_msgs::msg::PoseStamped l_goal_pose_msg = *msg;
+        l_goal_pose_ = computePoseMat(*msg);
+        l_goal_pose_received_ = true;
+        RCLCPP_DEBUG(this->get_logger(), "Left goal pose received: [%.3f, %.3f, %.3f]", 
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
     }
 
@@ -204,6 +220,7 @@ namespace motion_controller_ros
                 if (idx < static_cast<int>(msg->position.size())) {
                     q_[i] = msg->position[idx];
                 }
+                // ToDo: Add low pass filter
                 if (idx < static_cast<int>(msg->velocity.size())) {
                     qdot_[i] = msg->velocity[idx];
                 }
@@ -215,37 +232,8 @@ namespace motion_controller_ros
     {
         static int loop_count = 0;
         static int debug_count = 0;
-        static rclcpp::Time last_heartbeat;
-        static bool first_call = true;
-        
-        if (first_call) {
-            last_heartbeat = this->now();
-            first_call = false;
-        }
         
         loop_count++;
-        
-        // Log heartbeat every second to confirm control loop is running
-        rclcpp::Time current_time = this->now();
-        double elapsed = (current_time - last_heartbeat).seconds();
-        if (elapsed >= 1.0) {
-            double actual_freq = static_cast<double>(loop_count) / elapsed;
-            RCLCPP_INFO(this->get_logger(),
-                "Control loop running: %.1f Hz (target: %.1f Hz), goal_pose=%s, joint_state=%s",
-                actual_freq, DEFAULT_CONTROL_FREQUENCY,
-                goal_pose_received_ ? "received" : "waiting",
-                joint_state_received_ ? "received" : "waiting");
-            loop_count = 0;
-            last_heartbeat = current_time;
-        }
-        
-        if (!goal_pose_received_) {
-            if (debug_count++ % DEBUG_LOG_INTERVAL == 0) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                    "Control loop waiting for goal pose...");
-            }
-            return;
-        }
         
         if (!joint_state_received_) {
             if (debug_count++ % DEBUG_LOG_INTERVAL == 0) {
@@ -254,7 +242,7 @@ namespace motion_controller_ros
             }
             return;
         }
-        
+
         debug_count = 0;
 
         try {
@@ -262,37 +250,34 @@ namespace motion_controller_ros
             kinematics_solver_->updateState(q_, qdot_);
 
             // Get current and goal end-effector poses
-            Affine3d current_ee_pose = kinematics_solver_->computePose(q_, R_GRIPPER_NAME);
-            Affine3d goal_ee_pose = computeGoalPose();
+            right_gripper_pose_ = kinematics_solver_->getPose(R_GRIPPER_NAME);
+            left_gripper_pose_ = kinematics_solver_->getPose(L_GRIPPER_NAME);
 
-            // Publish current end-effector pose
-            if (r_gripper_pose_pub_) {
-                geometry_msgs::msg::PoseStamped ee_msg;
-                ee_msg.header.stamp = this->now();
-                ee_msg.header.frame_id = BASE_FRAME_ID;
-                ee_msg.pose.position.x = current_ee_pose.translation().x();
-                ee_msg.pose.position.y = current_ee_pose.translation().y();
-                ee_msg.pose.position.z = current_ee_pose.translation().z();
-                Eigen::Quaterniond ee_quat(current_ee_pose.linear());
-                ee_msg.pose.orientation.w = ee_quat.w();
-                ee_msg.pose.orientation.x = ee_quat.x();
-                ee_msg.pose.orientation.y = ee_quat.y();
-                ee_msg.pose.orientation.z = ee_quat.z();
-                r_gripper_pose_pub_->publish(ee_msg);
+            // Initialize goals to current EE pose on first cycle if not received
+            if (!r_goal_pose_received_ && !l_goal_pose_received_) {
+                r_goal_pose_ = right_gripper_pose_;
+                l_goal_pose_ = left_gripper_pose_;
             }
 
+            // Publish current end-effector pose
+            publishGripperPose(right_gripper_pose_, left_gripper_pose_);
+
             // Compute desired velocity
-            Vector6d desired_vel = computeDesiredVelocity(current_ee_pose, goal_ee_pose);
+            Vector6d right_desired_vel = computeDesiredVelocity(right_gripper_pose_, r_goal_pose_);
+            Vector6d left_desired_vel = computeDesiredVelocity(left_gripper_pose_, l_goal_pose_);
             
             std::map<std::string, Vector6d> desired_task_velocities;
-            desired_task_velocities["arm_r_link7"] = desired_vel;
+            desired_task_velocities[R_GRIPPER_NAME] = right_desired_vel;
+            desired_task_velocities[L_GRIPPER_NAME] = left_desired_vel;
 
             // Set weights for QP solver
             std::map<std::string, Vector6d> weights;
-            Vector6d weight_right = Vector6d::Ones();
-            weights["arm_r_link7"] = weight_right;
+            Vector6d weight_right = Vector6d::Ones() * WEIGHT_TRACKING;
+            Vector6d weight_left = Vector6d::Ones() * WEIGHT_TRACKING;
+            weights[R_GRIPPER_NAME] = weight_right;
+            weights[L_GRIPPER_NAME] = weight_left;
             
-            VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * DEFAULT_KV;
+            VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * WEIGHT_DAMPING;
 
             // Set weights and desired task velocities in QP controller
             qp_controller_->setWeight(weights, damping);
@@ -324,20 +309,20 @@ namespace motion_controller_ros
         }
     }
 
-    Affine3d AIWorkerController::computeGoalPose() const
+    Affine3d AIWorkerController::computePoseMat(const geometry_msgs::msg::PoseStamped& pose) const
     {
-        Affine3d goal_ee_pose = Affine3d::Identity();
-        goal_ee_pose.translation() << goal_pose_.pose.position.x, 
-                                     goal_pose_.pose.position.y, 
-                                     goal_pose_.pose.position.z;
+        Affine3d pose_mat = Affine3d::Identity();
+        pose_mat.translation() << pose.pose.position.x, 
+                                  pose.pose.position.y, 
+                                  pose.pose.position.z;
         
-        Eigen::Quaterniond quat(goal_pose_.pose.orientation.w,
-                               goal_pose_.pose.orientation.x,
-                               goal_pose_.pose.orientation.y,
-                               goal_pose_.pose.orientation.z);
-        goal_ee_pose.linear() = quat.toRotationMatrix();
+        Eigen::Quaterniond quat(pose.pose.orientation.w,
+                                pose.pose.orientation.x,
+                                pose.pose.orientation.y,
+                                pose.pose.orientation.z);
+        pose_mat.linear() = quat.toRotationMatrix();
         
-        return goal_ee_pose;
+        return pose_mat;
     }
 
     Vector6d AIWorkerController::computeDesiredVelocity(const Affine3d& current_pose, const Affine3d& goal_pose) const
@@ -351,8 +336,8 @@ namespace motion_controller_ros
         Vector3d angle_axis = angle_axis_error.axis() * angle_axis_error.angle();
 
         Vector6d desired_vel = Vector6d::Zero();
-        desired_vel.head(3) = DEFAULT_KP * pos_error;
-        desired_vel.tail(3) = DEFAULT_KP * angle_axis;
+        desired_vel.head(3) = DEFAULT_KP_POSITION * pos_error;
+        desired_vel.tail(3) = DEFAULT_KP_ORIENTATION * angle_axis;
         
         return desired_vel;
     }
@@ -464,6 +449,38 @@ namespace motion_controller_ros
 
         traj_msg.points.push_back(point);
         return traj_msg;
+    }
+
+    void AIWorkerController::publishGripperPose(const Affine3d& r_gripper_pose, const Affine3d& l_gripper_pose)
+    {
+        if (r_gripper_pose_pub_) {
+            geometry_msgs::msg::PoseStamped r_gripper_pose_msg;
+            r_gripper_pose_msg.header.stamp = this->now();
+            r_gripper_pose_msg.header.frame_id = BASE_FRAME_ID;
+            r_gripper_pose_msg.pose.position.x = r_gripper_pose.translation().x();
+            r_gripper_pose_msg.pose.position.y = r_gripper_pose.translation().y();
+            r_gripper_pose_msg.pose.position.z = r_gripper_pose.translation().z();
+            Eigen::Quaterniond r_gripper_pose_quat(r_gripper_pose.linear());
+            r_gripper_pose_msg.pose.orientation.w = r_gripper_pose_quat.w();
+            r_gripper_pose_msg.pose.orientation.x = r_gripper_pose_quat.x();
+            r_gripper_pose_msg.pose.orientation.y = r_gripper_pose_quat.y();
+            r_gripper_pose_msg.pose.orientation.z = r_gripper_pose_quat.z();
+            r_gripper_pose_pub_->publish(r_gripper_pose_msg);
+        }
+        if (l_gripper_pose_pub_) {
+            geometry_msgs::msg::PoseStamped l_gripper_pose_msg;
+            l_gripper_pose_msg.header.stamp = this->now();
+            l_gripper_pose_msg.header.frame_id = BASE_FRAME_ID;
+            l_gripper_pose_msg.pose.position.x = l_gripper_pose.translation().x();
+            l_gripper_pose_msg.pose.position.y = l_gripper_pose.translation().y();
+            l_gripper_pose_msg.pose.position.z = l_gripper_pose.translation().z();
+            Eigen::Quaterniond l_gripper_pose_quat(l_gripper_pose.linear());
+            l_gripper_pose_msg.pose.orientation.w = l_gripper_pose_quat.w();
+            l_gripper_pose_msg.pose.orientation.x = l_gripper_pose_quat.x();
+            l_gripper_pose_msg.pose.orientation.y = l_gripper_pose_quat.y();
+            l_gripper_pose_msg.pose.orientation.z = l_gripper_pose_quat.z();
+            l_gripper_pose_pub_->publish(l_gripper_pose_msg);
+        }
     }
 
 }  // namespace motion_controller_ros

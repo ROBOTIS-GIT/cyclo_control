@@ -13,8 +13,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
+find_package(interactive_markers REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(OsqpEigen REQUIRED)
@@ -59,6 +61,10 @@ add_executable(ai_worker_controller_node
   src/ai_worker_controller_node.cpp
 )
 
+add_executable(eef_interactive_marker_node
+  src/eef_interactive_marker_node.cpp
+)
+
 # Add include directories to the target
 message(STATUS "MOTION_CONTROLLER_CORE_INCLUDE_DIR = ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}")
 
@@ -76,6 +82,13 @@ ament_target_dependencies(ai_worker_controller_node
   sensor_msgs
   trajectory_msgs
   ament_index_cpp
+)
+
+ament_target_dependencies(eef_interactive_marker_node
+  rclcpp
+  geometry_msgs
+  visualization_msgs
+  interactive_markers
 )
 
 target_link_libraries(ai_worker_controller_node
@@ -97,9 +110,17 @@ install(TARGETS ai_worker_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(TARGETS eef_interactive_marker_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 # Install headers
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION include/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

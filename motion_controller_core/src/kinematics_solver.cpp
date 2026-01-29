@@ -5,16 +5,37 @@
 
 namespace motion_controller_core
 {
-    KinematicsSolver::KinematicsSolver(const std::string& urdf_path)
-    : urdf_path_(urdf_path)
+    KinematicsSolver::KinematicsSolver(const std::string& urdf_path, const std::string& srdf_path)
+    : urdf_path_(urdf_path), srdf_path_(srdf_path)
     {
         if (!std::filesystem::exists(urdf_path))
         {
             throw std::runtime_error("URDF file does not exist: " + urdf_path);
         }
+        if (!std::filesystem::exists(srdf_path))
+        {
+            throw std::runtime_error("SRDF file does not exist: " + srdf_path);
+        }
 
         pinocchio::urdf::buildModel(urdf_path, model_, /*verbose=*/false);
         data_ = pinocchio::Data(model_);
+
+        std::clog << "\033[33m" << "Collision model for the robot may not be perfect!" << "\033[0m" << std::endl;
+        pinocchio::urdf::buildGeom(model_, urdf_path, pinocchio::COLLISION, geom_model_);
+        
+        geom_model_.addAllCollisionPairs();
+
+        if (std::filesystem::exists(srdf_path))
+        {
+            pinocchio::srdf::removeCollisionPairs(model_, geom_model_, srdf_path);
+        }
+        else
+        {
+            std::clog << "\033[33m" << "SRDF file does not exist! : " << "\033[0m" << srdf_path << "\033[0m" << std::endl;
+            std::clog << "\033[33m" << "All the collision pairs is activated!" << "\033[0m" << std::endl;
+        }
+
+        geom_data_ = pinocchio::GeometryData(geom_model_);
 
         // Use nq to match position vector size in Pinocchio
         dof_ = static_cast<int>(model_.nq);
@@ -83,7 +104,7 @@ namespace motion_controller_core
 
     KinematicsSolver::~KinematicsSolver()
     {
-        // Cleanup if needed - pinocchio objects handle their own cleanup
+        
     }
 
     bool KinematicsSolver::updateState(const VectorXd& q, const VectorXd& qdot)
@@ -140,6 +161,107 @@ namespace motion_controller_core
                                         pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, J);
     
         return J;
+    }
+
+    MinDistResult KinematicsSolver::computeMinDistance(const VectorXd& q, const VectorXd& qdot, const bool& with_grad, const bool& with_graddot, const bool verbose)
+    {
+        MinDistResult result;
+        result.setZero(q.size());
+        
+        pinocchio::Data data = pinocchio::Data(model_);
+        pinocchio::GeometryData geom_data = pinocchio::GeometryData(geom_model_);
+        
+        pinocchio::computeDistances(model_, data, geom_model_, geom_data, q);
+        
+        double minDistance = std::numeric_limits<double>::max();
+        int    minPairIdx  = -1;
+        
+        for (std::size_t idx = 0; idx < geom_data.distanceResults.size(); ++idx)
+        {
+            const auto &res = geom_data.distanceResults[idx];
+            if (res.min_distance < minDistance)
+            {
+                minDistance = res.min_distance;
+                minPairIdx  = static_cast<int>(idx);
+            }
+        }
+        result.distance = minDistance;
+    
+        if (minPairIdx >= 0 && verbose)
+        {
+            const auto &pair   = geom_model_.collisionPairs[minPairIdx];
+            const std::string &link1 =
+                geom_model_.geometryObjects[pair.first].name;
+            const std::string &link2 =
+                geom_model_.geometryObjects[pair.second].name;
+    
+            std::cout << "[RobotDataBase] Closest links: " << link1
+                    << "  <->  " << link2
+                    << "   |  distance = " << minDistance << " [m]\n";
+        }
+    
+        if(with_grad || with_graddot)
+        {
+            pinocchio::computeJointJacobians(model_, data, q);
+            pinocchio::updateGeometryPlacements(model_, data, geom_model_, geom_data, q);
+    
+            const auto &pair  = geom_model_.collisionPairs[minPairIdx];
+            const int geomA = pair.first,  geomB = pair.second;
+            const int jointA = geom_model_.geometryObjects[geomA].parentJoint;
+            const int jointB = geom_model_.geometryObjects[geomB].parentJoint;
+    
+            // Witness points & normal (world frame)
+            const auto &res = geom_data.distanceResults[minPairIdx];
+            const Vector3d pA = res.nearest_points[0];
+            const Vector3d pB = res.nearest_points[1];
+            const Vector3d n  = (pB - pA).normalized();
+    
+            // Joint-space 6 × total_dof Jacobians for the two parent joints
+            MatrixXd J_jointA = MatrixXd::Zero(6, q.size());
+            MatrixXd J_jointB = MatrixXd::Zero(6, q.size());
+            pinocchio::getJointJacobian(model_, data, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA);
+            pinocchio::getJointJacobian(model_, data, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB);
+    
+            // r = point - joint-origin (world)
+            const Vector3d rA = pA - data.oMi[jointA].translation();
+            const Vector3d rB = pB - data.oMi[jointB].translation();
+    
+            // Linear part of point Jacobian: Jp = Jv + ω×r
+            auto skew = [](const Vector3d &v)->Matrix3d{
+                        return (Matrix3d() <<   0, -v.z(),  v.y(),
+                                            v.z(),      0, -v.x(),
+                                        -v.y(),  v.x(),     0).finished(); };
+    
+            const MatrixXd JA = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
+            const MatrixXd JB = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
+    
+            // d/dq (‖pB - pA‖) = nᵀ (J_B - J_A)
+            result.grad =( n.transpose() * (JB - JA)).transpose();   // total_dof × 1
+            if(minDistance < 0) result.grad *= -1.;
+    
+            if(with_graddot)
+            {
+                pinocchio::computeJointJacobiansTimeVariation(model_, data_, q, qdot);
+    
+                MatrixXd J_jointA_dot = MatrixXd::Zero(6, q.size());
+                MatrixXd J_jointB_dot = MatrixXd::Zero(6, q.size());
+                pinocchio::getJointJacobianTimeVariation(model_, data, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA_dot);
+                pinocchio::getJointJacobianTimeVariation(model_, data, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB_dot);
+    
+                const Vector3d pA_dot = JA * qdot;
+                const Vector3d pB_dot = JB * qdot;
+    
+                const Vector3d rA_dot = pA_dot - J_jointA.topRows<3>() * qdot;
+                const Vector3d rB_dot = pB_dot - J_jointB.topRows<3>() * qdot;
+    
+                const MatrixXd JA_dot = J_jointA_dot.topRows<3>() - (skew(rA_dot) * J_jointA.bottomRows<3>() + skew(rA) * J_jointA_dot.bottomRows<3>());
+                const MatrixXd JB_dot = J_jointB_dot.topRows<3>() - (skew(rB_dot) * J_jointB.bottomRows<3>() + skew(rB) * J_jointB_dot.bottomRows<3>());
+    
+                result.grad_dot = (n.transpose() * (JB_dot - JA_dot)).transpose(); // neglect n_dot term
+            }
+        }
+    
+        return result;  
     }
 
     // bool solveIK(const Isometry3d& target_pose, const VectorXd& q_init, VectorXd& q_out) override
@@ -234,6 +356,101 @@ namespace motion_controller_core
     
         return pinocchio::getFrameJacobian(model_, data_, link_index, 
                                            pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED);
+    }
+
+    MinDistResult KinematicsSolver::getMinDistance(const bool& with_grad, const bool& with_graddot, const bool verbose)
+    {
+        MinDistResult result;
+        result.setZero(q_.size());
+    
+        pinocchio::computeDistances(model_, data_, geom_model_, geom_data_, q_);
+    
+        double minDistance = std::numeric_limits<double>::max();
+        int    minPairIdx  = -1;
+    
+        for (std::size_t idx = 0; idx < geom_data_.distanceResults.size(); ++idx)
+        {
+            const auto &res = geom_data_.distanceResults[idx];
+            if (res.min_distance < minDistance)
+            {
+                minDistance = res.min_distance;
+                minPairIdx  = static_cast<int>(idx);
+            }
+        }
+        result.distance = minDistance;
+    
+        if (minPairIdx >= 0 && verbose)
+        {
+            const auto &pair   = geom_model_.collisionPairs[minPairIdx];
+            const std::string &link1 =
+                geom_model_.geometryObjects[pair.first].name;
+            const std::string &link2 =
+                geom_model_.geometryObjects[pair.second].name;
+    
+            std::cout << "[RobotDataBase] Closest links: " << link1
+                    << "  <->  " << link2
+                    << "   |  distance = " << minDistance << " [m]\n";
+        }
+    
+        if(with_grad || with_graddot)
+        {
+            pinocchio::updateGeometryPlacements(model_, data_, geom_model_, geom_data_, q_);
+    
+            const auto &pair  = geom_model_.collisionPairs[minPairIdx];
+            const int   geomA = pair.first,  geomB = pair.second;
+            const int   jointA = geom_model_.geometryObjects[geomA].parentJoint;
+            const int   jointB = geom_model_.geometryObjects[geomB].parentJoint;
+    
+            // Witness points & normal (world frame)
+            const auto &res = geom_data_.distanceResults[minPairIdx];
+            const Vector3d pA = res.nearest_points[0];
+            const Vector3d pB = res.nearest_points[1];
+            const Vector3d n  = (pB - pA).normalized();
+    
+            // Joint-space 6 × total_dof Jacobians for the two parent joints
+            MatrixXd J_jointA = MatrixXd::Zero(6, q_.size());
+            MatrixXd J_jointB = MatrixXd::Zero(6, q_.size());
+            pinocchio::getJointJacobian(model_, data_, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA);
+            pinocchio::getJointJacobian(model_, data_, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB);
+    
+            // r = point - joint-origin (world)
+            const Vector3d rA = pA - data_.oMi[jointA].translation();
+            const Vector3d rB = pB - data_.oMi[jointB].translation();
+    
+            // Linear part of point Jacobian: Jp = Jv + ω×r
+            auto skew = [](const Vector3d &v)->Matrix3d{
+                        return (Matrix3d() <<   0, -v.z(),  v.y(),
+                                            v.z(),      0, -v.x(),
+                                        -v.y(),  v.x(),     0).finished(); };
+    
+            const MatrixXd JA = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
+            const MatrixXd JB = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
+    
+            // d/dq (‖pB - pA‖) = nᵀ (J_B - J_A)
+            result.grad =( n.transpose() * (JB - JA)).transpose();   // total_dof × 1
+            if(minDistance < 0) result.grad *= -1.;
+    
+            if(with_graddot)
+            {
+                MatrixXd J_jointA_dot = MatrixXd::Zero(6, q_.size());
+                MatrixXd J_jointB_dot = MatrixXd::Zero(6, q_.size());
+                pinocchio::getJointJacobianTimeVariation(model_, data_, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA_dot);
+                pinocchio::getJointJacobianTimeVariation(model_, data_, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB_dot);
+    
+                const Vector3d pA_dot = JA * qdot_;
+                const Vector3d pB_dot = JB * qdot_;
+    
+                const Vector3d rA_dot = pA_dot - J_jointA.topRows<3>() * qdot_;
+                const Vector3d rB_dot = pB_dot - J_jointB.topRows<3>() * qdot_;
+    
+                const MatrixXd JA_dot = J_jointA_dot.topRows<3>() - (skew(rA_dot) * J_jointA.bottomRows<3>() + skew(rA) * J_jointA_dot.bottomRows<3>());
+                const MatrixXd JB_dot = J_jointB_dot.topRows<3>() - (skew(rB_dot) * J_jointB.bottomRows<3>() + skew(rB) * J_jointB_dot.bottomRows<3>());
+    
+                result.grad_dot = (n.transpose() * (JB_dot - JA_dot)).transpose(); // neglect n_dot term
+            }
+        }
+    
+        return result;     
     }
 
 } // namespace motion_controller_core

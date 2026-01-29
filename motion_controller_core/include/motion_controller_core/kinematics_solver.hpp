@@ -26,10 +26,13 @@
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/parsers/srdf.hpp>
 
+#include "math_utils.h"
+
 using namespace Eigen;
 
 namespace motion_controller_core
 {
+  using CollisionChecker::MinDistResult;
 
   /**
   * @brief Generic Kinematics Solver class that provides FK and IK using a selectable backend.
@@ -37,7 +40,7 @@ namespace motion_controller_core
   class KinematicsSolver
   {
   public:
-    KinematicsSolver(const std::string& urdf_path);
+    KinematicsSolver(const std::string& urdf_path, const std::string& srdf_path);
     ~KinematicsSolver();
 
     /**
@@ -46,7 +49,7 @@ namespace motion_controller_core
     * @param qdot  (Eigen::VectorXd) Joint velocities.
     * @return (bool) True if state update is successful.
     */ 
-    bool updateState(const VectorXd& q, const VectorXd& qdot);
+    virtual bool updateState(const VectorXd& q, const VectorXd& qdot);
 
     // ================================ Compute Functions ================================
     /**
@@ -55,7 +58,7 @@ namespace motion_controller_core
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::Affine3d) Pose of the link in the task space.
     */
-    Affine3d computePose(const VectorXd& q, const std::string& link_name);
+    virtual Affine3d computePose(const VectorXd& q, const std::string& link_name);
 
     /**
     * @brief Compute the Jacobian of the link.
@@ -63,7 +66,18 @@ namespace motion_controller_core
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::MatrixXd) Jacobian of the link.
     */
-    MatrixXd computeJacobian(const VectorXd& q, const std::string& link_name);
+    virtual MatrixXd computeJacobian(const VectorXd& q, const std::string& link_name);
+
+    /**
+    * @brief Compute the minimum pairwise distance between the robot's collision meshes and (optionally) its time variations.
+    * @param q             (Eigen::VectorXd) Joint positions.
+    * @param qdot          (Eigen::VectorXd) Joint velocities.
+    * @param with_grad     (bool) If true, computes the gradient of the minimum distance.
+    * @param with_graddot  (bool) If true, computes the gradient time variation of the minimum distance.
+    * @param verbose       (bool) If true, prints the closest pair of links and their minimum distance.
+    * @return (MinDistResult) Minimum distance result containing distance, gradient, and gradient time variation.
+    */
+    virtual MinDistResult computeMinDistance(const VectorXd& q, const VectorXd& qdot, const bool& with_grad, const bool& with_graddot, const bool verbose);
 
     // /**
     // * @brief Solve Inverse Kinematics.
@@ -76,24 +90,24 @@ namespace motion_controller_core
     // bool solveIK(const Eigen::Isometry3d& target_pose, const Eigen::VectorXd& q_init, Eigen::VectorXd& q_out);
 
     // ================================ Get Functions ================================
-    const std::string getURDFPath() const {return urdf_path_;}
+    virtual const std::string getURDFPath() const {return urdf_path_;}
 
     // Link frames (BODY)
-    const std::vector<std::string>& getLinkFrameVector() const { return link_frame_names_; }
-    bool hasLinkFrame(const std::string& name) const;
+    virtual const std::vector<std::string>& getLinkFrameVector() const { return link_frame_names_; }
+    virtual bool hasLinkFrame(const std::string& name) const;
 
     // Joint frames (JOINT)
-    const std::vector<std::string>& getJointFrameVector() const { return joint_frame_names_; }
-    bool hasJointFrame(const std::string& name) const;
+    virtual const std::vector<std::string>& getJointFrameVector() const { return joint_frame_names_; }
+    virtual bool hasJointFrame(const std::string& name) const;
     
     /**
      * @brief Get the actual joint names from the model (matching joint_states topic).
      * @return (std::vector<std::string>) Joint names from the model.
      */
-    std::vector<std::string> getJointNames() const;
+    virtual std::vector<std::string> getJointNames() const;
 
     // Root link (base link default)
-    const std::string& getRootLinkName() const { return root_link_name_; }
+    virtual const std::string& getRootLinkName() const { return root_link_name_; }
 
     /**
      * @brief Get the degrees of freedom of the manipulator.
@@ -139,6 +153,15 @@ namespace motion_controller_core
     */
     virtual MatrixXd getJacobian(const std::string& link_name);
 
+    /**
+     * @brief Get the minimum pairwise distance between the robot's collision meshes and (optionally) its time variations.
+     * @param with_grad     (bool) If true, get the gradient of the minimum distance.
+     * @param with_graddot  (bool) If true, get the gradient time variation of the minimum distance.
+     * @param verbose       (bool) If true, prints the closest pair of links and their minimum distance.
+     * @return (MinDistResult) Minimum distance result containing distance, gradient, and gradient time variation.
+     */
+    virtual MinDistResult getMinDistance(const bool& with_grad, const bool& with_graddot, const bool verbose);
+
   protected:
     /**
     * @brief Update the kinematic parameters of the manipulator.
@@ -149,9 +172,12 @@ namespace motion_controller_core
     virtual bool updateKinematics(const VectorXd& q, const VectorXd& qdot);
 
     std::string urdf_path_;
+    std::string srdf_path_;
 
     pinocchio::Model model_;                
     pinocchio::Data data_;  
+    pinocchio::GeometryModel geom_model_;
+    pinocchio::GeometryData geom_data_;
 
     // Cached frame name lists
     std::vector<std::string> link_frame_names_;   // URDF <link> names

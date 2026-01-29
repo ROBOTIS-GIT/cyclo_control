@@ -1,4 +1,4 @@
-#include "motion_controller_core/robot_controller.hpp"
+#include "motion_controller_core/ai_worker_controller.hpp"
 
 namespace motion_controller_core
 {
@@ -80,10 +80,12 @@ namespace motion_controller_core
             for(const auto& [link_name, xdot_desired] : link_xdot_desired_)
             {
                 MatrixXd J_i = robot_data_->getJacobian(link_name);
-                Vector6d w_tracking; w_tracking.setConstant(1.0);
+                Vector6d w_tracking = Vector6d::Ones();
 
                 auto iter = link_w_tracking_.find(link_name);
-                if(iter != link_w_tracking_.end()) w_tracking = iter->second;
+                if(iter != link_w_tracking_.end()) {
+                    w_tracking = iter->second;
+                }
 
                 P_ds_.block(si_index_.qdot_start,si_index_.qdot_start,si_index_.qdot_size,si_index_.qdot_size) += 2.0 * J_i.transpose() * w_tracking.asDiagonal() * J_i;
                 q_ds_.segment(si_index_.qdot_start,si_index_.qdot_size) += -2.0 * J_i.transpose() * w_tracking.asDiagonal() * xdot_desired;
@@ -149,6 +151,13 @@ namespace motion_controller_core
                 MatrixXd::Identity(si_index_.con_q_max_size, si_index_.slack_q_max_size);
             l_ineq_ds_.segment(si_index_.con_q_max_start, si_index_.con_q_max_size) = 
                 -DEFAULT_CBF_ALPHA * (q_max - q);
+
+            // self collision avoidance (CBF)
+            const CollisionChecker::MinDistResult min_dist_res = robot_data_->getMinDistance(true, false, false);
+    
+            A_ineq_ds_.block(si_index_.con_sel_col_start, si_index_.qdot_start, si_index_.con_sel_col_size, si_index_.qdot_size) = min_dist_res.grad.transpose();
+            A_ineq_ds_.block(si_index_.con_sel_col_start, si_index_.slack_sel_col_start, si_index_.con_sel_col_size, si_index_.slack_sel_col_size) = MatrixXd::Identity(si_index_.con_sel_col_size, si_index_.slack_sel_col_size);
+            l_ineq_ds_(si_index_.con_sel_col_start) = - DEFAULT_CBF_ALPHA*(min_dist_res.distance -0.05);
         }
     
         void QPIK::setEqConstraint()
