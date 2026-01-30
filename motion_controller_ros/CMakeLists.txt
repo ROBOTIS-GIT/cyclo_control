@@ -17,6 +17,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(interactive_markers REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(OsqpEigen REQUIRED)
@@ -89,6 +90,7 @@ ament_target_dependencies(eef_interactive_marker_node
   geometry_msgs
   visualization_msgs
   interactive_markers
+  tf2_ros
 )
 
 target_link_libraries(ai_worker_controller_node

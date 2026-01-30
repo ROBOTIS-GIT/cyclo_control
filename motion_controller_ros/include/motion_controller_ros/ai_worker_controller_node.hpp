@@ -40,10 +40,10 @@ namespace motion_controller_ros
         static constexpr double DEFAULT_CONTROL_FREQUENCY = 100.0;  // Hz
         static constexpr double DEFAULT_TIME_STEP = 0.01;  // seconds (1/100Hz)
         static constexpr double DEFAULT_TRAJECTORY_TIME = 0.01;  // seconds (time_from_start for trajectory points)
-        static constexpr double DEFAULT_KP_POSITION = 200.0;
-        static constexpr double DEFAULT_KP_ORIENTATION = 20.0;
+        static constexpr double DEFAULT_KP_POSITION = 100.0;
+        static constexpr double DEFAULT_KP_ORIENTATION = 10.0;
         static constexpr double WEIGHT_TRACKING = 1.0;
-        static constexpr double WEIGHT_DAMPING = 0.3;
+        static constexpr double WEIGHT_DAMPING = 0.2;
         static constexpr int DEBUG_LOG_INTERVAL = 100;
         static constexpr const char* R_GOAL_POSE_TOPIC = "/r_goal_pose";
         static constexpr const char* L_GOAL_POSE_TOPIC = "/l_goal_pose";

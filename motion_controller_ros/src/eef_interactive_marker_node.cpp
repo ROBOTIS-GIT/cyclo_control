@@ -3,11 +3,14 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <visualization_msgs/msg/interactive_marker.hpp>
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
 #include <visualization_msgs/msg/interactive_marker_feedback.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <interactive_markers/interactive_marker_server.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
 
 namespace motion_controller_ros
 {
@@ -29,22 +32,19 @@ namespace motion_controller_ros
               left_initialized_(false),
               right_locked_(false),
               left_locked_(false),
-              right_pose_received_(false),
-              left_pose_received_(false),
-              pending_update_(false)
+              right_dragging_(false),
+              left_dragging_(false)
         {
             base_frame_ = this->declare_parameter<std::string>("base_frame", "base_link");
+            right_link_ = this->declare_parameter<std::string>("right_link", "end_effector_r_link");
+            left_link_ = this->declare_parameter<std::string>("left_link", "end_effector_l_link");
             marker_scale_ = this->declare_parameter<double>("marker_scale", 0.2);
 
             r_goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/r_goal_pose", 10);
             l_goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/l_goal_pose", 10);
 
-            r_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-                "/r_gripper_pose", 10,
-                std::bind(&EefInteractiveMarkerNode::rightGripperPoseCallback, this, std::placeholders::_1));
-            l_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-                "/l_gripper_pose", 10,
-                std::bind(&EefInteractiveMarkerNode::leftGripperPoseCallback, this, std::placeholders::_1));
+            tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+            tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
             update_timer_ = this->create_wall_timer(
                 std::chrono::milliseconds(50),
@@ -125,93 +125,93 @@ namespace motion_controller_ros
 
         void markerFeedback(const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback)
         {
-            if (feedback->event_type != visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE &&
-                feedback->event_type != visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP) {
-                return;
-            }
-
-            geometry_msgs::msg::PoseStamped goal_msg;
-            goal_msg.header.stamp = this->get_clock()->now();
-            goal_msg.header.frame_id = feedback->header.frame_id.empty() ? base_frame_ : feedback->header.frame_id;
-            goal_msg.pose = feedback->pose;
-
             if (feedback->marker_name == "right_gripper_goal") {
-                right_locked_ = true;
-                r_goal_pub_->publish(goal_msg);
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_DOWN) {
+                    right_locked_ = true;
+                    right_dragging_ = true;
+                    return;
+                }
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP) {
+                    right_dragging_ = false;
+                    publishGoal(feedback->pose,
+                                feedback->header.frame_id.empty() ? base_frame_ : feedback->header.frame_id,
+                                r_goal_pub_);
+                    return;
+                }
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE &&
+                    right_dragging_) {
+                    publishGoal(feedback->pose,
+                                feedback->header.frame_id.empty() ? base_frame_ : feedback->header.frame_id,
+                                r_goal_pub_);
+                }
             } else if (feedback->marker_name == "left_gripper_goal") {
-                left_locked_ = true;
-                l_goal_pub_->publish(goal_msg);
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_DOWN) {
+                    left_locked_ = true;
+                    left_dragging_ = true;
+                    return;
+                }
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP) {
+                    left_dragging_ = false;
+                    publishGoal(feedback->pose,
+                                feedback->header.frame_id.empty() ? base_frame_ : feedback->header.frame_id,
+                                l_goal_pub_);
+                    return;
+                }
+                if (feedback->event_type == visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE &&
+                    left_dragging_) {
+                    publishGoal(feedback->pose,
+                                feedback->header.frame_id.empty() ? base_frame_ : feedback->header.frame_id,
+                                l_goal_pub_);
+                }
             }
-        }
-
-        void rightGripperPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-        {
-            if (right_locked_) {
-                return;
-            }
-
-            const std::string frame_id =
-                msg->header.frame_id.empty() ? base_frame_ : msg->header.frame_id;
-
-            if (!right_initialized_) {
-                create6DofMarker("right_gripper_goal", "Right gripper goal", msg->pose, frame_id, 1.0, 0.2, 0.2);
-                server_->applyChanges();
-                right_initialized_ = true;
-            }
-
-            last_right_pose_ = *msg;
-            right_pose_received_ = true;
-            pending_update_ = true;
-        }
-
-        void leftGripperPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-        {
-            if (left_locked_) {
-                return;
-            }
-
-            const std::string frame_id =
-                msg->header.frame_id.empty() ? base_frame_ : msg->header.frame_id;
-
-            if (!left_initialized_) {
-                create6DofMarker("left_gripper_goal", "Left gripper goal", msg->pose, frame_id, 0.2, 0.2, 1.0);
-                server_->applyChanges();
-                left_initialized_ = true;
-            }
-
-            last_left_pose_ = *msg;
-            left_pose_received_ = true;
-            pending_update_ = true;
         }
 
         void publishMarkerUpdates()
         {
-            if (!pending_update_) {
-                return;
-            }
-
             bool changed = false;
-            if (!right_locked_ && right_initialized_ && right_pose_received_) {
-                server_->setPose("right_gripper_goal", last_right_pose_.pose, last_right_pose_.header);
-                publishGoal(last_right_pose_.pose,
-                            last_right_pose_.header.frame_id.empty() ? base_frame_ : last_right_pose_.header.frame_id,
-                            r_goal_pub_);
-                changed = true;
+            if (!right_initialized_) {
+                if (lookupPose(right_link_, last_right_pose_)) {
+                    create6DofMarker("right_gripper_goal", "Right gripper goal",
+                                     last_right_pose_.pose, last_right_pose_.header.frame_id, 1.0, 0.2, 0.2);
+                    server_->applyChanges();
+                    publishGoal(last_right_pose_.pose, last_right_pose_.header.frame_id, r_goal_pub_);
+                    right_initialized_ = true;
+                    changed = true;
+                }
             }
 
-            if (!left_locked_ && left_initialized_ && left_pose_received_) {
-                server_->setPose("left_gripper_goal", last_left_pose_.pose, last_left_pose_.header);
-                publishGoal(last_left_pose_.pose,
-                            last_left_pose_.header.frame_id.empty() ? base_frame_ : last_left_pose_.header.frame_id,
-                            l_goal_pub_);
-                changed = true;
+            if (!left_initialized_) {
+                if (lookupPose(left_link_, last_left_pose_)) {
+                    create6DofMarker("left_gripper_goal", "Left gripper goal",
+                                     last_left_pose_.pose, last_left_pose_.header.frame_id, 0.2, 0.2, 1.0);
+                    server_->applyChanges();
+                    publishGoal(last_left_pose_.pose, last_left_pose_.header.frame_id, l_goal_pub_);
+                    left_initialized_ = true;
+                    changed = true;
+                }
             }
 
             if (changed) {
                 server_->applyChanges();
             }
+            if (right_initialized_ && left_initialized_) {
+                update_timer_->cancel();
+            }
+        }
 
-            pending_update_ = false;
+        bool lookupPose(const std::string& child_frame, geometry_msgs::msg::PoseStamped& pose_out)
+        {
+            try {
+                const auto tf = tf_buffer_->lookupTransform(base_frame_, child_frame, tf2::TimePointZero);
+                pose_out.header = tf.header;
+                pose_out.pose.position.x = tf.transform.translation.x;
+                pose_out.pose.position.y = tf.transform.translation.y;
+                pose_out.pose.position.z = tf.transform.translation.z;
+                pose_out.pose.orientation = tf.transform.rotation;
+                return true;
+            } catch (const std::exception&) {
+                return false;
+            }
         }
 
         void publishGoal(const geometry_msgs::msg::Pose& pose,
@@ -228,19 +228,20 @@ namespace motion_controller_ros
         std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr r_goal_pub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr l_goal_pub_;
-        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_pose_sub_;
-        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_pose_sub_;
         rclcpp::TimerBase::SharedPtr update_timer_;
+        std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+        std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
         std::string base_frame_;
+        std::string right_link_;
+        std::string left_link_;
         double marker_scale_;
         bool right_initialized_;
         bool left_initialized_;
         bool right_locked_;
         bool left_locked_;
-        bool right_pose_received_;
-        bool left_pose_received_;
-        bool pending_update_;
+        bool right_dragging_;
+        bool left_dragging_;
         geometry_msgs::msg::PoseStamped last_right_pose_;
         geometry_msgs::msg::PoseStamped last_left_pose_;
     };
