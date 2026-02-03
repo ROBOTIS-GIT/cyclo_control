@@ -19,7 +19,7 @@ namespace motion_controller_core
             
             // Constants
             static constexpr double DEFAULT_SLACK_PENALTY = 1000.0;
-            static constexpr double DEFAULT_CBF_ALPHA = 25.0;
+            static constexpr double DEFAULT_CBF_ALPHA = 50.0;
             static constexpr double DEFAULT_MAX_SLACK = 1.0e-4;
             
             /**

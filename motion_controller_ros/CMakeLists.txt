@@ -125,6 +125,10 @@ install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(FILES config/ai_worker_config.yaml
+  DESTINATION share/${PROJECT_NAME}/config
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

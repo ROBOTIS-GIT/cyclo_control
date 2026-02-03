@@ -10,24 +10,50 @@ namespace motion_controller_ros
           r_goal_pose_received_(false),
           l_goal_pose_received_(false),
           joint_state_received_(false),
-          dt_(DEFAULT_TIME_STEP)
+          dt_(0.01)
     {
         RCLCPP_INFO(this->get_logger(), "========================================");
         RCLCPP_INFO(this->get_logger(), "AI Worker Controller - Starting up...");
         RCLCPP_INFO(this->get_logger(), "Node name: %s", this->get_name());
         RCLCPP_INFO(this->get_logger(), "========================================");
 
+        // Load parameters
+        control_frequency_ = this->declare_parameter("control_frequency", 100.0);
+        time_step_ = this->declare_parameter("time_step", 0.01);
+        trajectory_time_ = this->declare_parameter("trajectory_time", 0.0);
+        kp_position_ = this->declare_parameter("kp_position", 50.0);
+        kp_orientation_ = this->declare_parameter("kp_orientation", 50.0);
+        weight_position_ = this->declare_parameter("weight_position", 10.0);
+        weight_orientation_ = this->declare_parameter("weight_orientation", 1.0);
+        weight_damping_ = this->declare_parameter("weight_damping", 0.1);
+        debug_log_interval_ = this->declare_parameter("debug_log_interval", 100);
+        r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
+        l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
+        joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
+        right_traj_topic_ = this->declare_parameter("right_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
+        left_traj_topic_ = this->declare_parameter("left_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
+        r_gripper_pose_topic_ = this->declare_parameter("r_gripper_pose_topic", std::string("/r_gripper_pose"));
+        l_gripper_pose_topic_ = this->declare_parameter("l_gripper_pose_topic", std::string("/l_gripper_pose"));
+        r_gripper_name_ = this->declare_parameter("r_gripper_name", std::string("arm_r_link7"));
+        l_gripper_name_ = this->declare_parameter("l_gripper_name", std::string("arm_l_link7"));
+        base_frame_id_ = this->declare_parameter("base_frame_id", std::string("base_link"));
+        traj_frame_id_ = this->declare_parameter("traj_frame_id", std::string(""));
+        right_gripper_joint_name_ = this->declare_parameter("right_gripper_joint", std::string("gripper_r_joint1"));
+        left_gripper_joint_name_ = this->declare_parameter("left_gripper_joint", std::string("gripper_l_joint1"));
+
+        dt_ = time_step_;
+
         // Initialize subscribers
         r_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            R_GOAL_POSE_TOPIC, 10,
+            r_goal_pose_topic_, 10,
             std::bind(&AIWorkerController::rightGoalPoseCallback, this, std::placeholders::_1));
 
         l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            L_GOAL_POSE_TOPIC, 10,
+            l_goal_pose_topic_, 10,
             std::bind(&AIWorkerController::leftGoalPoseCallback, this, std::placeholders::_1));        
         
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-            JOINT_STATES_TOPIC, 10,
+            joint_states_topic_, 10,
             std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
 
         // Initialize publishers
@@ -35,16 +61,16 @@ namespace motion_controller_ros
         //     LIFT_TRAJ_TOPIC, 10);
 
         arm_r_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            RIGHT_TRAJ_TOPIC, 10);
+            right_traj_topic_, 10);
 
         arm_l_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            LEFT_TRAJ_TOPIC, 10);
+            left_traj_topic_, 10);
 
         r_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-            R_GRIPPER_POSE_TOPIC, 10);
+            r_gripper_pose_topic_, 10);
 
         l_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-            L_GRIPPER_POSE_TOPIC, 10);    
+            l_gripper_pose_topic_, 10);    
 
         // Initialize motion controller
         std::string urdf_path;
@@ -85,8 +111,8 @@ namespace motion_controller_ros
         // Initialize joint configuration from URDF
         initializeJointConfig();
 
-        // Create control loop timer (100Hz = 10ms period)
-        int timer_period_ms = static_cast<int>(1000.0 / DEFAULT_CONTROL_FREQUENCY);
+        // Create control loop timer
+        int timer_period_ms = static_cast<int>(1000.0 / control_frequency_);
         control_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(timer_period_ms),
             std::bind(&AIWorkerController::controlLoopCallback, this));
@@ -100,7 +126,7 @@ namespace motion_controller_ros
         RCLCPP_INFO(this->get_logger(), 
             "AI Worker Controller initialized successfully!");
         RCLCPP_INFO(this->get_logger(), 
-            "  - Control loop: %.1f Hz (period: %d ms)", DEFAULT_CONTROL_FREQUENCY, timer_period_ms);
+            "  - Control loop: %.1f Hz (period: %d ms)", control_frequency_, timer_period_ms);
         RCLCPP_INFO(this->get_logger(), 
             "  - Subscriptions: joint_states=%s",
             joint_state_sub_ ? "OK" : "FAILED");
@@ -127,8 +153,7 @@ namespace motion_controller_ros
         right_arm_joints_.clear();
         // lift_joint_.clear();
         
-        // Parse joint names: expect arm_l_joint*, arm_r_joint*, lift_joint
-        // Note: gripper joints are fixed in URDF, so Pinocchio doesn't include them in the model
+        // Parse joint names
         for (const auto& joint_name : joint_names) {
             if (joint_name.find("arm_l_joint") != std::string::npos) {
                 left_arm_joints_.push_back(joint_name);
@@ -144,13 +169,8 @@ namespace motion_controller_ros
         std::sort(left_arm_joints_.begin(), left_arm_joints_.end());
         std::sort(right_arm_joints_.begin(), right_arm_joints_.end());
         
-        // Hardcode gripper joint names (they are fixed joints in URDF, so Pinocchio won't detect them)
-        // These are required by the controllers even though they're not part of the IK calculation
-        left_gripper_joint_ = LEFT_GRIPPER_JOINT;
-        right_gripper_joint_ = RIGHT_GRIPPER_JOINT;
         
-        
-        // Log the actual joint names for debugging
+        // Log joint names
         std::string left_str, right_str;
         for (const auto& j : left_arm_joints_) left_str += j + " ";
         for (const auto& j : right_arm_joints_) right_str += j + " ";
@@ -163,7 +183,6 @@ namespace motion_controller_ros
 
     void AIWorkerController::rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-        // geometry_msgs::msg::PoseStamped r_goal_pose_msg = *msg;
         r_goal_pose_ = computePoseMat(*msg);
         r_goal_pose_received_ = true;
         RCLCPP_DEBUG(this->get_logger(), "Right goal pose received: [%.3f, %.3f, %.3f]", 
@@ -172,7 +191,6 @@ namespace motion_controller_ros
 
     void AIWorkerController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-        // geometry_msgs::msg::PoseStamped l_goal_pose_msg = *msg;
         l_goal_pose_ = computePoseMat(*msg);
         l_goal_pose_received_ = true;
         RCLCPP_DEBUG(this->get_logger(), "Left goal pose received: [%.3f, %.3f, %.3f]", 
@@ -210,7 +228,6 @@ namespace motion_controller_ros
         qdot_.setZero(dof);
 
         // Fill joint positions/velocities in model joint order
-        // This is critical for correct kinematics/Jacobian calculations.
         const int max_index = std::min<int>(dof, static_cast<int>(model_joint_names_.size()));
         for (int i = 0; i < max_index; ++i) {
             const auto& joint_name = model_joint_names_[i];
@@ -236,7 +253,7 @@ namespace motion_controller_ros
         loop_count++;
         
         if (!joint_state_received_) {
-            if (debug_count++ % DEBUG_LOG_INTERVAL == 0) {
+            if (debug_count++ % debug_log_interval_ == 0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                     "Control loop waiting for joint states...");
             }
@@ -250,8 +267,8 @@ namespace motion_controller_ros
             kinematics_solver_->updateState(q_, qdot_);
 
             // Get current and goal end-effector poses
-            right_gripper_pose_ = kinematics_solver_->getPose(R_GRIPPER_NAME);
-            left_gripper_pose_ = kinematics_solver_->getPose(L_GRIPPER_NAME);
+            right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
+            left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
 
             // Initialize goals to current EE pose on first cycle if not received
             if (!r_goal_pose_received_ && !l_goal_pose_received_) {
@@ -267,17 +284,21 @@ namespace motion_controller_ros
             Vector6d left_desired_vel = computeDesiredVelocity(left_gripper_pose_, l_goal_pose_);
             
             std::map<std::string, Vector6d> desired_task_velocities;
-            desired_task_velocities[R_GRIPPER_NAME] = right_desired_vel;
-            desired_task_velocities[L_GRIPPER_NAME] = left_desired_vel;
+            desired_task_velocities[r_gripper_name_] = right_desired_vel;
+            desired_task_velocities[l_gripper_name_] = left_desired_vel;
 
             // Set weights for QP solver
             std::map<std::string, Vector6d> weights;
-            Vector6d weight_right = Vector6d::Ones() * WEIGHT_TRACKING;
-            Vector6d weight_left = Vector6d::Ones() * WEIGHT_TRACKING;
-            weights[R_GRIPPER_NAME] = weight_right;
-            weights[L_GRIPPER_NAME] = weight_left;
+            Vector6d weight_right = Vector6d::Ones();
+            Vector6d weight_left = Vector6d::Ones();
+            weight_right.head(3).setConstant(weight_position_);
+            weight_right.tail(3).setConstant(weight_orientation_);
+            weight_left.head(3).setConstant(weight_position_);
+            weight_left.tail(3).setConstant(weight_orientation_);
+            weights[r_gripper_name_] = weight_right;
+            weights[l_gripper_name_] = weight_left;
             
-            VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * WEIGHT_DAMPING;
+            VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
 
             // Set weights and desired task velocities in QP controller
             qp_controller_->setWeight(weights, damping);
@@ -296,13 +317,6 @@ namespace motion_controller_ros
 
             // Publish trajectory commands
             publishTrajectory(q_desired_);
-            
-            // Log successful control loop execution (throttled)
-            static int success_count = 0;
-            if (++success_count % 1000 == 0) {
-                RCLCPP_DEBUG(this->get_logger(), 
-                    "Control loop executed successfully %d times", success_count);
-            }
 
         } catch (const std::exception& e) {
             RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
@@ -336,8 +350,8 @@ namespace motion_controller_ros
         Vector3d angle_axis = angle_axis_error.axis() * angle_axis_error.angle();
 
         Vector6d desired_vel = Vector6d::Zero();
-        desired_vel.head(3) = DEFAULT_KP_POSITION * pos_error;
-        desired_vel.tail(3) = DEFAULT_KP_ORIENTATION * angle_axis;
+        desired_vel.head(3) = kp_position_ * pos_error;
+        desired_vel.tail(3) = kp_orientation_ * angle_axis;
         
         return desired_vel;
     }
@@ -346,7 +360,6 @@ namespace motion_controller_ros
     {
         try {
             // Build indices for each arm segment
-            // std::vector<int> left_arm_indices, right_arm_indices, lift_indices;
             std::vector<int> left_arm_indices, right_arm_indices;
             
             for (const auto& joint_name : left_arm_joints_) {
@@ -373,14 +386,14 @@ namespace motion_controller_ros
             // Publish left arm trajectory (include gripper joint with position 0)
             if (!left_arm_indices.empty()) {
                 auto traj_left = createTrajectoryMsgWithGripper(
-                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_);
+                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_);
                 arm_l_pub_->publish(traj_left);
             }
 
             // Publish right arm trajectory (include gripper joint with position 0)
             if (!right_arm_indices.empty()) {
                 auto traj_right = createTrajectoryMsgWithGripper(
-                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_);
+                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_);
                 arm_r_pub_->publish(traj_right);
             }
 
@@ -396,28 +409,6 @@ namespace motion_controller_ros
         }
     }
 
-    trajectory_msgs::msg::JointTrajectory AIWorkerController::createTrajectoryMsg(
-        const std::vector<std::string>& joint_names,
-        const VectorXd& positions,
-        const std::vector<int>& indices) const
-    {
-        trajectory_msgs::msg::JointTrajectory traj_msg;
-        traj_msg.header.frame_id = TRAJ_FRAME_ID;
-        traj_msg.joint_names = joint_names;
-
-        trajectory_msgs::msg::JointTrajectoryPoint point;
-        point.time_from_start = rclcpp::Duration::from_seconds(DEFAULT_TRAJECTORY_TIME);
-
-        for (int idx : indices) {
-            if (idx >= 0 && idx < static_cast<int>(positions.size())) {
-                point.positions.push_back(positions[idx]);
-            }
-        }
-
-        traj_msg.points.push_back(point);
-        return traj_msg;
-    }
-
     trajectory_msgs::msg::JointTrajectory AIWorkerController::createTrajectoryMsgWithGripper(
         const std::vector<std::string>& arm_joint_names,
         const VectorXd& positions,
@@ -425,17 +416,16 @@ namespace motion_controller_ros
         const std::string& gripper_joint_name) const
     {
         trajectory_msgs::msg::JointTrajectory traj_msg;
-        traj_msg.header.frame_id = TRAJ_FRAME_ID;
+        traj_msg.header.frame_id = traj_frame_id_;
         
         // Add arm joint names
         traj_msg.joint_names = arm_joint_names;
         
-        // Always add gripper joint name (hardcoded, required by controllers)
-        // Gripper joints are fixed in URDF so Pinocchio doesn't include them in the model
+        // Always add gripper joint name (required by controllers)
         traj_msg.joint_names.push_back(gripper_joint_name);
 
         trajectory_msgs::msg::JointTrajectoryPoint point;
-        point.time_from_start = rclcpp::Duration::from_seconds(DEFAULT_TRAJECTORY_TIME);
+        point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
 
         // Add arm joint positions
         for (int idx : arm_indices) {
@@ -444,7 +434,7 @@ namespace motion_controller_ros
             }
         }
         
-        // Always add gripper joint position (always 0.0 as required by controllers)
+        // Add gripper joint position
         point.positions.push_back(0.0);
 
         traj_msg.points.push_back(point);
@@ -456,7 +446,7 @@ namespace motion_controller_ros
         if (r_gripper_pose_pub_) {
             geometry_msgs::msg::PoseStamped r_gripper_pose_msg;
             r_gripper_pose_msg.header.stamp = this->now();
-            r_gripper_pose_msg.header.frame_id = BASE_FRAME_ID;
+            r_gripper_pose_msg.header.frame_id = base_frame_id_;
             r_gripper_pose_msg.pose.position.x = r_gripper_pose.translation().x();
             r_gripper_pose_msg.pose.position.y = r_gripper_pose.translation().y();
             r_gripper_pose_msg.pose.position.z = r_gripper_pose.translation().z();
@@ -470,7 +460,7 @@ namespace motion_controller_ros
         if (l_gripper_pose_pub_) {
             geometry_msgs::msg::PoseStamped l_gripper_pose_msg;
             l_gripper_pose_msg.header.stamp = this->now();
-            l_gripper_pose_msg.header.frame_id = BASE_FRAME_ID;
+            l_gripper_pose_msg.header.frame_id = base_frame_id_;
             l_gripper_pose_msg.pose.position.x = l_gripper_pose.translation().x();
             l_gripper_pose_msg.pose.position.y = l_gripper_pose.translation().y();
             l_gripper_pose_msg.pose.position.z = l_gripper_pose.translation().z();

@@ -36,8 +36,10 @@ namespace motion_controller_ros
               left_dragging_(false)
         {
             base_frame_ = this->declare_parameter<std::string>("base_frame", "base_link");
-            right_link_ = this->declare_parameter<std::string>("right_link", "end_effector_r_link");
-            left_link_ = this->declare_parameter<std::string>("left_link", "end_effector_l_link");
+            // right_link_ = this->declare_parameter<std::string>("right_link", "end_effector_r_link");
+            // left_link_ = this->declare_parameter<std::string>("left_link", "end_effector_l_link");
+            right_link_ = this->declare_parameter<std::string>("right_link", "arm_r_link7");
+            left_link_ = this->declare_parameter<std::string>("left_link", "arm_l_link7");
             marker_scale_ = this->declare_parameter<double>("marker_scale", 0.2);
 
             r_goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/r_goal_pose", 10);

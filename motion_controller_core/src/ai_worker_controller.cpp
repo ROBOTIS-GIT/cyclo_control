@@ -120,13 +120,13 @@ namespace motion_controller_core
             l_bound_ds_(si_index_.slack_sing_start) = 0.0;
             l_bound_ds_(si_index_.slack_sel_col_start) = 0.0;
 
-            // Tighten feasibility by limiting slack magnitude
-            u_bound_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size)
-                .setConstant(DEFAULT_MAX_SLACK);
-            u_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size)
-                .setConstant(DEFAULT_MAX_SLACK);
-            u_bound_ds_(si_index_.slack_sing_start) = DEFAULT_MAX_SLACK;
-            u_bound_ds_(si_index_.slack_sel_col_start) = DEFAULT_MAX_SLACK;
+            // // Tighten feasibility by limiting slack magnitude
+            // u_bound_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size)
+            //     .setConstant(DEFAULT_MAX_SLACK);
+            // u_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size)
+            //     .setConstant(DEFAULT_MAX_SLACK);
+            // u_bound_ds_(si_index_.slack_sing_start) = DEFAULT_MAX_SLACK;
+            // u_bound_ds_(si_index_.slack_sel_col_start) = DEFAULT_MAX_SLACK;
         }
     
         void QPIK::setIneqConstraint()
