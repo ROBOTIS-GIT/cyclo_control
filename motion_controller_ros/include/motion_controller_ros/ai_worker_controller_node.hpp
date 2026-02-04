@@ -40,10 +40,13 @@ namespace motion_controller_ros
         double kp_orientation_;
         double weight_position_;
         double weight_orientation_;
+        double weight_elbow_position_;
         double weight_damping_;
         int debug_log_interval_;
         std::string r_goal_pose_topic_;
         std::string l_goal_pose_topic_;
+        std::string r_elbow_pose_topic_;
+        std::string l_elbow_pose_topic_;
         std::string joint_states_topic_;
         std::string right_traj_topic_;
         std::string left_traj_topic_;
@@ -51,6 +54,8 @@ namespace motion_controller_ros
         std::string l_gripper_pose_topic_;
         std::string r_gripper_name_;
         std::string l_gripper_name_;
+        std::string r_elbow_name_;
+        std::string l_elbow_name_;
         std::string base_frame_id_;
         std::string traj_frame_id_;
         std::string right_gripper_joint_name_;
@@ -59,6 +64,8 @@ namespace motion_controller_ros
         // Subscribers
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_goal_pose_sub_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_goal_pose_sub_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_elbow_pose_sub_;
+        rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_elbow_pose_sub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
 
         // Publishers
@@ -83,8 +90,12 @@ namespace motion_controller_ros
         Affine3d left_gripper_pose_;
         Affine3d r_goal_pose_;
         Affine3d l_goal_pose_;
+        Affine3d r_elbow_pose_;
+        Affine3d l_elbow_pose_;
         bool r_goal_pose_received_;
         bool l_goal_pose_received_;
+        bool r_elbow_pose_received_;
+        bool l_elbow_pose_received_;
         bool joint_state_received_;
 
         // Joint configuration
@@ -101,6 +112,8 @@ namespace motion_controller_ros
         // Callbacks
         void rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+        void rightElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+        void leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
         void controlLoopCallback();
 

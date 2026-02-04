@@ -122,7 +122,9 @@ namespace motion_controller_core
 
     bool KinematicsSolver::updateKinematics(const VectorXd& q, const VectorXd& qdot)
     {
+        pinocchio::forwardKinematics(model_, data_, q, qdot);
         pinocchio::computeJointJacobians(model_, data_, q);
+        pinocchio::updateFramePlacements(model_, data_);
         
         return true;
     }
@@ -132,7 +134,7 @@ namespace motion_controller_core
     Affine3d KinematicsSolver::computePose(const VectorXd& q, const std::string& link_name)
     {
         pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
-        if (link_index == static_cast<pinocchio::FrameIndex>(-1))
+        if (link_index >= model_.frames.size())
         {
             throw std::runtime_error("Link name not found in URDF: " + link_name);
         }
@@ -148,7 +150,7 @@ namespace motion_controller_core
     MatrixXd KinematicsSolver::computeJacobian(const VectorXd& q, const std::string& link_name)
     {
         pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
-        if (link_index == static_cast<pinocchio::FrameIndex>(-1))
+        if (link_index >= model_.frames.size())
         {
             throw std::runtime_error("Link name not found in URDF: " + link_name);
         }
@@ -335,7 +337,7 @@ namespace motion_controller_core
     Affine3d KinematicsSolver::getPose(const std::string& link_name) const
     {
         pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
-        if (link_index == static_cast<pinocchio::FrameIndex>(-1))
+        if (link_index >= model_.frames.size())
         {
             throw std::runtime_error("Link name not found in URDF: " + link_name);
         }
@@ -349,7 +351,7 @@ namespace motion_controller_core
     MatrixXd KinematicsSolver::getJacobian(const std::string& link_name)
     {
         pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
-        if (link_index == static_cast<pinocchio::FrameIndex>(-1))
+        if (link_index >= model_.frames.size())
         {
             throw std::runtime_error("Link name not found in URDF: " + link_name);
         }

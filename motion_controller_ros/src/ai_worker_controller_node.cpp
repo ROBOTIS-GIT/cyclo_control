@@ -9,6 +9,8 @@ namespace motion_controller_ros
         : Node("ai_worker_controller"),
           r_goal_pose_received_(false),
           l_goal_pose_received_(false),
+          r_elbow_pose_received_(false),
+          l_elbow_pose_received_(false),
           joint_state_received_(false),
           dt_(0.01)
     {
@@ -25,10 +27,13 @@ namespace motion_controller_ros
         kp_orientation_ = this->declare_parameter("kp_orientation", 50.0);
         weight_position_ = this->declare_parameter("weight_position", 10.0);
         weight_orientation_ = this->declare_parameter("weight_orientation", 1.0);
+        weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 0.5);
         weight_damping_ = this->declare_parameter("weight_damping", 0.1);
         debug_log_interval_ = this->declare_parameter("debug_log_interval", 100);
         r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
         l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
+        r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_elbow_pose"));
+        l_elbow_pose_topic_ = this->declare_parameter("l_elbow_pose_topic", std::string("/l_elbow_pose"));
         joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
         right_traj_topic_ = this->declare_parameter("right_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
         left_traj_topic_ = this->declare_parameter("left_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
@@ -36,6 +41,8 @@ namespace motion_controller_ros
         l_gripper_pose_topic_ = this->declare_parameter("l_gripper_pose_topic", std::string("/l_gripper_pose"));
         r_gripper_name_ = this->declare_parameter("r_gripper_name", std::string("arm_r_link7"));
         l_gripper_name_ = this->declare_parameter("l_gripper_name", std::string("arm_l_link7"));
+        r_elbow_name_ = this->declare_parameter("r_elbow_name", std::string("arm_r_link4"));
+        l_elbow_name_ = this->declare_parameter("l_elbow_name", std::string("arm_l_link4"));
         base_frame_id_ = this->declare_parameter("base_frame_id", std::string("base_link"));
         traj_frame_id_ = this->declare_parameter("traj_frame_id", std::string(""));
         right_gripper_joint_name_ = this->declare_parameter("right_gripper_joint", std::string("gripper_r_joint1"));
@@ -50,7 +57,15 @@ namespace motion_controller_ros
 
         l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             l_goal_pose_topic_, 10,
-            std::bind(&AIWorkerController::leftGoalPoseCallback, this, std::placeholders::_1));        
+            std::bind(&AIWorkerController::leftGoalPoseCallback, this, std::placeholders::_1));    
+            
+        r_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            r_elbow_pose_topic_, 10,
+            std::bind(&AIWorkerController::rightElbowPoseCallback, this, std::placeholders::_1));
+    
+        l_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+            l_elbow_pose_topic_, 10,
+            std::bind(&AIWorkerController::leftElbowPoseCallback, this, std::placeholders::_1));  
         
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
@@ -197,6 +212,22 @@ namespace motion_controller_ros
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
     }
 
+    void AIWorkerController::rightElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    {
+        r_elbow_pose_ = computePoseMat(*msg);
+        r_elbow_pose_received_ = true;
+        RCLCPP_DEBUG(this->get_logger(), "Right elbow pose received: [%.3f, %.3f, %.3f]", 
+            msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    }
+
+    void AIWorkerController::leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    {
+        l_elbow_pose_ = computePoseMat(*msg);
+        l_elbow_pose_received_ = true;
+        RCLCPP_DEBUG(this->get_logger(), "Left elbow pose received: [%.3f, %.3f, %.3f]", 
+            msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    }
+
     void AIWorkerController::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
     {
         try {
@@ -269,11 +300,19 @@ namespace motion_controller_ros
             // Get current and goal end-effector poses
             right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
             left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
+            Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
+            Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
 
             // Initialize goals to current EE pose on first cycle if not received
             if (!r_goal_pose_received_ && !l_goal_pose_received_) {
                 r_goal_pose_ = right_gripper_pose_;
                 l_goal_pose_ = left_gripper_pose_;
+            }
+            if (!r_elbow_pose_received_) {
+                r_elbow_pose_ = right_elbow_pose;
+            }
+            if (!l_elbow_pose_received_) {
+                l_elbow_pose_ = left_elbow_pose;
             }
 
             // Publish current end-effector pose
@@ -282,10 +321,18 @@ namespace motion_controller_ros
             // Compute desired velocity
             Vector6d right_desired_vel = computeDesiredVelocity(right_gripper_pose_, r_goal_pose_);
             Vector6d left_desired_vel = computeDesiredVelocity(left_gripper_pose_, l_goal_pose_);
+            Vector6d right_elbow_desired_vel = Vector6d::Zero();
+            Vector6d left_elbow_desired_vel = Vector6d::Zero();
+            right_elbow_desired_vel.head(3) =
+                kp_position_ * (r_elbow_pose_.translation() - right_elbow_pose.translation());
+            left_elbow_desired_vel.head(3) =
+                kp_position_ * (l_elbow_pose_.translation() - left_elbow_pose.translation());
             
             std::map<std::string, Vector6d> desired_task_velocities;
             desired_task_velocities[r_gripper_name_] = right_desired_vel;
             desired_task_velocities[l_gripper_name_] = left_desired_vel;
+            desired_task_velocities[r_elbow_name_] = right_elbow_desired_vel;
+            desired_task_velocities[l_elbow_name_] = left_elbow_desired_vel;
 
             // Set weights for QP solver
             std::map<std::string, Vector6d> weights;
@@ -297,6 +344,12 @@ namespace motion_controller_ros
             weight_left.tail(3).setConstant(weight_orientation_);
             weights[r_gripper_name_] = weight_right;
             weights[l_gripper_name_] = weight_left;
+            Vector6d weight_right_elbow = Vector6d::Zero();
+            Vector6d weight_left_elbow = Vector6d::Zero();
+            weight_right_elbow.head(3).setConstant(weight_elbow_position_);
+            weight_left_elbow.head(3).setConstant(weight_elbow_position_);
+            weights[r_elbow_name_] = weight_right_elbow;
+            weights[l_elbow_name_] = weight_left_elbow;
             
             VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
 

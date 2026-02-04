@@ -3,14 +3,23 @@ ai_worker_controller:
     control_frequency: 100.0
     time_step: 0.01
     trajectory_time: 0.0
-    kp_position: 50.0
-    kp_orientation: 50.0
-    weight_position: 10.0
+    # kp_position: 50.0
+    # kp_orientation: 50.0
+    # weight_position: 10.0
+    # weight_orientation: 1.0
+    # weight_elbow_position: 0.5
+    # weight_damping: 0.1
+    kp_position: 100.0
+    kp_orientation: 10.0
+    weight_position: 1.0
     weight_orientation: 1.0
+    weight_elbow_position: 0.2
     weight_damping: 0.1
     debug_log_interval: 100
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"
+    r_elbow_pose_topic: "/r_elbow_pose"
+    l_elbow_pose_topic: "/l_elbow_pose"
     joint_states_topic: "/joint_states"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
@@ -18,6 +27,8 @@ ai_worker_controller:
     l_gripper_pose_topic: "/l_gripper_pose"
     r_gripper_name: "arm_r_link7"
     l_gripper_name: "arm_l_link7"
+    r_elbow_name: "arm_r_link4"
+    l_elbow_name: "arm_l_link4"
     base_frame_id: "base_link"
     traj_frame_id: ""
     right_gripper_joint: "gripper_r_joint1"
