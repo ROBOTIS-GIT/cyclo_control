@@ -68,17 +68,6 @@ namespace motion_controller_core
     */
     virtual MatrixXd computeJacobian(const VectorXd& q, const std::string& link_name);
 
-    /**
-    * @brief Compute the minimum pairwise distance between the robot's collision meshes and (optionally) its time variations.
-    * @param q             (Eigen::VectorXd) Joint positions.
-    * @param qdot          (Eigen::VectorXd) Joint velocities.
-    * @param with_grad     (bool) If true, computes the gradient of the minimum distance.
-    * @param with_graddot  (bool) If true, computes the gradient time variation of the minimum distance.
-    * @param verbose       (bool) If true, prints the closest pair of links and their minimum distance.
-    * @return (MinDistResult) Minimum distance result containing distance, gradient, and gradient time variation.
-    */
-    virtual MinDistResult computeMinDistance(const VectorXd& q, const VectorXd& qdot, const bool& with_grad, const bool& with_graddot, const bool verbose);
-
     // /**
     // * @brief Solve Inverse Kinematics.
     // * 
@@ -154,13 +143,22 @@ namespace motion_controller_core
     virtual MatrixXd getJacobian(const std::string& link_name);
 
     /**
-     * @brief Get the minimum pairwise distance between the robot's collision meshes and (optionally) its time variations.
-     * @param with_grad     (bool) If true, get the gradient of the minimum distance.
-     * @param with_graddot  (bool) If true, get the gradient time variation of the minimum distance.
-     * @param verbose       (bool) If true, prints the closest pair of links and their minimum distance.
-     * @return (MinDistResult) Minimum distance result containing distance, gradient, and gradient time variation.
+     * @brief Get the number of collision pairs in the model.
+     * @return (int) Number of collision pairs.
      */
-    virtual MinDistResult getMinDistance(const bool& with_grad, const bool& with_graddot, const bool verbose);
+    virtual int getCollisionPairCount() const;
+
+    /**
+     * @brief Get distance/gradient for all collision pairs.
+     * @param with_grad     (bool) If true, get gradients for each pair.
+     * @param with_graddot  (bool) If true, get gradient time variations.
+     * @param verbose       (bool) If true, prints closest pair info.
+     * @return (std::vector<MinDistResult>) Results per collision pair.
+     */
+    virtual std::vector<MinDistResult> getCollisionPairDistances(
+        const bool& with_grad,
+        const bool& with_graddot,
+        const bool verbose);
 
   protected:
     /**

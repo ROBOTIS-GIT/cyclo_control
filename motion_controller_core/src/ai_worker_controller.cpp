@@ -1,4 +1,5 @@
 #include "motion_controller_core/ai_worker_controller.hpp"
+#include <algorithm>
 
 namespace motion_controller_core
 {
@@ -12,11 +13,11 @@ namespace motion_controller_core
             si_index_.slack_q_min_size     = joint_dof_;
             si_index_.slack_q_max_size     = joint_dof_;
             si_index_.slack_sing_size      = 1;
-            si_index_.slack_sel_col_size   = 1;
+            si_index_.slack_sel_col_size   = robot_data_->getCollisionPairCount();
             si_index_.con_q_min_size       = joint_dof_;
             si_index_.con_q_max_size       = joint_dof_;
             si_index_.con_sing_size        = 1;
-            si_index_.con_sel_col_size     = 1;
+            si_index_.con_sel_col_size     = robot_data_->getCollisionPairCount();
             
             const int nx = si_index_.qdot_size +
                            si_index_.slack_q_min_size +
@@ -70,6 +71,14 @@ namespace motion_controller_core
             link_w_tracking_ = link_w_tracking;
             w_damping_ = w_damping;
         }
+
+        void QPIK::setControllerParams(const double slack_penalty, const double cbf_alpha, const double buffer_distance, const double safe_distance)
+        {
+            slack_penalty_ = slack_penalty;
+            cbf_alpha_ = cbf_alpha;
+            collision_buffer_ = buffer_distance;
+            collision_safe_distance_ = safe_distance;
+        }
     
         void QPIK::setCost()
         {
@@ -96,11 +105,14 @@ namespace motion_controller_core
             
             // for slack variables
             q_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size) = 
-                VectorXd::Constant(si_index_.slack_q_min_size, DEFAULT_SLACK_PENALTY);
+                VectorXd::Constant(si_index_.slack_q_min_size, slack_penalty_);
             q_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size) = 
-                VectorXd::Constant(si_index_.slack_q_max_size, DEFAULT_SLACK_PENALTY);
-            q_ds_(si_index_.slack_sing_start) = DEFAULT_SLACK_PENALTY;
-            q_ds_(si_index_.slack_sel_col_start) = DEFAULT_SLACK_PENALTY;
+                VectorXd::Constant(si_index_.slack_q_max_size, slack_penalty_);
+            q_ds_(si_index_.slack_sing_start) = slack_penalty_;
+            if (si_index_.slack_sel_col_size > 0) {
+                q_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size) =
+                    VectorXd::Constant(si_index_.slack_sel_col_size, slack_penalty_);
+            }
         }
     
         void QPIK::setBoundConstraint()
@@ -118,15 +130,9 @@ namespace motion_controller_core
             l_bound_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size).setZero();
             l_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size).setZero();
             l_bound_ds_(si_index_.slack_sing_start) = 0.0;
-            l_bound_ds_(si_index_.slack_sel_col_start) = 0.0;
-
-            // // Tighten feasibility by limiting slack magnitude
-            // u_bound_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size)
-            //     .setConstant(DEFAULT_MAX_SLACK);
-            // u_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size)
-            //     .setConstant(DEFAULT_MAX_SLACK);
-            // u_bound_ds_(si_index_.slack_sing_start) = DEFAULT_MAX_SLACK;
-            // u_bound_ds_(si_index_.slack_sel_col_start) = DEFAULT_MAX_SLACK;
+            if (si_index_.slack_sel_col_size > 0) {
+                l_bound_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size).setZero();
+            }
         }
     
         void QPIK::setIneqConstraint()
@@ -148,7 +154,7 @@ namespace motion_controller_core
                             si_index_.con_q_min_size, si_index_.slack_q_min_size) = 
                 MatrixXd::Identity(si_index_.con_q_min_size, si_index_.slack_q_min_size);
             l_ineq_ds_.segment(si_index_.con_q_min_start, si_index_.con_q_min_size) = 
-                -DEFAULT_CBF_ALPHA * (q - q_min);
+                -cbf_alpha_ * (q - q_min);
             
             // Upper bound constraint: -qdot + slack >= -alpha*(q_max - q)
             A_ineq_ds_.block(si_index_.con_q_max_start, si_index_.qdot_start, 
@@ -158,14 +164,28 @@ namespace motion_controller_core
                             si_index_.con_q_max_size, si_index_.slack_q_max_size) = 
                 MatrixXd::Identity(si_index_.con_q_max_size, si_index_.slack_q_max_size);
             l_ineq_ds_.segment(si_index_.con_q_max_start, si_index_.con_q_max_size) = 
-                -DEFAULT_CBF_ALPHA * (q_max - q);
+                -cbf_alpha_ * (q_max - q);
 
             // self collision avoidance (CBF)
-            const CollisionChecker::MinDistResult min_dist_res = robot_data_->getMinDistance(true, false, false);
-    
-            A_ineq_ds_.block(si_index_.con_sel_col_start, si_index_.qdot_start, si_index_.con_sel_col_size, si_index_.qdot_size) = min_dist_res.grad.transpose();
-            A_ineq_ds_.block(si_index_.con_sel_col_start, si_index_.slack_sel_col_start, si_index_.con_sel_col_size, si_index_.slack_sel_col_size) = MatrixXd::Identity(si_index_.con_sel_col_size, si_index_.slack_sel_col_size);
-            l_ineq_ds_(si_index_.con_sel_col_start) = - DEFAULT_CBF_ALPHA*(min_dist_res.distance -0.02);
+            if (si_index_.con_sel_col_size > 0)
+            {
+                const auto pair_results = robot_data_->getCollisionPairDistances(true, false, false);
+                const int pair_count = std::min<int>(si_index_.con_sel_col_size, pair_results.size());
+                for (int i = 0; i < pair_count; ++i)
+                {
+                    const auto &res = pair_results[i];
+                    A_ineq_ds_.block(si_index_.con_sel_col_start + i, si_index_.qdot_start, 1, si_index_.qdot_size) =
+                        res.grad.transpose();
+                    if (si_index_.slack_sel_col_size > 0 && i < si_index_.slack_sel_col_size) {
+                        A_ineq_ds_(si_index_.con_sel_col_start + i, si_index_.slack_sel_col_start + i) = 1.0;
+                    }
+                    if (res.distance <= collision_buffer_)
+                    {
+                        l_ineq_ds_(si_index_.con_sel_col_start + i) =
+                            -cbf_alpha_ * (res.distance - collision_safe_distance_);
+                    }
+                }
+            }
         }
     
         void QPIK::setEqConstraint()

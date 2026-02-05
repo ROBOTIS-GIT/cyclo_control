@@ -11,6 +11,8 @@ namespace motion_controller_ros
           l_goal_pose_received_(false),
           r_elbow_pose_received_(false),
           l_elbow_pose_received_(false),
+          reference_diverged_(true),
+          activate_pending_(true),
           joint_state_received_(false),
           dt_(0.01)
     {
@@ -18,6 +20,7 @@ namespace motion_controller_ros
         RCLCPP_INFO(this->get_logger(), "AI Worker Controller - Starting up...");
         RCLCPP_INFO(this->get_logger(), "Node name: %s", this->get_name());
         RCLCPP_INFO(this->get_logger(), "========================================");
+        activate_start_ = this->get_clock()->now();
 
         // Load parameters
         control_frequency_ = this->declare_parameter("control_frequency", 100.0);
@@ -29,7 +32,13 @@ namespace motion_controller_ros
         weight_orientation_ = this->declare_parameter("weight_orientation", 1.0);
         weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 0.5);
         weight_damping_ = this->declare_parameter("weight_damping", 0.1);
-        debug_log_interval_ = this->declare_parameter("debug_log_interval", 100);
+        slack_penalty_ = this->declare_parameter("slack_penalty", 1000.0);
+        cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
+        collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
+        collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+        urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
+        srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
+        reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reset"));
         r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
         l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
         r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_elbow_pose"));
@@ -71,6 +80,14 @@ namespace motion_controller_ros
             joint_states_topic_, 10,
             std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
 
+        ref_divergence_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            "/reference_diverged", 10,
+            std::bind(&AIWorkerController::referenceDivergenceCallback, this, std::placeholders::_1));
+            
+        ref_reactivate_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            reactivate_topic_, 10,
+            std::bind(&AIWorkerController::referenceReactivateCallback, this, std::placeholders::_1));
+
         // Initialize publishers
         // lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
         //     LIFT_TRAJ_TOPIC, 10);
@@ -88,17 +105,21 @@ namespace motion_controller_ros
             l_gripper_pose_topic_, 10);    
 
         // Initialize motion controller
-        std::string urdf_path;
-        std::string srdf_path;
         try {
-            std::string package_path = ament_index_cpp::get_package_share_directory("ffw_description");
-            urdf_path = package_path + "/urdf/ffw_sg2_rev1_follower/ffw_sg2_follower.urdf";
-            srdf_path = package_path + "/urdf/ffw_sg2_rev1_follower/ffw.srdf";
-            RCLCPP_INFO(this->get_logger(), "URDF path: %s", urdf_path.c_str());
-            RCLCPP_INFO(this->get_logger(), "SRDF path: %s", srdf_path.c_str());
+            if (urdf_path_.empty() || srdf_path_.empty()) {
+                std::string package_path = ament_index_cpp::get_package_share_directory("ffw_description");
+                if (urdf_path_.empty()) {
+                    urdf_path_ = package_path + "/urdf/ffw_sg2_rev1_follower/ffw_sg2_follower.urdf";
+                }
+                if (srdf_path_.empty()) {
+                    srdf_path_ = package_path + "/urdf/ffw_sg2_rev1_follower/ffw.srdf";
+                }
+            }
+            RCLCPP_INFO(this->get_logger(), "URDF path: %s", urdf_path_.c_str());
+            RCLCPP_INFO(this->get_logger(), "SRDF path: %s", srdf_path_.c_str());
         } catch (const std::exception& e) {
-            RCLCPP_FATAL(this->get_logger(), 
-                "Failed to find ffw_description package: %s\n",
+            RCLCPP_FATAL(this->get_logger(),
+                "Failed to resolve URDF/SRDF paths: %s\n",
                 e.what());
             rclcpp::shutdown();
             return;
@@ -106,9 +127,10 @@ namespace motion_controller_ros
         
         try {
             RCLCPP_INFO(this->get_logger(), "Loading URDF and initializing kinematics solver...");
-            kinematics_solver_ = std::make_shared<motion_controller_core::KinematicsSolver>(urdf_path, srdf_path);
+            kinematics_solver_ = std::make_shared<motion_controller_core::KinematicsSolver>(urdf_path_, srdf_path_);
             RCLCPP_INFO(this->get_logger(), "Initializing QP controller...");
             qp_controller_ = std::make_shared<motion_controller_core::QPIK>(kinematics_solver_, dt_);
+            qp_controller_->setControllerParams(slack_penalty_, cbf_alpha_, collision_buffer_, collision_safe_distance_);
 
             // Initialize state variables
             int dof = kinematics_solver_->getDof();
@@ -252,6 +274,31 @@ namespace motion_controller_ros
         }
     }
 
+    void AIWorkerController::referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg)
+    {
+        if (!msg->data) {
+            return;
+        }
+        // Ignore reference divergence if controller is activating
+        if (activate_pending_) {
+            return;
+        }
+        if (!reference_diverged_) {
+            RCLCPP_ERROR(this->get_logger(), "Reference divergence detected");
+        }
+        reference_diverged_ = true;
+    }
+
+    void AIWorkerController::referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
+    {
+        if (!msg->data) {
+            return;
+        }
+        RCLCPP_WARN(this->get_logger(), "Activating controller...");
+        activate_start_ = this->get_clock()->now();
+        activate_pending_ = true;
+    }
+
     void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr& msg)
     {
         int dof = kinematics_solver_->getDof();
@@ -284,10 +331,23 @@ namespace motion_controller_ros
         loop_count++;
         
         if (!joint_state_received_) {
-            if (debug_count++ % debug_log_interval_ == 0) {
+            if (debug_count++ % 100 == 0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                     "Control loop waiting for joint states...");
             }
+            return;
+        }
+
+        if (activate_pending_) {
+            const auto elapsed = this->get_clock()->now() - activate_start_;
+            if (elapsed.seconds() >= 3.0) {
+                reference_diverged_ = false;
+                activate_pending_ = false;
+                RCLCPP_WARN(this->get_logger(), "Controller activated.");
+            }
+        }
+
+        if (reference_diverged_) {
             return;
         }
 
@@ -365,7 +425,7 @@ namespace motion_controller_ros
                 return;
             }
 
-            // Compute command from current state (avoid integrating when robot does not move)
+            // Compute command from current state
             q_desired_ = q_ + optimal_velocities * dt_;
 
             // Publish trajectory commands
@@ -408,6 +468,7 @@ namespace motion_controller_ros
         
         return desired_vel;
     }
+
 
     void AIWorkerController::publishTrajectory(const VectorXd& q_desired)
     {

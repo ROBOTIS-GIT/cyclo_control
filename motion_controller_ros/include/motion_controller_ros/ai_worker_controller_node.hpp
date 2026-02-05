@@ -4,6 +4,7 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include <memory>
@@ -42,7 +43,11 @@ namespace motion_controller_ros
         double weight_orientation_;
         double weight_elbow_position_;
         double weight_damping_;
-        int debug_log_interval_;
+        double slack_penalty_;
+        double cbf_alpha_;
+        double collision_buffer_;
+        double collision_safe_distance_;
+        std::string reactivate_topic_;
         std::string r_goal_pose_topic_;
         std::string l_goal_pose_topic_;
         std::string r_elbow_pose_topic_;
@@ -60,6 +65,8 @@ namespace motion_controller_ros
         std::string traj_frame_id_;
         std::string right_gripper_joint_name_;
         std::string left_gripper_joint_name_;
+        std::string urdf_path_;
+        std::string srdf_path_;
 
         // Subscribers
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_goal_pose_sub_;
@@ -67,6 +74,8 @@ namespace motion_controller_ros
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_elbow_pose_sub_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_elbow_pose_sub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_divergence_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_reactivate_sub_;
 
         // Publishers
         // rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr lift_pub_;
@@ -96,6 +105,9 @@ namespace motion_controller_ros
         bool l_goal_pose_received_;
         bool r_elbow_pose_received_;
         bool l_elbow_pose_received_;
+        bool reference_diverged_;
+        rclcpp::Time activate_start_;
+        bool activate_pending_;
         bool joint_state_received_;
 
         // Joint configuration
@@ -115,6 +127,8 @@ namespace motion_controller_ros
         void rightElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
+        void referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg);
+        void referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg);
         void controlLoopCallback();
 
         // ================================ Helper functions ================================

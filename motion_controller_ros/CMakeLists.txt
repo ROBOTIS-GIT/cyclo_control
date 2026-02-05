@@ -66,6 +66,10 @@ add_executable(eef_interactive_marker_node
   src/eef_interactive_marker_node.cpp
 )
 
+add_executable(reference_checker_node
+  src/reference_checker_node.cpp
+)
+
 # Add include directories to the target
 message(STATUS "MOTION_CONTROLLER_CORE_INCLUDE_DIR = ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}")
 
@@ -93,6 +97,12 @@ ament_target_dependencies(eef_interactive_marker_node
   tf2_ros
 )
 
+ament_target_dependencies(reference_checker_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+)
+
 target_link_libraries(ai_worker_controller_node
   Eigen3::Eigen
   pinocchio::pinocchio
@@ -113,6 +123,10 @@ install(TARGETS ai_worker_controller_node
 )
 
 install(TARGETS eef_interactive_marker_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS reference_checker_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
