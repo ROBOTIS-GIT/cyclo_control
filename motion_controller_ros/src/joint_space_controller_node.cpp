@@ -10,8 +10,11 @@ JointSpaceController::JointSpaceController()
       right_traj_received_(false),
       left_traj_received_(false),
       joint_state_received_(false),
+      open_loop_initialized_(false),
       right_gripper_position_(0.0),
       left_gripper_position_(0.0),
+      right_traj_time_from_start_(0, 0),
+      left_traj_time_from_start_(0, 0),
       dt_(0.01)
 {
     RCLCPP_INFO(this->get_logger(), "========================================");
@@ -21,7 +24,6 @@ JointSpaceController::JointSpaceController()
 
     control_frequency_ = this->declare_parameter("control_frequency", 100.0);
     time_step_ = this->declare_parameter("time_step", 0.01);
-    trajectory_time_ = this->declare_parameter("trajectory_time", 0.0);
     weight_tracking_ = this->declare_parameter("weight_tracking", 1.0);
     weight_damping_ = this->declare_parameter("weight_damping", 1.0);
     slack_penalty_ = this->declare_parameter("slack_penalty", 1000.0);
@@ -38,6 +40,7 @@ JointSpaceController::JointSpaceController()
     traj_frame_id_ = this->declare_parameter("traj_frame_id", std::string(""));
     right_gripper_joint_name_ = this->declare_parameter("right_gripper_joint", std::string("gripper_r_joint1"));
     left_gripper_joint_name_ = this->declare_parameter("left_gripper_joint", std::string("gripper_l_joint1"));
+    command_timeout_ = this->declare_parameter("command_timeout", 0.1);
 
     dt_ = time_step_;
 
@@ -112,7 +115,8 @@ JointSpaceController::JointSpaceController()
     }
 
     RCLCPP_INFO(this->get_logger(),
-        "Joint Space Controller initialized successfully!");
+        "Joint Space Controller initialized (open-loop; initial pose from first %s message)",
+        joint_states_topic_.c_str());
 }
 
 JointSpaceController::~JointSpaceController()
@@ -146,6 +150,9 @@ void JointSpaceController::initializeJointConfig()
 void JointSpaceController::rightTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
     if (!msg->points.empty()) {
+        right_traj_time_from_start_ = msg->points.front().time_from_start;
+    }
+    if (!msg->points.empty()) {
         const auto& point = msg->points.front();
         if (!point.positions.empty()) {
             for (size_t i = 0; i < msg->joint_names.size(); ++i) {
@@ -160,10 +167,14 @@ void JointSpaceController::rightTrajectoryCallback(const trajectory_msgs::msg::J
     }
     updateDesiredVelocityFromTrajectory(*msg, right_arm_joints_, qdot_desired_);
     right_traj_received_ = true;
+    last_right_traj_time_ = this->now();
 }
 
 void JointSpaceController::leftTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
+    if (!msg->points.empty()) {
+        left_traj_time_from_start_ = msg->points.front().time_from_start;
+    }
     if (!msg->points.empty()) {
         const auto& point = msg->points.front();
         if (!point.positions.empty()) {
@@ -179,6 +190,7 @@ void JointSpaceController::leftTrajectoryCallback(const trajectory_msgs::msg::Jo
     }
     updateDesiredVelocityFromTrajectory(*msg, left_arm_joints_, qdot_desired_);
     left_traj_received_ = true;
+    last_left_traj_time_ = this->now();
 }
 
 void JointSpaceController::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
@@ -190,8 +202,15 @@ void JointSpaceController::jointStateCallback(const sensor_msgs::msg::JointState
             }
         }
 
+        if (open_loop_initialized_) {
+            return;  // State is last commanded; ignore further joint_states.
+        }
+
         extractJointStates(msg);
         joint_state_received_ = true;
+        open_loop_initialized_ = true;
+        RCLCPP_INFO(this->get_logger(),
+            "Initial pose captured from %s (one-time seed for open-loop)", joint_states_topic_.c_str());
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error in jointStateCallback: %s", e.what());
     }
@@ -253,20 +272,30 @@ void JointSpaceController::controlLoopCallback()
 {
     static int debug_count = 0;
 
-    if (!joint_state_received_) {
+    if (!open_loop_initialized_) {
         if (debug_count++ % 100 == 0) {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "Control loop waiting for joint states...");
+                "Waiting for initial pose from %s...", joint_states_topic_.c_str());
         }
         return;
     }
 
     try {
-        kinematics_solver_->updateState(q_, qdot_);
+        const rclcpp::Time now = this->now();
+        const bool right_recent = right_traj_received_ &&
+            (now - last_right_traj_time_).seconds() < command_timeout_;
+        const bool left_recent = left_traj_received_ &&
+            (now - last_left_traj_time_).seconds() < command_timeout_;
+        const bool has_recent_input = right_recent || left_recent;
 
-        if (!right_traj_received_ && !left_traj_received_) {
+        if (!has_recent_input) {
+            // No trajectory received recently: hold last joint position at 100 Hz
+            publishTrajectory(q_);
             return;
         }
+
+        // qdot_desired_ is set by trajectory callbacks
+        kinematics_solver_->updateState(q_, qdot_);
 
         VectorXd w_tracking = VectorXd::Ones(kinematics_solver_->getDof()) * weight_tracking_;
         VectorXd w_damping = VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
@@ -283,6 +312,8 @@ void JointSpaceController::controlLoopCallback()
         q_desired_ = q_ + optimal_velocities * dt_;
         publishTrajectory(q_desired_);
 
+        q_ = q_desired_;
+        qdot_ = optimal_velocities;
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
     }
@@ -308,14 +339,16 @@ void JointSpaceController::publishTrajectory(const VectorXd& q_desired)
         if (!left_arm_indices.empty()) {
             auto traj_left = createTrajectoryMsgWithGripper(
                 left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_,
-                left_gripper_position_);
+                left_gripper_position_,
+                left_traj_time_from_start_);
             arm_l_pub_->publish(traj_left);
         }
 
         if (!right_arm_indices.empty()) {
             auto traj_right = createTrajectoryMsgWithGripper(
                 right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_,
-                right_gripper_position_);
+                right_gripper_position_,
+                right_traj_time_from_start_);
             arm_r_pub_->publish(traj_right);
         }
     } catch (const std::exception& e) {
@@ -328,7 +361,8 @@ trajectory_msgs::msg::JointTrajectory JointSpaceController::createTrajectoryMsgW
     const VectorXd& positions,
     const std::vector<int>& arm_indices,
     const std::string& gripper_joint_name,
-    double gripper_position) const
+    double gripper_position,
+    const rclcpp::Duration& time_from_start) const
 {
     trajectory_msgs::msg::JointTrajectory traj_msg;
     traj_msg.header.frame_id = traj_frame_id_;
@@ -336,7 +370,7 @@ trajectory_msgs::msg::JointTrajectory JointSpaceController::createTrajectoryMsgW
     traj_msg.joint_names.push_back(gripper_joint_name);
 
     trajectory_msgs::msg::JointTrajectoryPoint point;
-    point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
+    point.time_from_start = time_from_start;
     for (int idx : arm_indices) {
         if (idx >= 0 && idx < static_cast<int>(positions.size())) {
             point.positions.push_back(positions[idx]);

@@ -9,25 +9,16 @@ ai_worker_controller:
     weight_orientation: 1.0
     weight_elbow_position: 8.0
     weight_damping: 0.1
-    # kp_position: 100.0
-    # kp_orientation: 10.0
-    # weight_position: 1.0
-    # weight_orientation: 1.0
-    # weight_elbow_position: 0.2
-    # weight_damping: 0.1
     collision_buffer: 0.05
     collision_safe_distance: 0.02
     slack_penalty: 1000.0
     cbf_alpha: 50.0
     reactivate_topic: "/reset"  
-    # reactivate_topic: "/vr_control/toggle"
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"
     r_elbow_pose_topic: "/r_elbow_pose"
     l_elbow_pose_topic: "/l_elbow_pose"
     joint_states_topic: "/joint_states"
-    # right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory_filtered"
-    # left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory_filtered"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
     r_gripper_pose_topic: "/r_gripper_pose"
@@ -45,13 +36,13 @@ joint_space_controller:
   ros__parameters:
     control_frequency: 100.0
     time_step: 0.01
-    trajectory_time: 0.0
     weight_tracking: 1.0
-    weight_damping: 2.0
+    weight_damping: 0.1
     collision_buffer: 0.05
     collision_safe_distance: 0.02
     slack_penalty: 1000.0
-    cbf_alpha: 5.0
+    cbf_alpha: 50.0
+    command_timeout: 0.1
     joint_states_topic: "/joint_states"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"

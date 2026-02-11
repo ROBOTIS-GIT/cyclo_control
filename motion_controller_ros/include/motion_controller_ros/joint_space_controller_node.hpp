@@ -36,13 +36,13 @@ namespace motion_controller_ros
         // Configurable parameters
         double control_frequency_;
         double time_step_;
-        double trajectory_time_;
         double weight_tracking_;
         double weight_damping_;
         double slack_penalty_;
         double cbf_alpha_;
         double collision_buffer_;
         double collision_safe_distance_;
+        double command_timeout_;
         std::string joint_states_topic_;
         std::string right_traj_topic_;
         std::string left_traj_topic_;
@@ -80,8 +80,14 @@ namespace motion_controller_ros
         bool right_traj_received_;
         bool left_traj_received_;
         bool joint_state_received_;
+        /** Set true after first /joint_states message; thereafter state is last commanded pose. */
+        bool open_loop_initialized_;
         double right_gripper_position_;
         double left_gripper_position_;
+        rclcpp::Duration right_traj_time_from_start_;
+        rclcpp::Duration left_traj_time_from_start_;
+        rclcpp::Time last_right_traj_time_;
+        rclcpp::Time last_left_traj_time_;
 
         // Joint configuration
         std::vector<std::string> left_arm_joints_;
@@ -129,7 +135,8 @@ namespace motion_controller_ros
             const VectorXd& positions,
             const std::vector<int>& arm_indices,
             const std::string& gripper_joint_name,
-            double gripper_position) const;
+            double gripper_position,
+            const rclcpp::Duration& time_from_start) const;
 
         /**
          * @brief Extract joint states from message.
