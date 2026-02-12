@@ -24,8 +24,8 @@ sudo make install
 ```
 - Set library path
 ```bash
-echo "export OsqpEigen_DIR=~/osqp-eigen_install" >> ~/.bashrc && \
-echo "export LD_LIBRARY_PATH=~/osqp-eigen_install/lib:$LD_LIBRARY_PATH" >> ~/.bashrc
+echo "export OsqpEigen_DIR=/root/osqp-eigen_install" >> ~/.bashrc && \
+echo "export LD_LIBRARY_PATH=/root/osqp-eigen_install/lib:$LD_LIBRARY_PATH" >> ~/.bashrc
 ```
 - Install Pinocchio
 ```bash
