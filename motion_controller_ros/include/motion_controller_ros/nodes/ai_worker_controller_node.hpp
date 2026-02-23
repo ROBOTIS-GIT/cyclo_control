@@ -59,6 +59,9 @@ namespace motion_controller_ros
         std::string joint_states_topic_;
         std::string right_traj_topic_;
         std::string left_traj_topic_;
+        std::string right_raw_traj_topic_;
+        std::string left_raw_traj_topic_;
+        double raw_traj_timeout_;
         std::string lift_topic_;
         double lift_vel_bound_;
         std::string r_gripper_pose_topic_;
@@ -78,6 +81,8 @@ namespace motion_controller_ros
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_elbow_pose_sub_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_elbow_pose_sub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
+        rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_raw_traj_sub_;
+        rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_raw_traj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_divergence_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_reactivate_sub_;
 
@@ -123,6 +128,14 @@ namespace motion_controller_ros
         bool activate_pending_;
         bool joint_state_received_;
 
+        // Latest gripper positions from raw joint trajectory (leader side)
+        bool right_raw_gripper_received_ = false;
+        bool left_raw_gripper_received_ = false;
+        double right_raw_gripper_position_ = 0.0;
+        double left_raw_gripper_position_ = 0.0;
+        rclcpp::Time last_right_raw_traj_time_;
+        rclcpp::Time last_left_raw_traj_time_;
+
         // Control timing
         double dt_;  // nominal time step in seconds
         rclcpp::Time last_control_time_;
@@ -143,6 +156,8 @@ namespace motion_controller_ros
         void rightElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
+        void rightRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
+        void leftRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
         void referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg);
         void referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg);
         void controlLoopCallback();
@@ -154,7 +169,8 @@ namespace motion_controller_ros
             const std::vector<std::string>& arm_joint_names,
             const VectorXd& positions,
             const std::vector<int>& arm_indices,
-            const std::string& gripper_joint_name) const;
+            const std::string& gripper_joint_name,
+            const double gripper_position) const;
         trajectory_msgs::msg::JointTrajectory createLiftTrajectoryMsg(
             std::string lift_joint_name,
             const double position) const;

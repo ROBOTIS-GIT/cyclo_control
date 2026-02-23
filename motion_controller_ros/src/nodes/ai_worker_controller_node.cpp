@@ -46,6 +46,13 @@ namespace motion_controller_ros
         joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
         right_traj_topic_ = this->declare_parameter("right_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
         left_traj_topic_ = this->declare_parameter("left_traj_topic", std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
+        right_raw_traj_topic_ = this->declare_parameter(
+            "right_raw_traj_topic",
+            std::string("/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"));
+        left_raw_traj_topic_ = this->declare_parameter(
+            "left_raw_traj_topic",
+            std::string("/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"));
+        raw_traj_timeout_ = this->declare_parameter("raw_traj_timeout", 0.5);
         lift_topic_ = this->declare_parameter("lift_topic", std::string("/leader/joystick_controller_right/joint_trajectory"));
         lift_vel_bound_ = this->declare_parameter("lift_vel_bound", 0.0);
         r_gripper_pose_topic_ = this->declare_parameter("r_gripper_pose_topic", std::string("/r_gripper_pose"));
@@ -58,6 +65,8 @@ namespace motion_controller_ros
         left_gripper_joint_name_ = this->declare_parameter("left_gripper_joint", std::string("gripper_l_joint1"));
 
         dt_ = time_step_;
+        last_right_raw_traj_time_ = this->now();
+        last_left_raw_traj_time_ = this->now();
 
         // Initialize subscribers
         r_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -79,6 +88,13 @@ namespace motion_controller_ros
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
             std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
+
+        right_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+            right_raw_traj_topic_, 10,
+            std::bind(&AIWorkerController::rightRawTrajectoryCallback, this, std::placeholders::_1));
+        left_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+            left_raw_traj_topic_, 10,
+            std::bind(&AIWorkerController::leftRawTrajectoryCallback, this, std::placeholders::_1));
 
         ref_divergence_sub_ = this->create_subscription<std_msgs::msg::Bool>(
             "/reference_diverged", 10,
@@ -258,6 +274,52 @@ namespace motion_controller_ros
         l_elbow_pose_received_ = true;
         RCLCPP_DEBUG(this->get_logger(), "Left elbow pose received: [%.3f, %.3f, %.3f]", 
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    }
+
+    void AIWorkerController::rightRawTrajectoryCallback(
+        const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+    {
+        if (!msg || msg->points.empty()) {
+            return;
+        }
+        const auto &point = msg->points.front();
+        if (point.positions.empty()) {
+            return;
+        }
+        for (size_t i = 0; i < msg->joint_names.size(); ++i) {
+            if (msg->joint_names[i] != right_gripper_joint_name_) {
+                continue;
+            }
+            if (i < point.positions.size()) {
+                right_raw_gripper_position_ = point.positions[i];
+                right_raw_gripper_received_ = true;
+                last_right_raw_traj_time_ = this->now();
+            }
+            return;
+        }
+    }
+
+    void AIWorkerController::leftRawTrajectoryCallback(
+        const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+    {
+        if (!msg || msg->points.empty()) {
+            return;
+        }
+        const auto &point = msg->points.front();
+        if (point.positions.empty()) {
+            return;
+        }
+        for (size_t i = 0; i < msg->joint_names.size(); ++i) {
+            if (msg->joint_names[i] != left_gripper_joint_name_) {
+                continue;
+            }
+            if (i < point.positions.size()) {
+                left_raw_gripper_position_ = point.positions[i];
+                left_raw_gripper_received_ = true;
+                last_left_raw_traj_time_ = this->now();
+            }
+            return;
+        }
     }
 
     void AIWorkerController::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
@@ -526,15 +588,25 @@ namespace motion_controller_ros
 
             // Publish left arm trajectory (include gripper joint with position 0)
             if (!left_arm_indices.empty()) {
+                double gripper_pos = 0.0;
+                if (left_raw_gripper_received_ &&
+                    (this->now() - last_left_raw_traj_time_).seconds() < raw_traj_timeout_) {
+                    gripper_pos = left_raw_gripper_position_;
+                }
                 auto traj_left = createTrajectoryMsgWithGripper(
-                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_);
+                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_, gripper_pos);
                 arm_l_pub_->publish(traj_left);
             }
 
             // Publish right arm trajectory (include gripper joint with position 0)
             if (!right_arm_indices.empty()) {
+                double gripper_pos = 0.0;
+                if (right_raw_gripper_received_ &&
+                    (this->now() - last_right_raw_traj_time_).seconds() < raw_traj_timeout_) {
+                    gripper_pos = right_raw_gripper_position_;
+                }
                 auto traj_right = createTrajectoryMsgWithGripper(
-                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_);
+                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_, gripper_pos);
                 arm_r_pub_->publish(traj_right);
             }
 
@@ -559,7 +631,8 @@ namespace motion_controller_ros
         const std::vector<std::string>& arm_joint_names,
         const VectorXd& positions,
         const std::vector<int>& arm_indices,
-        const std::string& gripper_joint_name) const
+        const std::string& gripper_joint_name,
+        const double gripper_position) const
     {
         trajectory_msgs::msg::JointTrajectory traj_msg;
         traj_msg.header.frame_id = "";
@@ -581,7 +654,7 @@ namespace motion_controller_ros
         }
         
         // Add gripper joint position
-        point.positions.push_back(0.0);
+        point.positions.push_back(gripper_position);
 
         traj_msg.points.push_back(point);
         return traj_msg;
