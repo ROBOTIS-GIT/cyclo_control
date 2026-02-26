@@ -10,6 +10,12 @@ from motion_controller_msgs.msg import HandJoints
 
 from motion_controller_core.src.retargeting.retarget import ROBOTISHandRetargeter
 
+# Create a profile that prioritizes speed over reliability
+qos_best_effort = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1
+)
 
 class RetargetingTeleop(Node):
     def __init__(self):
@@ -34,35 +40,41 @@ class RetargetingTeleop(Node):
             "finger_r_joint17", "finger_r_joint18", "finger_r_joint19", "finger_r_joint20"
         ]
 
-        self.left_publisher_ = self.create_publisher(JointTrajectory, '/left_hand_controller/joint_trajectory', 10)
-        # self.left_publisher_ = self.create_publisher(JointState, '/joint_states', 10)
+        self.left_publisher_ = self.create_publisher(JointTrajectory, '/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory', qos_best_effort)
+        # self.left_publisher_ = self.create_publisher(JointTrajectory, '/left_hand_controller/joint_trajectory', qos_best_effort)
+        # self.left_publisher_ = self.create_publisher(JointState, '/joint_states', qos_best_effort)
 
-        # self.right_publisher_ = self.create_publisher(JointTrajectory, '/right_hand_controller/joint_trajectory', 10)
-        self.right_publisher_ = self.create_publisher(JointState, '/joint_states', 10)
+        self.right_publisher_ = self.create_publisher(JointTrajectory, '/leader/joint_trajectory_command_broadcaster_right_hand/joint_trajectory', qos_best_effort)
+        # self.right_publisher_ = self.create_publisher(JointTrajectory, '/right_hand_controller/joint_trajectory', qos_best_effort)
+        # self.right_publisher_ = self.create_publisher(JointState, '/joint_states', qos_best_effort)
 
         self.left_subscriber_ = self.create_subscription(
             HandJoints,
             '/left_hand/hand_joint_pos',
-            self.run_teleop,
-            10
+            self.run_teleop_left,
+            qos_best_effort
         )
 
         self.right_subscriber_ = self.create_subscription(
             HandJoints,
             '/right_hand/hand_joint_pos',
-            self.run_teleop,
-            10
+            self.run_teleop_right,
+            qos_best_effort
         )
 
         self.get_logger().info('Retargeting Teleop Node Started')
 
-    def run_teleop(self, msg):
+    def run_teleop_left(self, msg):
         mediapipe_pos = self.convert_msg_to_numpy(msg)
-        # mediapipe_pos = self.reorder_mediapipe_pos(mediapipe_pos)
-        retargeting_result = self.retargeter.retarget(mediapipe_pos)
+        retargeting_result = self.left_retargeter.retarget(mediapipe_pos)
         hand_joint_positions = retargeting_result.robot_qpos
-        # hand_joint_positions = self.reorder_hand_pos(hand_joint_positions)
-        self.publish_trajectory(hand_joint_positions)
+        self.publish_trajectory_left(hand_joint_positions)
+
+    def run_teleop_right(self, msg):
+        mediapipe_pos = self.convert_msg_to_numpy(msg)
+        retargeting_result = self.right_retargeter.retarget(mediapipe_pos)
+        hand_joint_positions = retargeting_result.robot_qpos
+        self.publish_trajectory_right(hand_joint_positions)
 
     def convert_msg_to_numpy(self, msg):
         num_joints = 21
@@ -73,23 +85,39 @@ class RetargetingTeleop(Node):
             pose_array_np[i,2] = point.z
         return pose_array_np
 
-    def publish_trajectory(self, goal, duration=0):
+    def publish_trajectory_left(self, goal, duration=0):
         msg = JointTrajectory()
         msg.joint_names = self.left_joint_names
-        # msg.joint_names = self.right_joint_names
         goal_point = JointTrajectoryPoint()
         goal_point.positions = goal.tolist()
         goal_point.time_from_start.sec = int(duration)
         goal_point.time_from_start.nanosec = 0
         msg.points.append(goal_point)
-        self.publisher_.publish(msg)
+        self.left_publisher_.publish(msg)
 
-    # def publish_trajectory(self, goal):
+    def publish_trajectory_right(self, goal, duration=0):
+        msg = JointTrajectory()
+        msg.joint_names = self.right_joint_names
+        goal_point = JointTrajectoryPoint()
+        goal_point.positions = goal.tolist()
+        goal_point.time_from_start.sec = int(duration)
+        goal_point.time_from_start.nanosec = 0
+        msg.points.append(goal_point)
+        self.right_publisher_.publish(msg)
+
+    # def publish_trajectory_left(self, goal):
     #     msg = JointState()
     #     msg.header.stamp = self.get_clock().now().to_msg()
     #     msg.name = self.left_joint_names
     #     msg.position = goal.tolist()
-    #     self.publisher_.publish(msg)
+    #     self.left_publisher_.publish(msg)
+
+    # def publish_trajectory_right(self, goal):
+    #     msg = JointState()
+    #     msg.header.stamp = self.get_clock().now().to_msg()
+    #     msg.name = self.right_joint_names
+    #     msg.position = goal.tolist()
+    #     self.right_publisher_.publish(msg)
 
 
 def main(args=None):
