@@ -29,7 +29,7 @@ namespace motion_controller_ros
         left_traj_topic_ = this->declare_parameter(
             "left_traj_topic",
             std::string("/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"));
-        reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string(""));
+        reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/reactivate"));
         command_timeout_ = this->declare_parameter("command_timeout", 0.1);
         r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
         l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
@@ -61,8 +61,22 @@ namespace motion_controller_ros
             r_elbow_pose_topic_, 10);
         l_elbow_pose_pub_ =this->create_publisher<geometry_msgs::msg::PoseStamped>(
             l_elbow_pose_topic_, 10); 
-        reactivate_pub_ = this->create_publisher<std_msgs::msg::Bool>(
-            reactivate_topic_, 10);
+
+        reactivate_client_ = this->create_client<std_srvs::srv::Trigger>(reactivate_service_);
+        if (!reactivate_client_) {
+            RCLCPP_FATAL(this->get_logger(),
+                "Failed to create reactivate service client '%s'.",
+                reactivate_service_.c_str());
+            rclcpp::shutdown();
+            return;
+        }
+        if (!reactivate_client_->wait_for_service(std::chrono::seconds(2))) {
+            RCLCPP_WARN(this->get_logger(),
+                "Reactivate service '%s' not available yet; will retry on first publish.",
+                reactivate_service_.c_str());
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Reactivate service available: %s", reactivate_service_.c_str());
+        }
 
         try {
             if (urdf_path_.empty()) {
@@ -212,14 +226,31 @@ namespace motion_controller_ros
         }
     }
 
-    void LeaderController::publishReactivateOnce()
+    bool LeaderController::requestReactivateOnce()
     {
-        if (!reactivate_pub_) {
-            return;
+        if (!reactivate_client_) {
+            return false;
         }
-        std_msgs::msg::Bool msg;
-        msg.data = true;
-        reactivate_pub_->publish(msg);
+        if (!reactivate_client_->service_is_ready()) {
+            return false;
+        }
+
+        auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+        (void)reactivate_client_->async_send_request(
+            request,
+            [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+                try {
+                    const auto resp = future.get();
+                    if (resp->success) {
+                        RCLCPP_INFO(this->get_logger(), "Reactivate service call succeeded: %s", resp->message.c_str());
+                    } else {
+                        RCLCPP_WARN(this->get_logger(), "Reactivate service call failed: %s", resp->message.c_str());
+                    }
+                } catch (const std::exception& e) {
+                    RCLCPP_WARN(this->get_logger(), "Reactivate service call exception: %s", e.what());
+                }
+            });
+        return true;
     }
 
     void LeaderController::controlLoopCallback()
@@ -237,6 +268,7 @@ namespace motion_controller_ros
 
         if (!right_traj_has_publisher && !left_traj_has_publisher) {
             was_publishing_reference_ = false;
+            reactivate_requested_ = false;
             if (debug_count++ % 100 == 0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                     "No publishers on trajectory topics; skipping goal pose publish");
@@ -255,6 +287,7 @@ namespace motion_controller_ros
         // Wait until we have at least one arm trajectory message before publishing any goal pose.
         if (!has_recent_reference) {
             was_publishing_reference_ = false;
+            reactivate_requested_ = false;
             if (debug_count++ % 100 == 0) {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                     "Control loop waiting for joint trajectory commands...");
@@ -262,11 +295,18 @@ namespace motion_controller_ros
             return;
         }
 
-        // On first start, trigger slow-start.
-        if (!was_publishing_reference_) {
-            publishReactivateOnce();
-            was_publishing_reference_ = true;
+        // When a command stream starts (or resumes after timeout), trigger slow-start via reactivate service.
+        // Keep publishing references even if the service isn't ready yet; we'll retry calling it until it is.
+        if (!reactivate_requested_) {
+            if (requestReactivateOnce()) {
+                reactivate_requested_ = true;
+            } else {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                    "Reactivate service '%s' not ready; will retry...",
+                    reactivate_service_.c_str());
+            }
         }
+        was_publishing_reference_ = true;
 
         try {
             kinematics_solver_->updateState(q_, qdot_);

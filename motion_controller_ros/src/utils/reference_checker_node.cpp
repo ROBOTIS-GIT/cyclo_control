@@ -6,13 +6,11 @@ namespace motion_controller_ros
 {
     ReferenceDivergenceChecker::ReferenceDivergenceChecker()
         : Node("reference_checker"),
-          divergence_active_(false),
           r_goal_prev_set_(false),
           l_goal_prev_set_(false)
     {
         ref_pos_jump_threshold_ = this->declare_parameter("ref_pos_jump_threshold", 0.1);
         ref_ori_jump_threshold_deg_ = this->declare_parameter("ref_ori_jump_threshold_deg", 30.0);
-        reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reset"));
         r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
         l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
 
@@ -25,10 +23,6 @@ namespace motion_controller_ros
         l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
           l_goal_pose_topic_, 10,
           std::bind(&ReferenceDivergenceChecker::leftGoalPoseCallback, this, std::placeholders::_1));
-
-        ref_reactivate_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-          reactivate_topic_, 10,
-          std::bind(&ReferenceDivergenceChecker::referenceReactivateCallback, this, std::placeholders::_1));
     }
 
     void ReferenceDivergenceChecker::rightGoalPoseCallback(
@@ -45,15 +39,6 @@ namespace motion_controller_ros
         checkReferenceJump("left_goal", l_goal_prev_, msg->pose, l_goal_prev_set_);
         l_goal_prev_ = msg->pose;
         l_goal_prev_set_ = true;
-    }
-
-    void ReferenceDivergenceChecker::referenceReactivateCallback(
-        const std_msgs::msg::Bool::SharedPtr msg)
-    {
-        if (!msg->data) {
-            return;
-        }
-        divergence_active_ = false;
     }
 
     void ReferenceDivergenceChecker::checkReferenceJump(
@@ -86,7 +71,6 @@ namespace motion_controller_ros
         const double angle_deg = angle_rad * 180.0 / M_PI;
 
         if (pos_dist > ref_pos_jump_threshold_ || angle_deg > ref_ori_jump_threshold_deg_) {
-            divergence_active_ = true;
             std_msgs::msg::Bool msg;
             msg.data = true;
             reference_divergence_pub_->publish(msg);

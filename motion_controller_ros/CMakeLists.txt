@@ -12,6 +12,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -103,6 +104,7 @@ target_include_directories(leader_controller_node PRIVATE
 ament_target_dependencies(ai_worker_controller_node
   rclcpp
   std_msgs
+  std_srvs
   geometry_msgs
   sensor_msgs
   trajectory_msgs
@@ -121,6 +123,7 @@ ament_target_dependencies(joint_space_controller_node
 ament_target_dependencies(leader_controller_node
   rclcpp
   std_msgs
+  std_srvs
   geometry_msgs
   sensor_msgs
   trajectory_msgs

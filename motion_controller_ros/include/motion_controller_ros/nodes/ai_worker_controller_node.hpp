@@ -5,6 +5,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include <memory>
@@ -51,7 +52,7 @@ namespace motion_controller_ros
         double cbf_alpha_;
         double collision_buffer_;
         double collision_safe_distance_;
-        std::string reactivate_topic_;
+        std::string reactivate_service_;
         std::string r_goal_pose_topic_;
         std::string l_goal_pose_topic_;
         std::string r_elbow_pose_topic_;
@@ -84,7 +85,9 @@ namespace motion_controller_ros
         rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_raw_traj_sub_;
         rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_raw_traj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_divergence_sub_;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_reactivate_sub_;
+
+        // Services
+        rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reactivate_srv_;
 
         // Publishers
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_r_pub_;
@@ -159,7 +162,9 @@ namespace motion_controller_ros
         void rightRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
         void leftRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
         void referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg);
-        void referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg);
+        void reactivateServiceCallback(
+            const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+            std::shared_ptr<std_srvs::srv::Trigger::Response> response);
         void controlLoopCallback();
 
         // Helper functions

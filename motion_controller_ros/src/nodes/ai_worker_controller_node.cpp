@@ -38,7 +38,7 @@ namespace motion_controller_ros
         collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
         urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
         srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
-        reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reset"));
+        reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/reactivate"));
         r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
         l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
         r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_elbow_pose"));
@@ -99,10 +99,18 @@ namespace motion_controller_ros
         ref_divergence_sub_ = this->create_subscription<std_msgs::msg::Bool>(
             "/reference_diverged", 10,
             std::bind(&AIWorkerController::referenceDivergenceCallback, this, std::placeholders::_1));
-            
-        ref_reactivate_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-            reactivate_topic_, 10,
-            std::bind(&AIWorkerController::referenceReactivateCallback, this, std::placeholders::_1));
+
+        reactivate_srv_ = this->create_service<std_srvs::srv::Trigger>(
+            reactivate_service_,
+            std::bind(&AIWorkerController::reactivateServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
+        if (!reactivate_srv_) {
+            RCLCPP_FATAL(this->get_logger(),
+                "Failed to create reactivate service server '%s'. Controller will not start.",
+                reactivate_service_.c_str());
+            rclcpp::shutdown();
+            return;
+        }
+        RCLCPP_INFO(this->get_logger(), "Reactivate service ready: %s", reactivate_service_.c_str());
 
         // Initialize publishers
         lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
@@ -361,14 +369,16 @@ namespace motion_controller_ros
         reference_diverged_ = true;
     }
 
-    void AIWorkerController::referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
+    void AIWorkerController::reactivateServiceCallback(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
-        if (!msg->data) {
-            return;
-        }
+        (void)request;
         RCLCPP_WARN(this->get_logger(), "Activating controller...");
         activate_start_ = this->get_clock()->now();
         activate_pending_ = true;
+        response->success = true;
+        response->message = "Controller activated!";
     }
 
     void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr& msg)

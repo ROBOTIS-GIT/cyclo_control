@@ -13,7 +13,7 @@ ai_worker_controller:
     collision_safe_distance: 0.02
     slack_penalty: 1000.0
     cbf_alpha: 50.0
-    reactivate_topic: "/reset"  
+    reactivate_service: "/reactivate"
     joint_states_topic: "/joint_states"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
@@ -55,6 +55,7 @@ leader_controller:
     joint_states_topic: "/joint_states" 
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"
+    reactivate_service: "/reactivate"
     command_timeout: 0.1
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"
@@ -72,6 +73,5 @@ reference_checker:
   ros__parameters:
     ref_pos_jump_threshold: 0.1
     ref_ori_jump_threshold_deg: 30.0
-    reactivate_topic: "/reset"
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"
