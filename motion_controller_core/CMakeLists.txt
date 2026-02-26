@@ -36,7 +36,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-ament_python_install_package(${PROJECT_NAME})
+ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/retargeting)
 
 install(
     TARGETS ${PROJECT_NAME}
