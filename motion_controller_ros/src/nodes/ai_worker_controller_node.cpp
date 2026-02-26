@@ -2,6 +2,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace motion_controller_ros
 {
@@ -12,7 +13,7 @@ namespace motion_controller_ros
           r_elbow_pose_received_(false),
           l_elbow_pose_received_(false),
           reference_diverged_(true),
-          activate_pending_(true),
+          activate_pending_(false),
           joint_state_received_(false),
           dt_(0.01)
     {
@@ -63,6 +64,8 @@ namespace motion_controller_ros
         l_elbow_name_ = this->declare_parameter("l_elbow_name", std::string("arm_l_link4"));
         right_gripper_joint_name_ = this->declare_parameter("right_gripper_joint", std::string("gripper_r_joint1"));
         left_gripper_joint_name_ = this->declare_parameter("left_gripper_joint", std::string("gripper_l_joint1"));
+        startup_ref_pos_threshold_ = this->declare_parameter("startup_ref_pos_threshold", 0.15);
+        startup_ref_ori_threshold_deg_ = this->declare_parameter("startup_ref_ori_threshold_deg", 45.0);
 
         dt_ = time_step_;
         last_right_raw_traj_time_ = this->now();
@@ -113,6 +116,8 @@ namespace motion_controller_ros
         RCLCPP_INFO(this->get_logger(), "Reactivate service ready: %s", reactivate_service_.c_str());
 
         // Initialize publishers
+        reference_divergence_pub_ = this->create_publisher<std_msgs::msg::Bool>("/reference_diverged", 10);
+        controller_error_pub_ = this->create_publisher<std_msgs::msg::String>("~/controller_error", 10);
         lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             lift_topic_, 10);
 
@@ -190,6 +195,10 @@ namespace motion_controller_ros
             joint_state_sub_ ? "OK" : "FAILED");
         RCLCPP_INFO(this->get_logger(), "========================================");
         RCLCPP_INFO(this->get_logger(), "Node is ready! Waiting for messages...");
+        RCLCPP_WARN(
+            this->get_logger(),
+            "Control loop is ready. Call '%s' to start control.",
+            reactivate_service_.c_str());
     }
 
     AIWorkerController::~AIWorkerController()
@@ -374,11 +383,14 @@ namespace motion_controller_ros
         std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
         (void)request;
-        RCLCPP_WARN(this->get_logger(), "Activating controller...");
-        activate_start_ = this->get_clock()->now();
-        activate_pending_ = true;
+        RCLCPP_WARN(this->get_logger(), "Start requested (reactivate). Waiting for reference alignment...");
+        start_requested_ = true;
+        control_enabled_ = false;      // will become true after startup check passes
+        activate_pending_ = false;     // set true when we actually enable
+        reference_diverged_ = true;    // keep inhibited until activation delay finishes
         response->success = true;
-        response->message = "Controller activated!";
+        response->message =
+            "Start requested. Controller will start when goal-current pose error is within threshold.";
     }
 
     void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr& msg)
@@ -418,6 +430,103 @@ namespace motion_controller_ros
                     "Control loop waiting for joint states...");
             }
             return;
+        }
+
+        // Always compute & publish current gripper poses from measured state.
+        // This allows external nodes to validate reference-vs-current before control starts.
+        Affine3d r_gripper_pose_meas = Affine3d::Identity();
+        Affine3d l_gripper_pose_meas = Affine3d::Identity();
+        try {
+            kinematics_solver_->updateState(q_, qdot_);
+            r_gripper_pose_meas = kinematics_solver_->getPose(r_gripper_name_);
+            l_gripper_pose_meas = kinematics_solver_->getPose(l_gripper_name_);
+            publishGripperPose(r_gripper_pose_meas, l_gripper_pose_meas);
+        } catch (const std::exception &e) {
+            RCLCPP_WARN_THROTTLE(
+                this->get_logger(), *this->get_clock(), 2000,
+                "Failed to compute/publish measured gripper pose: %s", e.what());
+        }
+
+        // Startup arming: wait for reactivate AND small goal-current pose error for both arms.
+        if (!start_requested_) {
+            if (debug_count++ % 100 == 0) {
+                RCLCPP_WARN_THROTTLE(
+                    this->get_logger(), *this->get_clock(), 2000,
+                    "Control loop waiting for reactivate service '%s'...",
+                    reactivate_service_.c_str());
+            }
+            return;
+        }
+
+        // Only perform the goal-vs-current mismatch check during startup (before enabling control).
+        if (!control_enabled_) {
+            if (!r_goal_pose_received_ || !l_goal_pose_received_) {
+                if (debug_count++ % 100 == 0) {
+                    RCLCPP_WARN_THROTTLE(
+                        this->get_logger(), *this->get_clock(), 2000,
+                        "Waiting for goal poses: right=%s left=%s",
+                        r_goal_pose_received_ ? "OK" : "MISSING",
+                        l_goal_pose_received_ ? "OK" : "MISSING");
+                }
+                return;
+            }
+
+            auto pose_error = [](const Affine3d &cur, const Affine3d &goal, double &pos_m, double &ori_deg) {
+                pos_m = (goal.translation() - cur.translation()).norm();
+                const Eigen::Quaterniond q_cur(cur.linear());
+                const Eigen::Quaterniond q_goal(goal.linear());
+                const double dot = std::abs(q_cur.dot(q_goal));
+                const double clamped = std::min(1.0, std::max(-1.0, dot));
+                const double angle_rad = 2.0 * std::acos(clamped);
+                ori_deg = angle_rad * 180.0 / M_PI;
+            };
+
+            double r_pos_err = 0.0, r_ori_err = 0.0;
+            double l_pos_err = 0.0, l_ori_err = 0.0;
+            pose_error(r_gripper_pose_meas, r_goal_pose_, r_pos_err, r_ori_err);
+            pose_error(l_gripper_pose_meas, l_goal_pose_, l_pos_err, l_ori_err);
+
+            const bool r_ok =
+                (r_pos_err <= startup_ref_pos_threshold_) &&
+                (r_ori_err <= startup_ref_ori_threshold_deg_);
+            const bool l_ok =
+                (l_pos_err <= startup_ref_pos_threshold_) &&
+                (l_ori_err <= startup_ref_ori_threshold_deg_);
+
+            if (!(r_ok && l_ok)) {
+                reference_diverged_ = true;
+
+                if (reference_divergence_pub_) {
+                    std_msgs::msg::Bool msg;
+                    msg.data = true;
+                    reference_divergence_pub_->publish(msg);
+                }
+                if (controller_error_pub_) {
+                    std_msgs::msg::String err;
+                    err.data =
+                        "Startup reference mismatch: "
+                        "R(pos=" + std::to_string(r_pos_err) + "m, ori=" + std::to_string(r_ori_err) + "deg) "
+                        "L(pos=" + std::to_string(l_pos_err) + "m, ori=" + std::to_string(l_ori_err) + "deg) "
+                        "thresholds(pos=" + std::to_string(startup_ref_pos_threshold_) + "m, ori=" +
+                        std::to_string(startup_ref_ori_threshold_deg_) + "deg)";
+                    controller_error_pub_->publish(err);
+                }
+
+                RCLCPP_ERROR_THROTTLE(
+                    this->get_logger(), *this->get_clock(), 2000,
+                    "Startup mismatch. Waiting. R: pos=%.3f m ori=%.1f deg, L: pos=%.3f m ori=%.1f deg (thr pos=%.3f, ori=%.1f)",
+                    r_pos_err, r_ori_err, l_pos_err, l_ori_err, startup_ref_pos_threshold_, startup_ref_ori_threshold_deg_);
+                return;
+            }
+
+            // Arm controller once the mismatch is small enough
+            control_enabled_ = true;
+            activate_start_ = this->get_clock()->now();
+            activate_pending_ = true;
+            reference_diverged_ = true;  // will be cleared after activation delay
+            RCLCPP_WARN(
+                this->get_logger(),
+                "Startup check passed. Activating controller.");
         }
 
         if (activate_pending_) {

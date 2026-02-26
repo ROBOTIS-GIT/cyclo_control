@@ -31,6 +31,8 @@ ai_worker_controller:
     l_elbow_name: "arm_l_link4"
     right_gripper_joint: "gripper_r_joint1"
     left_gripper_joint: "gripper_l_joint1"
+    startup_ref_pos_threshold: 0.3
+    startup_ref_ori_threshold_deg: 120.0
 
 joint_space_controller:
   ros__parameters:
