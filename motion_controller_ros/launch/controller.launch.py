@@ -15,8 +15,8 @@ def generate_launch_description():
                               description='Start interactive markers for goal poses.'),
         DeclareLaunchArgument('base_frame', default_value='base_link',
                               description='Frame for interactive markers and goal poses.'),
-        DeclareLaunchArgument('reactivate_topic', default_value='/reset',
-                              description='Topic to reactivate controller.'),
+        DeclareLaunchArgument('reactivate_service', default_value='/reactivate',
+                              description='Trigger service to reactivate controller.'),
         DeclareLaunchArgument('marker_scale', default_value='0.2',
                               description='Interactive marker scale.'),
         DeclareLaunchArgument('follower_urdf_path',
@@ -24,8 +24,8 @@ def generate_launch_description():
                                   FindPackageShare('motion_controller_ros'),
                                   'models',
                                   'ai_worker',
-                                #   'ffw_sg2_follower_wholebody.urdf'
-                                  'ffw_sg2_follower.urdf'
+                                  'ffw_sg2_follower_wholebody.urdf'
+                                #   'ffw_sg2_follower.urdf'
                               ]),
                               description='Path to robot URDF file.'),
         DeclareLaunchArgument('follower_srdf_path',
@@ -70,7 +70,7 @@ def generate_launch_description():
     leader_urdf_path = LaunchConfiguration('leader_urdf_path')
     leader_srdf_path = LaunchConfiguration('leader_srdf_path')
     base_frame = LaunchConfiguration('base_frame')
-    reactivate_topic = LaunchConfiguration('reactivate_topic')
+    reactivate_service = LaunchConfiguration('reactivate_service')
     marker_scale = LaunchConfiguration('marker_scale')
     config_file = LaunchConfiguration('config_file')
     controller_type = LaunchConfiguration('controller_type')
@@ -97,7 +97,7 @@ def generate_launch_description():
         parameters=[config_file, {
             'urdf_path': leader_urdf_path,
             'srdf_path': leader_srdf_path,
-            'reactivate_topic': reactivate_topic,
+            'reactivate_service': reactivate_service,
         }],
         output='screen',
         condition=IfCondition(PythonExpression([
@@ -111,7 +111,7 @@ def generate_launch_description():
         parameters=[config_file, {
             'urdf_path': follower_urdf_path,
             'srdf_path': follower_srdf_path,
-            'reactivate_topic': reactivate_topic,
+            'reactivate_service': reactivate_service,
         }],
         output='screen',
         condition=IfCondition(PythonExpression([

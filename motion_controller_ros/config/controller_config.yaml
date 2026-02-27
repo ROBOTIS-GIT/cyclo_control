@@ -50,7 +50,7 @@ ai_worker_wholebody_controller:
     collision_safe_distance: 0.02
     slack_penalty: 1000.0
     cbf_alpha: 10.0
-    reactivate_topic: "/reset"  
+    reactivate_service: "/reactivate"
     joint_states_topic: "/joint_states"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
@@ -80,6 +80,10 @@ ai_worker_wholebody_controller:
     cmd_vel_max_accel_vy: 1.0
     cmd_vel_max_accel_wz: 2.0
     base_accel_constraint_enabled: true
+
+    # Same startup safety gating as ai_worker_controller (reactivate + reference alignment check)
+    startup_ref_pos_threshold: 0.3
+    startup_ref_ori_threshold_deg: 120.0
 
     # Wholebody base actuation lag model inside QP (can amplify odom twist bias)
     base_actuation_lag_comp_enabled: true

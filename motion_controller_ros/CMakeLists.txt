@@ -125,6 +125,7 @@ ament_target_dependencies(ai_worker_controller_node
 ament_target_dependencies(ai_worker_wholebody_controller_node
   rclcpp
   std_msgs
+  std_srvs
   geometry_msgs
   nav_msgs
   sensor_msgs

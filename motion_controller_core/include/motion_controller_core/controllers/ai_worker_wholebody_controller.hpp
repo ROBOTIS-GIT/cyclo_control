@@ -88,6 +88,12 @@ namespace controllers
                 base_accel_cfg_ = cfg;
             }
 
+            void resetBaseAccelerationConstraintState()
+            {
+                prev_base_cmd_initialized_ = false;
+                prev_base_cmd_body_.setZero();
+            }
+
         private:
             /**
              * @brief Struct to hold the indices of the QP variables and constraints.

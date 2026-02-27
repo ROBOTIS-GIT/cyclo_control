@@ -7,6 +7,8 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include <memory>
@@ -54,7 +56,7 @@ namespace motion_controller_ros
         double cbf_alpha_;
         double collision_buffer_;
         double collision_safe_distance_;
-        std::string reactivate_topic_;
+        std::string reactivate_service_;
         std::string r_goal_pose_topic_;
         std::string l_goal_pose_topic_;
         std::string r_elbow_pose_topic_;
@@ -103,8 +105,10 @@ namespace motion_controller_ros
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr base_goal_pose_sub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_divergence_sub_;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr ref_reactivate_sub_;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+
+        // Services
+        rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reactivate_srv_;
 
         // Publishers
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_r_pub_;
@@ -113,6 +117,8 @@ namespace motion_controller_ros
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr r_gripper_pose_pub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr l_gripper_pose_pub_;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr reference_divergence_pub_;
+        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr controller_error_pub_;
 
         // Timer for control loop
         rclcpp::TimerBase::SharedPtr control_timer_;
@@ -149,7 +155,13 @@ namespace motion_controller_ros
         bool reference_diverged_;
         rclcpp::Time activate_start_;
         bool activate_pending_;
+        bool control_enabled_ = false;  // start only after reactivate service
+        bool start_requested_ = false;  // reactivate has been requested
         bool joint_state_received_;
+
+        // Startup reference vs current pose check
+        double startup_ref_pos_threshold_ = 0.15;        // meters
+        double startup_ref_ori_threshold_deg_ = 45.0;    // degrees
 
         // Control timing
         double dt_;  // nominal time step in seconds
@@ -192,7 +204,9 @@ namespace motion_controller_ros
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
         void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
         void referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg);
-        void referenceReactivateCallback(const std_msgs::msg::Bool::SharedPtr msg);
+        void reactivateServiceCallback(
+            const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+            std::shared_ptr<std_srvs::srv::Trigger::Response> response);
         void controlLoopCallback();
 
         // Helper functions
@@ -218,6 +232,7 @@ namespace motion_controller_ros
         // Base helper functions
         static double yawFromQuaternion(const geometry_msgs::msg::Quaternion& q);
         void publishBaseCmdVel(const Eigen::VectorXd& optimal_velocities);
+        void publishZeroCmdVel();
     };
 }  // namespace motion_controller_ros
 
