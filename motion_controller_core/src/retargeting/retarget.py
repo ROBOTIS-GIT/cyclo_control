@@ -1,5 +1,7 @@
 """High-level retargeting interface for ROBOTIS Hand using DexPilot algorithm."""
 
+import os
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,19 +14,10 @@ from retargeting.opt import DexPilotOptimizer, LPFilter
 
 
 # Package root for URDF path resolution
-_THIS_FILE = Path(__file__).resolve()
-_PACKAGE_ROOT = _THIS_FILE.parent.parent.parent.parent.parent
+current_dir = Path(__file__).resolve().parent
+package_root = current_dir.parent.parent
 
-# ROBOTIS Hand fixed configuration
-# HX_WRIST_LINK_NAME = "hx5_d20_left_base"
-# HX_FINGER_TIP_LINK_NAMES = [
-#     "finger_end_l_link1",
-#     "finger_end_l_link2",
-#     "finger_end_l_link3",
-#     "finger_end_l_link4",
-#     "finger_end_l_link5",
-# ]
-LOW_PASS_ALPHA = 0.5  # Low-pass filter alpha (smaller = smoother but more latency)
+LOW_PASS_ALPHA = 0.9  # Low-pass filter alpha (smaller = smoother but more latency)
 
 # MediaPipe landmark indices: wrist=0, thumb_tip=4, index_tip=8, middle_tip=12, ring_tip=16, pinky_tip=20
 MP_WRIST_IDX = 0
@@ -73,8 +66,7 @@ class ROBOTISHandRetargeter:
                 ]
 
         # Build URDF path (from package directory)
-        # urdf_path = (_PACKAGE_ROOT / f"ai_worker/ffw_description/urdf/common/hx5_d20/hx5_d20_{self.hand_side}.urdf").resolve()
-        urdf_path = (_PACKAGE_ROOT / f"ai_worker/ffw_description/urdf/common/hx5_d20/hx5_d20_{self.hand_side}.urdf").resolve()
+        urdf_path = package_root / 'ai_worker' / 'ffw_description' / 'urdf' / 'common' / 'hx5_d20' / f'hx5_d20_{self.hand_side}.urdf'
         if not urdf_path.exists():
             raise ValueError(f"URDF path {urdf_path} does not exist")
 
