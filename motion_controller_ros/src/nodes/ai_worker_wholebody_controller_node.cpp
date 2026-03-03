@@ -387,6 +387,19 @@ namespace motion_controller_ros
             }
         }
 
+        // Hard-coded deadband to avoid swerve steering oscillations near standstill.
+        // Snap tiny commands to exactly zero so steering controllers can hold angle stably.
+        constexpr double kCmdVelLinearDeadband = 0.01;   // m/s
+        constexpr double kCmdVelAngularDeadband = 0.02;  // rad/s
+        const double v_norm = std::hypot(cmd_out.linear.x, cmd_out.linear.y);
+        if (v_norm < kCmdVelLinearDeadband) {
+            cmd_out.linear.x = 0.0;
+            cmd_out.linear.y = 0.0;
+        }
+        if (std::abs(cmd_out.angular.z) < kCmdVelAngularDeadband) {
+            cmd_out.angular.z = 0.0;
+        }
+
         cmd_vel_pub_->publish(cmd_out);
         last_cmd_vel_ = cmd_out;
         last_cmd_vel_stamp_ = now;
