@@ -24,7 +24,8 @@ def generate_launch_description():
                                   FindPackageShare('motion_controller_ros'),
                                   'models',
                                   'ai_worker',
-                                  'ffw_sg2_follower.urdf'
+                                #   'ffw_sg2_follower.urdf'
+                                  'ffw_sg2_follower_arm_right.urdf'
                               ]),
                               description='Path to robot URDF file.'),
         DeclareLaunchArgument('follower_srdf_path',

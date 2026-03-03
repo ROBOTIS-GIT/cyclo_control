@@ -51,6 +51,33 @@ joint_space_controller:
     right_traj_filtered_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_filtered_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
 
+right_arm_relative_controller:
+  ros__parameters:
+    control_frequency: 100.0
+    time_step: 0.01
+    trajectory_time: 0.0
+    kp_position: 50.0
+    kp_orientation: 50.0
+    weight_position: 10.0
+    weight_orientation: 1.0
+    weight_damping: 0.1
+    collision_buffer: 0.05
+    collision_safe_distance: 0.02
+    slack_penalty: 1000.0
+    cbf_alpha: 50.0
+    command_hz: 20.0
+    delta_pose_topic: "/r_delta_pose"
+    delta_in_ee_frame: false
+    lock_other_joints: true
+    joint_states_topic: "/joint_states"
+    right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
+    right_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
+    raw_traj_timeout: 0.5
+    r_gripper_pose_topic: "/r_gripper_pose"
+    base_frame_id: "base_link"
+    r_gripper_name: "arm_r_link7"
+    right_gripper_joint: "gripper_r_joint1"
+
 leader_controller:
   ros__parameters:
     control_frequency: 100.0
