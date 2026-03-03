@@ -126,12 +126,20 @@ source install/setup.bash
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/ros2_ws/install/setup.bash
-
-# AI Worker controller is launched as default
-ros2 launch motion_controller_ros controller.launch.py controller_type:=ai_worker start_interactive_marker:=true
+# launch gazebo simulation
+ros2 launch ffw_bringup ffw_sg2_follower_ai_gazebo.launch.py
+```
+```bash
+# launch right arm relative pose controller on new terminal
+ros2 launch motion_controller_ros controller.launch.py controller_type:=right_arm_relative
 ```
 
-You can also switch controllers via `controller_type`:
+```bash
+# Example for relative pose command
+ros2 topic pub --once /r_delta_pose geometry_msgs/msg/PoseStamped "{
+  header: {frame_id: base_link},
+  pose: {position: {x: 0.0, y: 0.0, z: -0.2}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}
+}"
+```
 
-- `controller_type:=joint_space` (runs `joint_space_controller_node`)
-- `controller_type:=leader` (runs `leader_controller_node` and also starts the follower controller for leader/follower use)
+you can change command hz via yaml file(motion_controller/motion_controller_ros/config/controller_config.yaml)
