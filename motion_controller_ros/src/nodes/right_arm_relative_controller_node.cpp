@@ -29,7 +29,11 @@ RightArmRelativeController::RightArmRelativeController()
   delta_in_ee_frame_ = this->declare_parameter("delta_in_ee_frame", delta_in_ee_frame_);
   lock_other_joints_ = this->declare_parameter("lock_other_joints", lock_other_joints_);
 
-  delta_pose_topic_ = this->declare_parameter("delta_pose_topic", delta_pose_topic_);
+  relative_pose_topic_ = this->declare_parameter("relative_pose_topic", relative_pose_topic_);
+  deprecated_delta_pose_topic_ = this->declare_parameter("delta_pose_topic", deprecated_delta_pose_topic_);
+  if (!deprecated_delta_pose_topic_.empty()) {
+    relative_pose_topic_ = deprecated_delta_pose_topic_;
+  }
   joint_states_topic_ = this->declare_parameter("joint_states_topic", joint_states_topic_);
   right_traj_topic_ = this->declare_parameter("right_traj_topic", right_traj_topic_);
   right_raw_traj_topic_ = this->declare_parameter("right_raw_traj_topic", right_raw_traj_topic_);
@@ -72,9 +76,9 @@ RightArmRelativeController::RightArmRelativeController()
   lockNonRightArmJointsIfRequested();
 
   // Subscribers
-  delta_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-    delta_pose_topic_, 10,
-    std::bind(&RightArmRelativeController::deltaPoseCallback, this, std::placeholders::_1));
+  relative_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+    relative_pose_topic_, 10,
+    std::bind(&RightArmRelativeController::relativePoseCallback, this, std::placeholders::_1));
 
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
     joint_states_topic_, 10,
@@ -96,7 +100,7 @@ RightArmRelativeController::RightArmRelativeController()
 
   RCLCPP_INFO(this->get_logger(), "Right arm relative controller ready.");
   RCLCPP_INFO(this->get_logger(), "  - Control loop: %.1f Hz (period: %d ms)", control_frequency_, timer_period_ms);
-  RCLCPP_INFO(this->get_logger(), "  - Delta pose topic: %s (command_hz=%.1f)", delta_pose_topic_.c_str(), command_hz_);
+  RCLCPP_INFO(this->get_logger(), "  - Relative pose topic: %s (command_hz=%.1f)", relative_pose_topic_.c_str(), command_hz_);
   RCLCPP_INFO(this->get_logger(), "  - Right traj topic: %s", right_traj_topic_.c_str());
   RCLCPP_INFO(this->get_logger(), "  - Right EE link: %s", r_gripper_name_.c_str());
   RCLCPP_INFO(this->get_logger(), "========================================");
@@ -235,6 +239,7 @@ void RightArmRelativeController::seedGoalPoseFromJointStateOnce()
   try {
     kinematics_solver_->updateState(q_, qdot_);
     current_pose_ = kinematics_solver_->getPose(r_gripper_name_);
+    seed_pose_ = current_pose_;
     goal_pose_ = current_pose_;
     interp_active_ = false;
     interp_steps_total_ = 1;
@@ -305,24 +310,26 @@ RightArmRelativeController::Affine3d RightArmRelativeController::interpolatePose
   return out;
 }
 
-void RightArmRelativeController::deltaPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void RightArmRelativeController::relativePoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   if (!msg) {
     return;
   }
   if (!ee_seeded_) {
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-      "Ignoring delta command until EE is seeded from joint states.");
+      "Ignoring relative pose command until EE is seeded from joint states.");
     return;
   }
   if (!msg->header.frame_id.empty() && msg->header.frame_id != base_frame_id_) {
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-      "Delta command frame_id='%s' != base_frame_id='%s'. Applying anyway.",
+      "Relative command frame_id='%s' != base_frame_id='%s'. Applying anyway.",
       msg->header.frame_id.c_str(), base_frame_id_.c_str());
   }
 
   interp_start_ = goal_pose_;
-  interp_end_ = applyDeltaPose(interp_start_, msg->pose);
+  // Interpret msg->pose as a pose RELATIVE TO the seeded start pose (odometry-like).
+  // Goal is: seed_pose ⊕ relative_pose.
+  interp_end_ = applyDeltaPose(seed_pose_, msg->pose);
 
   const double hz = std::max(0.1, command_hz_);
   const int steps = std::max(1, static_cast<int>(std::round(control_frequency_ / hz)));

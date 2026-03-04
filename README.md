@@ -136,9 +136,9 @@ ros2 launch motion_controller_ros controller.launch.py controller_type:=right_ar
 
 ```bash
 # Example for relative pose command
-ros2 topic pub --once /r_delta_pose geometry_msgs/msg/PoseStamped "{
+ros2 topic pub --once /r_relative_pose geometry_msgs/msg/PoseStamped "{
   header: {frame_id: base_link},
-  pose: {position: {x: 0.0, y: 0.0, z: -0.2}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}
+  pose: {position: {x: 0.0, y: 0.0, z: 0.2}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}
 }"
 ```
 

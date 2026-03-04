@@ -51,7 +51,8 @@ private:
   bool delta_in_ee_frame_{false};
   bool lock_other_joints_{true};
 
-  std::string delta_pose_topic_{"/r_delta_pose"};
+  std::string relative_pose_topic_{"/r_relative_pose"};
+  std::string deprecated_delta_pose_topic_{""};
   std::string joint_states_topic_{"/joint_states"};
   std::string right_traj_topic_{"/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"};
   std::string right_raw_traj_topic_{"/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"};
@@ -62,7 +63,7 @@ private:
   std::string right_gripper_joint_name_{"gripper_r_joint1"};
 
   // Subscribers
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr delta_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr relative_pose_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
   rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_raw_traj_sub_;
 
@@ -105,10 +106,11 @@ private:
   int interp_step_idx_{0};
   Affine3d interp_start_{Affine3d::Identity()};
   Affine3d interp_end_{Affine3d::Identity()};
+  Affine3d seed_pose_{Affine3d::Identity()};
 
   // Callbacks
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
-  void deltaPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  void relativePoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
   void rightRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
   void controlLoopCallback();
 

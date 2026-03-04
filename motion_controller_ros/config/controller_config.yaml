@@ -66,7 +66,8 @@ right_arm_relative_controller:
     slack_penalty: 1000.0
     cbf_alpha: 50.0
     command_hz: 20.0
-    delta_pose_topic: "/r_delta_pose"
+    relative_pose_topic: "/r_relative_pose"
+    delta_pose_topic: ""  # deprecated compatibility
     delta_in_ee_frame: false
     lock_other_joints: true
     joint_states_topic: "/joint_states"
