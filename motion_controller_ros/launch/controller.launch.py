@@ -21,7 +21,7 @@ def generate_launch_description():
                               description='Interactive marker scale.'),
         DeclareLaunchArgument('follower_urdf_path',
                               default_value=PathJoinSubstitution([
-                                  FindPackageShare('motion_controller_ros'),
+                                  FindPackageShare('motion_controller_models'),
                                   'models',
                                   'ai_worker',
                                   'ffw_sg2_follower.urdf'
@@ -29,7 +29,7 @@ def generate_launch_description():
                               description='Path to robot URDF file.'),
         DeclareLaunchArgument('follower_srdf_path',
                               default_value=PathJoinSubstitution([
-                                  FindPackageShare('motion_controller_ros'),
+                                  FindPackageShare('motion_controller_models'),
                                   'models',
                                   'ai_worker',
                                   'ffw_sg2_follower.srdf'
@@ -37,7 +37,7 @@ def generate_launch_description():
                               description='Path to robot SRDF file.'),
         DeclareLaunchArgument('leader_urdf_path',
                               default_value=PathJoinSubstitution([
-                                  FindPackageShare('motion_controller_ros'),
+                                  FindPackageShare('motion_controller_models'),
                                   'models',
                                   'leader',
                                   'ffw_lg2_leader.urdf'
@@ -45,7 +45,7 @@ def generate_launch_description():
                               description='Path to robot URDF file.'),
         DeclareLaunchArgument('leader_srdf_path',
                               default_value=PathJoinSubstitution([
-                                  FindPackageShare('motion_controller_ros'),
+                                  FindPackageShare('motion_controller_models'),
                                   'models',
                                   'leader',
                                   'ffw_lg2_leader.srdf'
