@@ -14,8 +14,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 set(SOURCES
     src/kinematics/kinematics_solver.cpp
-    src/controllers/ai_worker_controller.cpp
-    src/controllers/joint_space_controller.cpp
+    src/controllers/ai_worker/ai_worker_controller.cpp
+    src/controllers/ai_worker/joint_space_controller.cpp
+    src/controllers/omx/omx_controller.cpp
+    src/controllers/omx/omx_movej_controller.cpp
+    src/controllers/omx/omx_movel_controller.cpp
+    src/controllers/omy/omy_controller.cpp
+    src/controllers/omy/omy_movej_controller.cpp
+    src/controllers/omy/omy_movel_controller.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})

@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel1/Description Topic1
+        - /RobotModel1
       Splitter Ratio: 0.5
     Tree Height: 1849
   - Class: rviz_common/Selection
@@ -61,80 +61,56 @@ Visualization Manager:
         Value: /robot_description
       Enabled: true
       Links:
-        All Links Enabled:
-          {}
+        All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        arm_base_link:
+        end_effector_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link1:
+          Value: true
+        link0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link2:
+          Value: true
+        link1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link3:
+          Value: true
+        link2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link4:
+          Value: true
+        link3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link5:
+          Value: true
+        link4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link6:
+          Value: true
+        link5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_l_link7:
+          Value: true
+        link6:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_r_link1:
+          Value: true
+        link7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_r_link2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_r_link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_r_link4:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_r_link5:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_r_link6:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_r_link7:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        gripper_l_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        gripper_r_link1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
+          Value: true
         world:
           Alpha: 1
           Show Axes: false
@@ -148,76 +124,21 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
-      Enabled: true
+      Enabled: false
       Filter (blacklist): ""
       Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        arm_base_link:
-          Value: true
-        arm_l_link1:
-          Value: true
-        arm_l_link2:
-          Value: true
-        arm_l_link3:
-          Value: true
-        arm_l_link4:
-          Value: true
-        arm_l_link5:
-          Value: true
-        arm_l_link6:
-          Value: true
-        arm_l_link7:
-          Value: true
-        arm_r_link1:
-          Value: true
-        arm_r_link2:
-          Value: true
-        arm_r_link3:
-          Value: true
-        arm_r_link4:
-          Value: true
-        arm_r_link5:
-          Value: true
-        arm_r_link6:
-          Value: true
-        arm_r_link7:
-          Value: true
-        gripper_l_link1:
-          Value: true
-        gripper_r_link1:
-          Value: true
-        world:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        world:
-          arm_base_link:
-            arm_l_link1:
-              arm_l_link2:
-                arm_l_link3:
-                  arm_l_link4:
-                    arm_l_link5:
-                      arm_l_link6:
-                        arm_l_link7:
-                          gripper_l_link1:
-                            {}
-            arm_r_link1:
-              arm_r_link2:
-                arm_r_link3:
-                  arm_r_link4:
-                    arm_r_link5:
-                      arm_r_link6:
-                        arm_r_link7:
-                          gripper_r_link1:
-                            {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -264,25 +185,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 2.5465376377105713
+      Distance: 0.6141819357872009
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.1252933144569397
-        Y: -0.011586886830627918
-        Z: 1.0286709070205688
+        X: -0.024192381650209427
+        Y: -0.030978692695498466
+        Z: 0.08575039356946945
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.484796941280365
+      Pitch: 0.43039849400520325
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.393597602844238
+      Yaw: 1.0803974866867065
     Saved: ~
 Window Geometry:
   Displays:

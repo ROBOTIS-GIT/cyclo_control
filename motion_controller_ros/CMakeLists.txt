@@ -60,18 +60,42 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Create executable
 add_executable(ai_worker_controller_node 
-  src/nodes/ai_worker_controller_node.cpp
+  src/nodes/ai_worker/ai_worker_controller_node.cpp
 )
 
 add_executable(joint_space_controller_node 
-  src/nodes/joint_space_controller_node.cpp
+  src/nodes/ai_worker/joint_space_controller_node.cpp
 )
 
 add_executable(leader_controller_node
-  src/nodes/leader_controller_node.cpp
+  src/nodes/ai_worker/leader_controller_node.cpp
 )
 
-add_executable(eef_interactive_marker_node
+add_executable(omx_controller_node
+  src/nodes/omx/omx_controller_node.cpp
+)
+
+add_executable(omx_movej_controller_node
+  src/nodes/omx/omx_movej_controller_node.cpp
+)
+
+add_executable(omx_movel_controller_node
+  src/nodes/omx/omx_movel_controller_node.cpp
+)
+
+add_executable(omy_controller_node
+  src/nodes/omy/omy_controller_node.cpp
+)
+
+add_executable(omy_movej_controller_node
+  src/nodes/omy/omy_movej_controller_node.cpp
+)
+
+add_executable(omy_movel_controller_node
+  src/nodes/omy/omy_movel_controller_node.cpp
+)
+
+add_executable(interactive_marker_node
   src/utils/eef_interactive_marker_node.cpp
 )
 
@@ -95,6 +119,42 @@ target_include_directories(joint_space_controller_node PRIVATE
 )
 
 target_include_directories(leader_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omx_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omx_movej_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omx_movel_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omy_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omy_movej_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(omy_movel_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
@@ -130,7 +190,55 @@ ament_target_dependencies(leader_controller_node
   ament_index_cpp
 )
 
-ament_target_dependencies(eef_interactive_marker_node
+ament_target_dependencies(omx_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(omx_movej_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(omx_movel_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(omy_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(omy_movej_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(omy_movel_controller_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  trajectory_msgs
+)
+
+ament_target_dependencies(interactive_marker_node
   rclcpp
   geometry_msgs
   visualization_msgs
@@ -162,16 +270,64 @@ target_link_libraries(leader_controller_node
   OsqpEigen::OsqpEigen
 )
 
+target_link_libraries(omx_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(omx_movej_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(omx_movel_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(omy_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(omy_movej_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(omy_movel_controller_node
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
 # Link motion_controller_core
 if(motion_controller_core_FOUND)
   target_link_libraries(ai_worker_controller_node motion_controller_core::motion_controller_core)
   target_link_libraries(joint_space_controller_node motion_controller_core::motion_controller_core)
   target_link_libraries(leader_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_movej_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_movel_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_movej_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_movel_controller_node motion_controller_core::motion_controller_core)
 else()
   # Link with full path for fallback
   target_link_libraries(ai_worker_controller_node ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(joint_space_controller_node ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(leader_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_movej_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_movel_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_movej_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_movel_controller_node ${MOTION_CONTROLLER_CORE_LIB})
 endif()
 
 # Install executable
@@ -187,7 +343,31 @@ install(TARGETS leader_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(TARGETS eef_interactive_marker_node
+install(TARGETS omx_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS omx_movej_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS omx_movel_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS omy_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS omy_movej_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS omy_movel_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS interactive_marker_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

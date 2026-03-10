@@ -19,7 +19,7 @@
 #include <Eigen/Geometry>
 
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
-#include "motion_controller_core/controllers/ai_worker_controller.hpp"
+#include "motion_controller_core/controllers/ai_worker/ai_worker_controller.hpp"
 #include "motion_controller_core/common/type_define.h"
 
 using namespace Eigen;

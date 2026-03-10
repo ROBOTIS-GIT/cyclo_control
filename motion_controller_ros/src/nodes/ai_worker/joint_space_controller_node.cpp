@@ -1,4 +1,4 @@
-#include "motion_controller_ros/nodes/joint_space_controller_node.hpp"
+#include "motion_controller_ros/nodes/ai_worker/joint_space_controller_node.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <algorithm>

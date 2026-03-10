@@ -1,4 +1,4 @@
-#include "motion_controller_core/controllers/joint_space_controller.hpp"
+#include "motion_controller_core/controllers/ai_worker/ai_worker_controller.hpp"
 #include <algorithm>
 
 namespace motion_controller
@@ -6,11 +6,11 @@ namespace motion_controller
 namespace controllers
 {
 
-        QPFilter::QPFilter(std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data, const double dt)
+        QPIK::QPIK(std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data, const double dt)
         : motion_controller::optimization::QPBase(), robot_data_(robot_data), dt_(dt)
         {
             joint_dof_ = robot_data_->getDof();
-
+    
             si_index_.qdot_size            = joint_dof_;
             si_index_.slack_q_min_size     = joint_dof_;
             si_index_.slack_q_max_size     = joint_dof_;
@@ -20,7 +20,7 @@ namespace controllers
             si_index_.con_q_max_size       = joint_dof_;
             si_index_.con_sing_size        = 1;
             si_index_.con_sel_col_size     = robot_data_->getCollisionPairCount();
-
+            
             const int nx = si_index_.qdot_size +
                            si_index_.slack_q_min_size +
                            si_index_.slack_q_max_size +
@@ -32,9 +32,9 @@ namespace controllers
                               si_index_.con_sing_size +
                               si_index_.con_sel_col_size;
             const int neq = 0;
-
+            
             QPBase::setQPsize(nx, nbound, nineq, neq);
-
+            
             si_index_.qdot_start          = 0;
             si_index_.slack_q_min_start   = si_index_.qdot_start + si_index_.qdot_size;
             si_index_.slack_q_max_start   = si_index_.slack_q_min_start + si_index_.slack_q_min_size;
@@ -45,23 +45,15 @@ namespace controllers
             si_index_.con_sing_start      = si_index_.con_q_max_start + si_index_.con_q_max_size;
             si_index_.con_sel_col_start   = si_index_.con_sing_start + si_index_.con_sing_size;
 
-            qdot_desired_.setZero(joint_dof_);
-            w_tracking_.setOnes(joint_dof_);
             w_damping_.setOnes(joint_dof_);
-            slack_penalty_ = 1000.0;
-            cbf_alpha_ = 5.0;
-            collision_buffer_ = 0.05;
-            collision_safe_distance_ = 0.02;
         }
-
-        void QPFilter::setDesiredJointVel(const Eigen::VectorXd& qdot_desired)
+    
+        void QPIK::setDesiredTaskVel(const std::map<std::string, motion_controller::common::Vector6d> &link_xdot_desired)
         {
-            if (qdot_desired.size() == joint_dof_) {
-                qdot_desired_ = qdot_desired;
-            }
+            link_xdot_desired_ = link_xdot_desired;
         }
-
-        bool QPFilter::getOptJointVel(Eigen::VectorXd &opt_qdot)
+    
+        bool QPIK::getOptJointVel(Eigen::VectorXd &opt_qdot)
         {
             Eigen::MatrixXd sol;
             if(!solveQP(sol))
@@ -76,40 +68,46 @@ namespace controllers
             }
         }
 
-        void QPFilter::setWeight(const Eigen::VectorXd& w_tracking, const Eigen::VectorXd& w_damping)
+        void QPIK::setWeight(
+            const std::map<std::string, motion_controller::common::Vector6d> link_w_tracking,
+            const Eigen::VectorXd w_damping)
         {
-            if (w_tracking.size() == joint_dof_) {
-                w_tracking_ = w_tracking;
-            }
-            if (w_damping.size() == joint_dof_) {
-                w_damping_ = w_damping;
-            }
+            link_w_tracking_ = link_w_tracking;
+            w_damping_ = w_damping;
         }
 
-        void QPFilter::setControllerParams(const double slack_penalty, const double cbf_alpha, const double buffer_distance, const double safe_distance)
+        void QPIK::setControllerParams(const double slack_penalty, const double cbf_alpha, const double buffer_distance, const double safe_distance)
         {
             slack_penalty_ = slack_penalty;
             cbf_alpha_ = cbf_alpha;
             collision_buffer_ = buffer_distance;
             collision_safe_distance_ = safe_distance;
         }
-
-        void QPFilter::setCost()
+    
+        void QPIK::setCost()
         {
             P_ds_.setZero(nx_, nx_);
             q_ds_.setZero(nx_);
 
-            // Track desired joint velocity: ||qdot - qdot_des||_W^2
-            P_ds_.block(si_index_.qdot_start, si_index_.qdot_start,
-                        si_index_.qdot_size, si_index_.qdot_size) += 2.0 * w_tracking_.asDiagonal();
-            q_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) +=
-                -2.0 * w_tracking_.asDiagonal() * qdot_desired_;
+            // for task space velocity tracking
+            for(const auto& [link_name, xdot_desired] : link_xdot_desired_)
+            {
+                Eigen::MatrixXd J_i = robot_data_->getJacobian(link_name);
+                motion_controller::common::Vector6d w_tracking = motion_controller::common::Vector6d::Ones();
 
-            // Joint velocity damping
-            P_ds_.block(si_index_.qdot_start, si_index_.qdot_start,
-                        si_index_.qdot_size, si_index_.qdot_size) += 2.0 * w_damping_.asDiagonal();
+                auto iter = link_w_tracking_.find(link_name);
+                if(iter != link_w_tracking_.end()) {
+                    w_tracking = iter->second;
+                }
 
-            // Slack penalties
+                P_ds_.block(si_index_.qdot_start,si_index_.qdot_start,si_index_.qdot_size,si_index_.qdot_size) += 2.0 * J_i.transpose() * w_tracking.asDiagonal() * J_i;
+                q_ds_.segment(si_index_.qdot_start,si_index_.qdot_size) += -2.0 * J_i.transpose() * w_tracking.asDiagonal() * xdot_desired;
+            }
+            
+            // for joint velocity damping
+            P_ds_.block(si_index_.qdot_start,si_index_.qdot_start,si_index_.qdot_size,si_index_.qdot_size) += 2.0 * w_damping_.asDiagonal();
+            
+            // for slack variables
             q_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size) =
                 Eigen::VectorXd::Constant(si_index_.slack_q_min_size, slack_penalty_);
             q_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size) =
@@ -120,16 +118,16 @@ namespace controllers
                     Eigen::VectorXd::Constant(si_index_.slack_sel_col_size, slack_penalty_);
             }
         }
-
-        void QPFilter::setBoundConstraint()
+    
+        void QPIK::setBoundConstraint()
         {
             l_bound_ds_.setConstant(nbc_, -OSQP_INFTY);
             u_bound_ds_.setConstant(nbc_, OSQP_INFTY);
 
-            // Joint velocity limits
-            l_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) =
+            // Manipulator Joint Velocity Limit
+            l_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) = 
                 robot_data_->getJointVelocityLimit().first;
-            u_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) =
+            u_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) = 
                 robot_data_->getJointVelocityLimit().second;
 
             // Slack variables must be non-negative
@@ -140,39 +138,39 @@ namespace controllers
                 l_bound_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size).setZero();
             }
         }
-
-        void QPFilter::setIneqConstraint()
+    
+        void QPIK::setIneqConstraint()
         {
             A_ineq_ds_.setZero(nineqc_, nx_);
             l_ineq_ds_.setConstant(nineqc_, -OSQP_INFTY);
             u_ineq_ds_.setConstant(nineqc_, OSQP_INFTY);
 
-            // Joint position limits (CBF)
+            // Manipulator Joint Angle Limit (CBF)
             const Eigen::VectorXd q_min = robot_data_->getJointPositionLimit().first;
             const Eigen::VectorXd q_max = robot_data_->getJointPositionLimit().second;
             const Eigen::VectorXd q = robot_data_->getJointPosition();
-
-            // Lower bound: qdot + slack >= -alpha*(q - q_min)
-            A_ineq_ds_.block(si_index_.con_q_min_start, si_index_.qdot_start,
-                            si_index_.con_q_min_size, si_index_.qdot_size) =
+                
+            // Lower bound constraint: qdot + slack >= -alpha*(q - q_min)
+            A_ineq_ds_.block(si_index_.con_q_min_start, si_index_.qdot_start, 
+                            si_index_.con_q_min_size, si_index_.qdot_size) = 
                 Eigen::MatrixXd::Identity(si_index_.con_q_min_size, si_index_.qdot_size);
-            A_ineq_ds_.block(si_index_.con_q_min_start, si_index_.slack_q_min_start,
-                            si_index_.con_q_min_size, si_index_.slack_q_min_size) =
+            A_ineq_ds_.block(si_index_.con_q_min_start, si_index_.slack_q_min_start, 
+                            si_index_.con_q_min_size, si_index_.slack_q_min_size) = 
                 Eigen::MatrixXd::Identity(si_index_.con_q_min_size, si_index_.slack_q_min_size);
-            l_ineq_ds_.segment(si_index_.con_q_min_start, si_index_.con_q_min_size) =
+            l_ineq_ds_.segment(si_index_.con_q_min_start, si_index_.con_q_min_size) = 
                 -cbf_alpha_ * (q - q_min);
-
-            // Upper bound: -qdot + slack >= -alpha*(q_max - q)
-            A_ineq_ds_.block(si_index_.con_q_max_start, si_index_.qdot_start,
-                            si_index_.con_q_max_size, si_index_.qdot_size) =
+            
+            // Upper bound constraint: -qdot + slack >= -alpha*(q_max - q)
+            A_ineq_ds_.block(si_index_.con_q_max_start, si_index_.qdot_start, 
+                            si_index_.con_q_max_size, si_index_.qdot_size) = 
                 -Eigen::MatrixXd::Identity(si_index_.con_q_max_size, si_index_.qdot_size);
-            A_ineq_ds_.block(si_index_.con_q_max_start, si_index_.slack_q_max_start,
-                            si_index_.con_q_max_size, si_index_.slack_q_max_size) =
+            A_ineq_ds_.block(si_index_.con_q_max_start, si_index_.slack_q_max_start, 
+                            si_index_.con_q_max_size, si_index_.slack_q_max_size) = 
                 Eigen::MatrixXd::Identity(si_index_.con_q_max_size, si_index_.slack_q_max_size);
-            l_ineq_ds_.segment(si_index_.con_q_max_start, si_index_.con_q_max_size) =
+            l_ineq_ds_.segment(si_index_.con_q_max_start, si_index_.con_q_max_size) = 
                 -cbf_alpha_ * (q_max - q);
 
-            // Self collision avoidance (CBF)
+            // self collision avoidance (CBF)
             if (si_index_.con_sel_col_size > 0)
             {
                 const auto pair_results = robot_data_->getCollisionPairDistances(true, false, false);
@@ -193,8 +191,8 @@ namespace controllers
                 }
             }
         }
-
-        void QPFilter::setEqConstraint()
+    
+        void QPIK::setEqConstraint()
         {
             A_eq_ds_.setZero(neqc_, nx_);
             b_eq_ds_.setZero(neqc_);

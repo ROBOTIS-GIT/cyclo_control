@@ -17,7 +17,7 @@
 #include <Eigen/Geometry>
 
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
-#include "motion_controller_core/controllers/joint_space_controller.hpp"
+#include "motion_controller_core/controllers/ai_worker/joint_space_controller.hpp"
 
 using namespace Eigen;
 

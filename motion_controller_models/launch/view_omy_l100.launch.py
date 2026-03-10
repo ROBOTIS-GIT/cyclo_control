@@ -15,8 +15,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
 
     pkg_share = get_package_share_directory('motion_controller_models')
-    urdf_path = os.path.join(pkg_share, 'models', 'ai_worker', 'ffw_lg2_leader.urdf')
-    rviz_config_file = os.path.join(pkg_share, 'rviz', 'ffw_lg2_leader.rviz')
+    urdf_path = os.path.join(pkg_share, 'models', 'omy', 'omy_l100.urdf')
+    rviz_config_file = os.path.join(pkg_share, 'rviz', 'omy.rviz')
 
     with open(urdf_path, 'r', encoding='utf-8') as f:
         robot_description = f.read()

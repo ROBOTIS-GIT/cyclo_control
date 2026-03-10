@@ -19,6 +19,14 @@ def generate_launch_description():
                               description='Topic to reactivate controller.'),
         DeclareLaunchArgument('marker_scale', default_value='0.2',
                               description='Interactive marker scale.'),
+        DeclareLaunchArgument('right_controlled_link', default_value='arm_r_link7',
+                              description='Controlled link for the right interactive marker.'),
+        DeclareLaunchArgument('left_controlled_link', default_value='arm_l_link7',
+                              description='Controlled link for the left interactive marker.'),
+        DeclareLaunchArgument('right_goal_topic', default_value='/r_goal_pose',
+                              description='Goal topic for the right interactive marker.'),
+        DeclareLaunchArgument('left_goal_topic', default_value='/l_goal_pose',
+                              description='Goal topic for the left interactive marker.'),
         DeclareLaunchArgument('follower_urdf_path',
                               default_value=PathJoinSubstitution([
                                   FindPackageShare('motion_controller_models'),
@@ -39,7 +47,7 @@ def generate_launch_description():
                               default_value=PathJoinSubstitution([
                                   FindPackageShare('motion_controller_models'),
                                   'models',
-                                  'leader',
+                                  'ai_worker',
                                   'ffw_lg2_leader.urdf'
                               ]),
                               description='Path to robot URDF file.'),
@@ -47,7 +55,7 @@ def generate_launch_description():
                               default_value=PathJoinSubstitution([
                                   FindPackageShare('motion_controller_models'),
                                   'models',
-                                  'leader',
+                                  'ai_worker',
                                   'ffw_lg2_leader.srdf'
                               ]),
                               description='Path to robot SRDF file.'),
@@ -55,7 +63,7 @@ def generate_launch_description():
                               default_value=PathJoinSubstitution([
                                   FindPackageShare('motion_controller_ros'),
                                   'config',
-                                  'controller_config.yaml'
+                                  'ai_worker_config.yaml'
                               ]),
                               description='Path to controller config file.'),
         DeclareLaunchArgument('controller_type',
@@ -71,6 +79,10 @@ def generate_launch_description():
     base_frame = LaunchConfiguration('base_frame')
     reactivate_topic = LaunchConfiguration('reactivate_topic')
     marker_scale = LaunchConfiguration('marker_scale')
+    right_controlled_link = LaunchConfiguration('right_controlled_link')
+    left_controlled_link = LaunchConfiguration('left_controlled_link')
+    right_goal_topic = LaunchConfiguration('right_goal_topic')
+    left_goal_topic = LaunchConfiguration('left_goal_topic')
     config_file = LaunchConfiguration('config_file')
     controller_type = LaunchConfiguration('controller_type')
     controller_executable = PythonExpression([
@@ -128,12 +140,41 @@ def generate_launch_description():
         ])),
     )
 
-    interactive_marker = Node(
+    right_interactive_marker = Node(
         package='motion_controller_ros',
-        executable='eef_interactive_marker_node',
-        name='eef_interactive_marker_node',
+        executable='interactive_marker_node',
+        name='right_interactive_marker_node',
         parameters=[{
             'base_frame': base_frame,
+            'controlled_link': right_controlled_link,
+            'goal_topic': right_goal_topic,
+            'server_name': 'right_goal_marker_server',
+            'marker_name': 'right_goal_marker',
+            'marker_description': 'Right gripper goal',
+            'marker_scale': marker_scale,
+            'marker_color_r': 1.0,
+            'marker_color_g': 0.2,
+            'marker_color_b': 0.2,
+        }],
+        output='screen',
+        condition=IfCondition(start_interactive_marker)
+    )
+
+    left_interactive_marker = Node(
+        package='motion_controller_ros',
+        executable='interactive_marker_node',
+        name='left_interactive_marker_node',
+        parameters=[{
+            'base_frame': base_frame,
+            'controlled_link': left_controlled_link,
+            'goal_topic': left_goal_topic,
+            'server_name': 'left_goal_marker_server',
+            'marker_name': 'left_goal_marker',
+            'marker_description': 'Left gripper goal',
+            'marker_scale': marker_scale,
+            'marker_color_r': 0.2,
+            'marker_color_g': 0.2,
+            'marker_color_b': 1.0,
         }],
         output='screen',
         condition=IfCondition(start_interactive_marker)
@@ -145,6 +186,7 @@ def generate_launch_description():
             leader_controller_node,
             follower_with_leader_node,
             reference_checker_node,
-            interactive_marker,
+            right_interactive_marker,
+            left_interactive_marker,
         ]
     )

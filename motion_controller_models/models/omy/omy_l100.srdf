@@ -1,0 +1,4 @@
+<!-- Dummy SRDF file to match the convention of the controller-->
+<?xml version="1.0" ?>
+<robot name="omy_l100">
+</robot>
