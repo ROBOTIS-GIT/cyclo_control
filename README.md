@@ -17,15 +17,15 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
 │   │   │   └── ...
 │   │   └── retargeting/
 │   │       └── ...
-│   └── src/
-│       ├── controllers/
-│       │   └── ...
-│       ├── kinematics/
-│       │   └── ...
-│       └── retargeting/
-│           └── ...
-├── CMakeLists.txt
-├── package.xml
+│   ├── src/
+│   │   ├── controllers/
+│   │   │   └── ...
+│   │   ├── kinematics/
+│   │   │   └── ...
+│   │   └── retargeting/
+│   │       └── ...
+│   ├── CMakeLists.txt
+│   └── package.xml
 │
 ├── motion_controller_ros/
 │   ├── config/
@@ -37,23 +37,21 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
 │   │       └── ...
 │   ├── launch/
 │   │   └── ...
-│   └── src/
-│       ├── nodes/
-│       │   └── ...
-│       └── utils/
-│           └── ...
-├── CMakeLists.txt
-├── package.xml
-│
-├── motion_controller_models/
-│   ├── launch/
-│   │   └── ...
-│   ├── models/
-│   │   └── ...
+│   ├── src/
+│   │   ├── nodes/
+│   │   │   └── ...
+│   │   └── utils/
+│   │       └── ...
 │   ├── CMakeLists.txt
 │   └── package.xml
-├── CMakeLists.txt
-└── package.xml
+│
+└── motion_controller_models/
+    ├── launch/
+    │   └── ...
+    ├── models/
+    │   └── ...
+    ├── CMakeLists.txt
+    └── package.xml
 ```
 ### Directory Description
 | Directory | Description |
@@ -136,15 +134,117 @@ source install/setup.bash
 
 ## Run
 
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/ros2_ws/install/setup.bash
+### AI Worker Controllers
 
-# AI Worker controller is launched as default
-ros2 launch motion_controller_ros controller.launch.py controller_type:=ai_worker start_interactive_marker:=true
+Launch AI Worker follower controller
+
+```bash
+ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=ai_worker start_interactive_marker:=true
 ```
 
-You can also switch controllers via `controller_type`:
+You can switch AI Worker controllers via `controller_type`:
 
-- `controller_type:=joint_space` (runs `joint_space_controller_node`)
-- `controller_type:=leader` (runs `leader_controller_node` and also starts the follower controller for leader/follower use)
+- `controller_type:=ai_worker` runs `ai_worker_controller_node`
+- `controller_type:=joint_space` runs `joint_space_controller_node`
+- `controller_type:=leader` runs `leader_controller_node` and also starts the follower controller for leader/follower use
+
+When `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
+
+- right marker uses `right_controlled_link` and publishes to `right_goal_topic`
+- left marker uses `left_controlled_link` and publishes to `left_goal_topic`
+
+### OMX Controllers
+
+Launch the OMX follower controller:
+
+```bash
+ros2 launch motion_controller_ros omx_controller.launch.py controller_type:=omx start_interactive_marker:=true
+```
+
+You can switch OMX controllers via `controller_type`:
+
+- `controller_type:=omx` runs `omx_controller_node`
+- `controller_type:=movej` runs `omx_movej_controller_node`
+- `controller_type:=movel` runs `omx_movel_controller_node`
+
+When `controller_type:=omx` and `start_interactive_marker:=true`, `omx_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
+
+Example `movel` command:
+
+```bash
+ros2 topic pub --once /omx_movel_controller/movel geometry_msgs/msg/PoseStamped "{
+  pose: {
+    position: {x: 0.20, y: 0.00, z: 0.18},
+    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+  }
+}"
+```
+The default `movel` interpolation duration is 3 seconds and can be configured in the YAML file.
+
+Example `movej` command:
+
+```bash
+ros2 topic pub --once /omx_movej_controller/movej trajectory_msgs/msg/JointTrajectory "{
+  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5'],
+  points: [
+    {
+      positions: [0.0, -0.5, 0.8, 0.0, 0.3],
+      time_from_start: {sec: 3, nanosec: 0}
+    }
+  ]
+}"
+```
+
+### OMY Controllers
+
+Launch the OMY follower controller:
+
+```bash
+ros2 launch motion_controller_ros omy_controller.launch.py controller_type:=omy start_interactive_marker:=true
+```
+
+You can switch OMY controllers via `controller_type`:
+
+- `controller_type:=omy` runs `omy_controller_node`
+- `controller_type:=movej` runs `omy_movej_controller_node`
+- `controller_type:=movel` runs `omy_movel_controller_node`
+
+When `controller_type:=omy` and `start_interactive_marker:=true`, `omy_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
+
+Example `movel` command:
+
+```bash
+ros2 topic pub --once /omy_movel_controller/movel geometry_msgs/msg/PoseStamped "{
+  pose: {
+    position: {x: 0.30, y: -0.20, z: 0.5},
+    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+  }
+}"
+```
+The default `movel` interpolation duration is 3 seconds and can be configured in the YAML file.
+
+Example `movej` command:
+
+```bash
+ros2 topic pub --once /omy_movej_controller/movej trajectory_msgs/msg/JointTrajectory "{
+  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6'],
+  points: [                               
+    {                                            
+      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.0],
+      time_from_start: {sec: 3, nanosec: 0}
+    }
+  ]
+}"
+```
+
+### Model Visualization
+
+You can visualize the robot models used by the controllers with the launch files below.
+
+Examples:
+
+```bash
+ros2 launch motion_controller_models view_ffw_sg2_follower.launch.py
+ros2 launch motion_controller_models view_omx_f.launch.py
+ros2 launch motion_controller_models view_omy_f3m.launch.py
+```
