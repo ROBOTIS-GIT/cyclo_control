@@ -21,6 +21,7 @@
   <depend>trajectory_msgs</depend>
   <depend>interactive_markers</depend>
   <depend>tf2_ros</depend>
+  <depend>motion_controller_msgs</depend>
   <depend>motion_controller_core</depend>
   <depend>ament_index_cpp</depend>
   <exec_depend>motion_controller_models</exec_depend>

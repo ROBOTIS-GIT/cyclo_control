@@ -55,7 +55,6 @@ omy_movel_controller:
     control_frequency: 100.0
     time_step: 0.01
     trajectory_time: 0.0
-    default_movel_duration: 3.0
 
     kp_position: 50.0
     kp_orientation: 50.0

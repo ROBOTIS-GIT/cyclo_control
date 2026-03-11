@@ -6,14 +6,6 @@
 
 namespace motion_controller_ros
 {
-    namespace
-    {
-        double clampDuration(double duration, double fallback)
-        {
-            return duration > 1e-6 ? duration : std::max(1e-3, fallback);
-        }
-    }
-
     OmyMoveLControllerNode::OmyMoveLControllerNode()
         : Node("omy_movel_controller"),
           joint_state_received_(false),
@@ -33,7 +25,6 @@ namespace motion_controller_ros
         control_frequency_ = this->declare_parameter("control_frequency", 100.0);
         time_step_ = this->declare_parameter("time_step", 0.01);
         trajectory_time_ = this->declare_parameter("trajectory_time", 0.05);
-        default_movel_duration_ = this->declare_parameter("default_movel_duration", 3.0);
         kp_position_ = this->declare_parameter("kp_position", 4.0);
         kp_orientation_ = this->declare_parameter("kp_orientation", 2.5);
         weight_task_position_ = this->declare_parameter("weight_task_position", 10.0);
@@ -70,7 +61,7 @@ namespace motion_controller_ros
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
             std::bind(&OmyMoveLControllerNode::jointStateCallback, this, std::placeholders::_1));
-        movel_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+        movel_sub_ = this->create_subscription<motion_controller_msgs::msg::MoveL>(
             movel_topic_, 10,
             std::bind(&OmyMoveLControllerNode::moveLCallback, this, std::placeholders::_1));
 
@@ -239,7 +230,7 @@ namespace motion_controller_ros
         }
     }
 
-    void OmyMoveLControllerNode::moveLCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    void OmyMoveLControllerNode::moveLCallback(const motion_controller_msgs::msg::MoveL::SharedPtr msg)
     {
         if (!msg || !joint_state_received_) {
             RCLCPP_WARN_THROTTLE(
@@ -250,10 +241,12 @@ namespace motion_controller_ros
             return;
         }
 
+        const double requested_duration = commandDurationSeconds(msg->time_from_start);
+
         kinematics_solver_->updateState(q_commanded_, qdot_);
         movel_start_pose_ = kinematics_solver_->getPose(controlled_link_);
-        movel_goal_pose_ = poseMsgToEigen(*msg);
-        active_motion_duration_ = clampDuration(default_movel_duration_, default_movel_duration_);
+        movel_goal_pose_ = poseMsgToEigen(msg->pose);
+        active_motion_duration_ = requested_duration;
         motion_start_time_ = this->now();
         movel_target_initialized_ = true;
         movel_trajectory_active_ = true;
