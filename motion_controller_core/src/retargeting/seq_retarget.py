@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-# from pathlib import Path
+from pathlib import Path
 
 import numpy as np
 
@@ -66,7 +66,7 @@ class ROBOTISHandRetargeter:
 
         # Build URDF path (from package directory)
         # urdf_path = (_PACKAGE_ROOT / f"motion_controller_models/models/hx5_d20/hx5_d20_{self.hand_side}.urdf").resolve()
-        urdf_path = path_to_urdf
+        urdf_path = Path(path_to_urdf)
         if not urdf_path.exists():
             raise ValueError(f"URDF path {urdf_path} does not exist")
 
