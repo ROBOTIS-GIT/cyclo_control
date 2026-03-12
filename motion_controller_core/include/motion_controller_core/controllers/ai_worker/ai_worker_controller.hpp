@@ -26,7 +26,7 @@ namespace controllers
              */
             QPIK(std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data, const double dt);
             /**
-             * @brief Set the wight vector for the cost terms
+             * @brief Set the weight vector for the cost terms
              * @param link_w_tracking (std::map<std::string, Vector6d>) Weight for task space velocity tracking per links.
              * @param w_damping  (Eigen::VectorXd) Weight for joint velocity damping; its size must same as dof.
              */
