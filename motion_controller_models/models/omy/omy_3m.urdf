@@ -53,7 +53,7 @@
     <child link="link1"/>
     <origin rpy="0 0 0" xyz="0.0 0.0 0.1715"/>
     <axis xyz="0 0 1"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="1.5"/>
     <dynamics damping="0.05"/>
   </joint>
   <link name="link1">
@@ -83,7 +83,7 @@
     <child link="link2"/>
     <origin rpy="0 0 0" xyz="0 -0.1215 0.0"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="1.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="link2">
@@ -113,7 +113,7 @@
     <child link="link3"/>
     <origin rpy="0 0 0" xyz="0 0 0.247"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-2.61799" upper="2.61799" velocity="1.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="link3">
@@ -143,7 +143,7 @@
     <child link="link4"/>
     <origin rpy="0 0 0" xyz="0 0.1215 0.2195"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="1.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="link4">
@@ -173,7 +173,7 @@
     <child link="link5"/>
     <origin rpy="0 0 0" xyz="0 -0.113 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="1.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="link5">
@@ -203,7 +203,7 @@
     <child link="link6"/>
     <origin rpy="0 0 0" xyz="0 0 0.1155"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.8"/>
+    <limit effort="1000" lower="-6.283185307179586" upper="6.283185307179586" velocity="1.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="link6">
