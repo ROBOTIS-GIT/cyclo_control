@@ -1,14 +1,39 @@
 #!/usr/bin/env python3
+#
+# Copyright 2026 ROBOTIS CO., LTD.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Author: Yeonguk Kim
+
+
+"""Launch the OMY motion controller variants."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import (
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    PythonExpression,
+)
+
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    """Create the launch description for OMY controllers."""
     declared_arguments = [
         DeclareLaunchArgument(
             'start_interactive_marker',
@@ -18,35 +43,43 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'base_frame',
             default_value='link0',
-            description='Base frame for the OMY controller and interactive marker.',
+            description=(
+                'Base frame for the OMY controller and interactive marker.'
+            ),
         ),
         DeclareLaunchArgument(
             'urdf_path',
-            default_value=PathJoinSubstitution([
-                FindPackageShare('motion_controller_models'),
-                'models',
-                'omy',
-                'omy_f3m.urdf',
-            ]),
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare('motion_controller_models'),
+                    'models',
+                    'omy',
+                    'omy_f3m.urdf',
+                ]
+            ),
             description='Path to robot URDF file.',
         ),
         DeclareLaunchArgument(
             'srdf_path',
-            default_value=PathJoinSubstitution([
-                FindPackageShare('motion_controller_models'),
-                'models',
-                'omy',
-                'omy_f3m.srdf',
-            ]),
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare('motion_controller_models'),
+                    'models',
+                    'omy',
+                    'omy_f3m.srdf',
+                ]
+            ),
             description='Path to robot SRDF file.',
         ),
         DeclareLaunchArgument(
             'config_file',
-            default_value=PathJoinSubstitution([
-                FindPackageShare('motion_controller_ros'),
-                'config',
-                'omy_config.yaml',
-            ]),
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare('motion_controller_ros'),
+                    'config',
+                    'omy_config.yaml',
+                ]
+            ),
             description='Path to controller config file.',
         ),
         DeclareLaunchArgument(
@@ -84,72 +117,92 @@ def generate_launch_description():
     omy_controller_node = Node(
         package='motion_controller_ros',
         executable='omy_controller_node',
-        parameters=[config_file, {
-            'urdf_path': urdf_path,
-            'srdf_path': srdf_path,
-            'base_frame': base_frame,
-            'controlled_link': controlled_link,
-        }],
+        parameters=[
+            config_file,
+            {
+                'urdf_path': urdf_path,
+                'srdf_path': srdf_path,
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+            },
+        ],
         output='screen',
-        condition=IfCondition(PythonExpression([
-            "'", controller_type, "' == 'omy'"
-        ])),
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'omy'"])
+        ),
     )
 
     omy_movej_controller_node = Node(
         package='motion_controller_ros',
         executable='omy_movej_controller_node',
-        parameters=[config_file, {
-            'urdf_path': urdf_path,
-            'srdf_path': srdf_path,
-            'base_frame': base_frame,
-            'controlled_link': controlled_link,
-        }],
+        parameters=[
+            config_file,
+            {
+                'urdf_path': urdf_path,
+                'srdf_path': srdf_path,
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+            },
+        ],
         output='screen',
-        condition=IfCondition(PythonExpression([
-            "'", controller_type, "' == 'movej'"
-        ])),
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'movej'"])
+        ),
     )
 
     omy_movel_controller_node = Node(
         package='motion_controller_ros',
         executable='omy_movel_controller_node',
-        parameters=[config_file, {
-            'urdf_path': urdf_path,
-            'srdf_path': srdf_path,
-            'base_frame': base_frame,
-            'controlled_link': controlled_link,
-        }],
+        parameters=[
+            config_file,
+            {
+                'urdf_path': urdf_path,
+                'srdf_path': srdf_path,
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+            },
+        ],
         output='screen',
-        condition=IfCondition(PythonExpression([
-            "'", controller_type, "' == 'movel'"
-        ])),
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'movel'"])
+        ),
     )
 
     interactive_marker_node = Node(
         package='motion_controller_ros',
         executable='interactive_marker_node',
         name='omy_interactive_marker_node',
-        parameters=[{
-            'base_frame': base_frame,
-            'controlled_link': controlled_link,
-            'goal_topic': marker_goal_topic,
-            'server_name': 'omy_goal_marker',
-            'marker_name': 'omy_goal_marker',
-            'marker_description': 'OMY goal',
-            'marker_scale': marker_scale,
-            'marker_color_r': 0.8,
-            'marker_color_g': 0.4,
-            'marker_color_b': 0.2,
-        }],
+        parameters=[
+            {
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+                'goal_topic': marker_goal_topic,
+                'server_name': 'omy_goal_marker',
+                'marker_name': 'omy_goal_marker',
+                'marker_description': 'OMY goal',
+                'marker_scale': marker_scale,
+                'marker_color_r': 0.8,
+                'marker_color_g': 0.4,
+                'marker_color_b': 0.2,
+            }
+        ],
         output='screen',
-        condition=IfCondition(PythonExpression([
-            "'", controller_type, "' == 'omy' and '", start_interactive_marker, "' == 'true'"
-        ])),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    controller_type,
+                    "' == 'omy' and '",
+                    start_interactive_marker,
+                    "' == 'true'",
+                ]
+            )
+        ),
     )
 
     return LaunchDescription(
-        declared_arguments + [
+        declared_arguments
+        + [
             omy_controller_node,
             omy_movej_controller_node,
             omy_movel_controller_node,

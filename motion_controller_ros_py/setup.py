@@ -1,3 +1,5 @@
+"""Setup metadata for the motion_controller_ros_py package."""
+
 from setuptools import find_packages, setup
 
 package_name = 'motion_controller_ros_py'

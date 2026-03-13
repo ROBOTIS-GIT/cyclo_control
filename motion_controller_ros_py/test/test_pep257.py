@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""PEP 257 regression test for the Python package."""
+
 from ament_pep257.main import main
+
 import pytest
 
 
 @pytest.mark.linter
 @pytest.mark.pep257
 def test_pep257():
+    """Verify the package passes pydocstyle checks."""
     rc = main(argv=['.', 'test'])
     assert rc == 0, 'Found code style errors / warnings'
