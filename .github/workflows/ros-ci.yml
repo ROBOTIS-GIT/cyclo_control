@@ -75,5 +75,4 @@ jobs:
               motion_controller_models \
               motion_controller_ros \
               motion_controller_ros_py \
-            --event-handlers=console_cohesion+ \
-            --symlink-install
+            --event-handlers=console_cohesion+
