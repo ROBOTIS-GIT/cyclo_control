@@ -473,8 +473,8 @@ void AIWorkerController::controlLoopCallback()
 
         // Always compute & publish current gripper poses from measured state.
         // This allows external nodes to validate reference-vs-current before control starts.
-  Affine3d r_gripper_pose_meas = Affine3d::Identity();
-  Affine3d l_gripper_pose_meas = Affine3d::Identity();
+  Eigen::Affine3d r_gripper_pose_meas = Eigen::Affine3d::Identity();
+  Eigen::Affine3d l_gripper_pose_meas = Eigen::Affine3d::Identity();
   try {
     kinematics_solver_->updateState(q_, qdot_);
     r_gripper_pose_meas = kinematics_solver_->getPose(r_gripper_name_);
@@ -510,7 +510,7 @@ void AIWorkerController::controlLoopCallback()
       return;
     }
 
-    auto pose_error = [](const Affine3d & cur, const Affine3d & goal, double & pos_m,
+    auto pose_error = [](const Eigen::Affine3d & cur, const Eigen::Affine3d & goal, double & pos_m,
       double & ori_deg) {
         pos_m = (goal.translation() - cur.translation()).norm();
         const Eigen::Quaterniond q_cur(cur.linear());
@@ -591,7 +591,7 @@ void AIWorkerController::controlLoopCallback()
   try {
             // kinematics_solver_->updateState(q_, qdot_);
             // Use previously commanded joint goals as feedback state
-    VectorXd q_feedback =
+    Eigen::VectorXd q_feedback =
       (q_desired_.size() == q_.size()) ? q_desired_ : q_;
 
     // If lift is commanded by another node, use measured lift state for
@@ -604,8 +604,8 @@ void AIWorkerController::controlLoopCallback()
             // Get current and goal end-effector poses
     right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
     left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
-    Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
-    Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
+    Eigen::Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
+    Eigen::Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
 
             // Initialize goals to current EE pose on first cycle if not received
     if (!r_goal_pose_received_ && !l_goal_pose_received_) {
@@ -674,14 +674,14 @@ void AIWorkerController::controlLoopCallback()
     weights[r_elbow_name_] = weight_right_elbow;
     weights[l_elbow_name_] = weight_left_elbow;
 
-    VectorXd damping = VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
+    Eigen::VectorXd damping = Eigen::VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
 
             // Set weights and desired task velocities in QP controller
     qp_controller_->setWeight(weights, damping);
     qp_controller_->setDesiredTaskVel(desired_task_velocities);
 
             // Solve QP to get optimal joint velocities
-    VectorXd optimal_velocities;
+    Eigen::VectorXd optimal_velocities;
     if (!qp_controller_->getOptJointVel(optimal_velocities)) {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                     "QP solver failed to converge");
@@ -699,9 +699,10 @@ void AIWorkerController::controlLoopCallback()
   }
 }
 
-Affine3d AIWorkerController::computePoseMat(const geometry_msgs::msg::PoseStamped & pose) const
+Eigen::Affine3d AIWorkerController::computePoseMat(
+  const geometry_msgs::msg::PoseStamped & pose) const
 {
-  Affine3d pose_mat = Affine3d::Identity();
+  Eigen::Affine3d pose_mat = Eigen::Affine3d::Identity();
   pose_mat.translation() << pose.pose.position.x,
     pose.pose.position.y,
     pose.pose.position.z;
@@ -716,16 +717,16 @@ Affine3d AIWorkerController::computePoseMat(const geometry_msgs::msg::PoseStampe
 }
 
 motion_controller::common::Vector6d AIWorkerController::computeDesiredVelocity(
-  const Affine3d & current_pose,
-  const Affine3d & goal_pose) const
+  const Eigen::Affine3d & current_pose,
+  const Eigen::Affine3d & goal_pose) const
 {
         // Compute position error
-  Vector3d pos_error = goal_pose.translation() - current_pose.translation();
+  Eigen::Vector3d pos_error = goal_pose.translation() - current_pose.translation();
 
         // Compute orientation error
-  Matrix3d rotation_error = goal_pose.linear() * current_pose.linear().transpose();
+  Eigen::Matrix3d rotation_error = goal_pose.linear() * current_pose.linear().transpose();
   Eigen::AngleAxisd angle_axis_error(rotation_error);
-  Vector3d angle_axis = angle_axis_error.axis() * angle_axis_error.angle();
+  Eigen::Vector3d angle_axis = angle_axis_error.axis() * angle_axis_error.angle();
 
   motion_controller::common::Vector6d desired_vel = motion_controller::common::Vector6d::Zero();
   desired_vel.head(3) = kp_position_ * pos_error;
@@ -735,7 +736,7 @@ motion_controller::common::Vector6d AIWorkerController::computeDesiredVelocity(
 }
 
 
-void AIWorkerController::publishTrajectory(const VectorXd & q_desired)
+void AIWorkerController::publishTrajectory(const Eigen::VectorXd & q_desired)
 {
   try {
             // Build indices for each arm segment
@@ -801,7 +802,7 @@ void AIWorkerController::publishTrajectory(const VectorXd & q_desired)
 
 trajectory_msgs::msg::JointTrajectory AIWorkerController::createTrajectoryMsgWithGripper(
   const std::vector<std::string> & arm_joint_names,
-  const VectorXd & positions,
+  const Eigen::VectorXd & positions,
   const std::vector<int> & arm_indices,
   const std::string & gripper_joint_name,
   const double gripper_position) const
@@ -849,8 +850,8 @@ trajectory_msgs::msg::JointTrajectory AIWorkerController::createLiftTrajectoryMs
 }
 
 void AIWorkerController::publishGripperPose(
-  const Affine3d & r_gripper_pose,
-  const Affine3d & l_gripper_pose)
+  const Eigen::Affine3d & r_gripper_pose,
+  const Eigen::Affine3d & l_gripper_pose)
 {
   if (r_gripper_pose_pub_) {
     geometry_msgs::msg::PoseStamped r_gripper_pose_msg;

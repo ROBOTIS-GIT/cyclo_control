@@ -36,10 +36,8 @@
 
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
 #include "motion_controller_core/controllers/ai_worker/ai_worker_controller.hpp"
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 
-using Eigen::Affine3d;
-using Eigen::VectorXd;
 
 namespace motion_controller_ros
 {
@@ -124,23 +122,23 @@ private:
   std::shared_ptr<motion_controller::controllers::QPIK> qp_controller_;
 
         // State variables (measured)
-  VectorXd q_;
-  VectorXd qdot_;
+  Eigen::VectorXd q_;
+  Eigen::VectorXd qdot_;
 
         // State variables (observer / internal model)
-  VectorXd q_model_;
+  Eigen::VectorXd q_model_;
   bool model_state_initialized_ = false;
 
         // Commanded state
-  VectorXd q_desired_;
+  Eigen::VectorXd q_desired_;
 
         // Task-space state
-  Affine3d right_gripper_pose_;
-  Affine3d left_gripper_pose_;
-  Affine3d r_goal_pose_;
-  Affine3d l_goal_pose_;
-  Affine3d r_elbow_pose_;
-  Affine3d l_elbow_pose_;
+  Eigen::Affine3d right_gripper_pose_;
+  Eigen::Affine3d left_gripper_pose_;
+  Eigen::Affine3d r_goal_pose_;
+  Eigen::Affine3d l_goal_pose_;
+  Eigen::Affine3d r_elbow_pose_;
+  Eigen::Affine3d l_elbow_pose_;
 
   bool r_goal_pose_received_;
   bool l_goal_pose_received_;
@@ -195,23 +193,25 @@ private:
 
         // Helper functions
   void initializeJointConfig();
-  void publishTrajectory(const VectorXd & q_desired);
+  void publishTrajectory(const Eigen::VectorXd & q_desired);
   trajectory_msgs::msg::JointTrajectory createTrajectoryMsgWithGripper(
     const std::vector<std::string> & arm_joint_names,
-    const VectorXd & positions,
+    const Eigen::VectorXd & positions,
     const std::vector<int> & arm_indices,
     const std::string & gripper_joint_name,
     const double gripper_position) const;
   trajectory_msgs::msg::JointTrajectory createLiftTrajectoryMsg(
     std::string lift_joint_name,
     const double position) const;
-  void publishGripperPose(const Affine3d & r_gripper_pose, const Affine3d & l_gripper_pose);
+  void publishGripperPose(
+    const Eigen::Affine3d & r_gripper_pose,
+    const Eigen::Affine3d & l_gripper_pose);
   void extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg);
 
         // Control computation functions
-  Affine3d computePoseMat(const geometry_msgs::msg::PoseStamped & pose) const;
+  Eigen::Affine3d computePoseMat(const geometry_msgs::msg::PoseStamped & pose) const;
   motion_controller::common::Vector6d computeDesiredVelocity(
-    const Affine3d & current_pose,
-    const Affine3d & goal_pose) const;
+    const Eigen::Affine3d & current_pose,
+    const Eigen::Affine3d & goal_pose) const;
 };
 }  // namespace motion_controller_ros

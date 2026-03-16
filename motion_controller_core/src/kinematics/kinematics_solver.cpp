@@ -23,10 +23,6 @@ namespace motion_controller
 {
 namespace kinematics
 {
-using Eigen::Matrix3d;
-using Eigen::MatrixXd;
-using Eigen::Vector3d;
-using Eigen::VectorXd;
 
 KinematicsSolver::KinematicsSolver(const std::string & urdf_path, const std::string & srdf_path)
 : urdf_path_(urdf_path), srdf_path_(srdf_path)
@@ -120,7 +116,7 @@ KinematicsSolver::~KinematicsSolver()
 {
 }
 
-bool KinematicsSolver::updateState(const VectorXd & q, const VectorXd & qdot)
+bool KinematicsSolver::updateState(const Eigen::VectorXd & q, const Eigen::VectorXd & qdot)
 {
   q_ = q;
   qdot_ = qdot;
@@ -143,7 +139,7 @@ bool KinematicsSolver::setJointVelocityBoundsByIndex(
   return true;
 }
 
-bool KinematicsSolver::updateKinematics(const VectorXd & q, const VectorXd & qdot)
+bool KinematicsSolver::updateKinematics(const Eigen::VectorXd & q, const Eigen::VectorXd & qdot)
 {
   pinocchio::forwardKinematics(model_, data_, q, qdot);
   pinocchio::computeJointJacobians(model_, data_, q);
@@ -154,7 +150,9 @@ bool KinematicsSolver::updateKinematics(const VectorXd & q, const VectorXd & qdo
 
     // ================================ Compute Functions ================================
 
-Affine3d KinematicsSolver::computePose(const VectorXd & q, const std::string & link_name)
+Eigen::Affine3d KinematicsSolver::computePose(
+  const Eigen::VectorXd & q,
+  const std::string & link_name)
 {
   pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
   if (link_index >= model_.frames.size()) {
@@ -163,20 +161,22 @@ Affine3d KinematicsSolver::computePose(const VectorXd & q, const std::string & l
 
   pinocchio::Data data = pinocchio::Data(model_);
   pinocchio::framesForwardKinematics(model_, data, q);
-  Affine3d link_pose;
+  Eigen::Affine3d link_pose;
   link_pose.matrix() = data.oMf[link_index].toHomogeneousMatrix();
 
   return link_pose;
 }
 
-MatrixXd KinematicsSolver::computeJacobian(const VectorXd & q, const std::string & link_name)
+Eigen::MatrixXd KinematicsSolver::computeJacobian(
+  const Eigen::VectorXd & q,
+  const std::string & link_name)
 {
   pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
   if (link_index >= model_.frames.size()) {
     throw std::runtime_error("Link name not found in URDF: " + link_name);
   }
 
-  MatrixXd J;
+  Eigen::MatrixXd J;
   J.setZero(6, dof_);
   pinocchio::Data data = pinocchio::Data(model_);
   pinocchio::computeJointJacobians(model_, data, q);
@@ -211,20 +211,20 @@ std::vector<std::string> KinematicsSolver::getJointNames() const
   return joint_names;
 }
 
-Affine3d KinematicsSolver::getPose(const std::string & link_name) const
+Eigen::Affine3d KinematicsSolver::getPose(const std::string & link_name) const
 {
   pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
   if (link_index >= model_.frames.size()) {
     throw std::runtime_error("Link name not found in URDF: " + link_name);
   }
 
-  Affine3d link_pose;
+  Eigen::Affine3d link_pose;
   link_pose.matrix() = data_.oMf[link_index].toHomogeneousMatrix();
 
   return link_pose;
 }
 
-MatrixXd KinematicsSolver::getJacobian(const std::string & link_name)
+Eigen::MatrixXd KinematicsSolver::getJacobian(const std::string & link_name)
 {
   pinocchio::FrameIndex link_index = model_.getFrameId(link_name);
   if (link_index >= model_.frames.size()) {
@@ -288,8 +288,8 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
       pinocchio::computeJointJacobiansTimeVariation(model_, data_, q_, qdot_);
     }
 
-    auto skew = [](const Vector3d & v)->Matrix3d{
-        return (Matrix3d() << 0, -v.z(), v.y(),
+    auto skew = [](const Eigen::Vector3d & v)->Eigen::Matrix3d{
+        return (Eigen::Matrix3d() << 0, -v.z(), v.y(),
                v.z(), 0, -v.x(),
                -v.y(), v.x(), 0).finished();
       };
@@ -301,9 +301,9 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
       const int jointB = geom_model_.geometryObjects[geomB].parentJoint;
 
       const auto & dist_res = geom_data_.distanceResults[idx];
-      const Vector3d pA = dist_res.nearest_points[0];
-      const Vector3d pB = dist_res.nearest_points[1];
-      Vector3d n = pB - pA;
+      const Eigen::Vector3d pA = dist_res.nearest_points[0];
+      const Eigen::Vector3d pB = dist_res.nearest_points[1];
+      Eigen::Vector3d n = pB - pA;
       const double n_norm = n.norm();
       if (n_norm > 0.0) {
         n /= n_norm;
@@ -311,16 +311,16 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
         n.setZero();
       }
 
-      MatrixXd J_jointA = MatrixXd::Zero(6, q_.size());
-      MatrixXd J_jointB = MatrixXd::Zero(6, q_.size());
+      Eigen::MatrixXd J_jointA = Eigen::MatrixXd::Zero(6, q_.size());
+      Eigen::MatrixXd J_jointB = Eigen::MatrixXd::Zero(6, q_.size());
       pinocchio::getJointJacobian(model_, data_, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA);
       pinocchio::getJointJacobian(model_, data_, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB);
 
-      const Vector3d rA = pA - data_.oMi[jointA].translation();
-      const Vector3d rB = pB - data_.oMi[jointB].translation();
+      const Eigen::Vector3d rA = pA - data_.oMi[jointA].translation();
+      const Eigen::Vector3d rB = pB - data_.oMi[jointB].translation();
 
-      const MatrixXd JA = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
-      const MatrixXd JB = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
+      const Eigen::MatrixXd JA = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
+      const Eigen::MatrixXd JB = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
 
       results[idx].grad = (n.transpose() * (JB - JA)).transpose();
       if (dist_res.min_distance < 0) {
@@ -328,22 +328,22 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
       }
 
       if (with_graddot) {
-        MatrixXd J_jointA_dot = MatrixXd::Zero(6, q_.size());
-        MatrixXd J_jointB_dot = MatrixXd::Zero(6, q_.size());
+        Eigen::MatrixXd J_jointA_dot = Eigen::MatrixXd::Zero(6, q_.size());
+        Eigen::MatrixXd J_jointB_dot = Eigen::MatrixXd::Zero(6, q_.size());
         pinocchio::getJointJacobianTimeVariation(model_, data_, jointA,
               pinocchio::LOCAL_WORLD_ALIGNED, J_jointA_dot);
         pinocchio::getJointJacobianTimeVariation(model_, data_, jointB,
               pinocchio::LOCAL_WORLD_ALIGNED, J_jointB_dot);
 
-        const Vector3d pA_dot = JA * qdot_;
-        const Vector3d pB_dot = JB * qdot_;
+        const Eigen::Vector3d pA_dot = JA * qdot_;
+        const Eigen::Vector3d pB_dot = JB * qdot_;
 
-        const Vector3d rA_dot = pA_dot - J_jointA.topRows<3>() * qdot_;
-        const Vector3d rB_dot = pB_dot - J_jointB.topRows<3>() * qdot_;
+        const Eigen::Vector3d rA_dot = pA_dot - J_jointA.topRows<3>() * qdot_;
+        const Eigen::Vector3d rB_dot = pB_dot - J_jointB.topRows<3>() * qdot_;
 
-        const MatrixXd JA_dot = J_jointA_dot.topRows<3>() -
+        const Eigen::MatrixXd JA_dot = J_jointA_dot.topRows<3>() -
           (skew(rA_dot) * J_jointA.bottomRows<3>() + skew(rA) * J_jointA_dot.bottomRows<3>());
-        const MatrixXd JB_dot = J_jointB_dot.topRows<3>() -
+        const Eigen::MatrixXd JB_dot = J_jointB_dot.topRows<3>() -
           (skew(rB_dot) * J_jointB.bottomRows<3>() + skew(rB) * J_jointB_dot.bottomRows<3>());
 
         results[idx].grad_dot = (n.transpose() * (JB_dot - JA_dot)).transpose();

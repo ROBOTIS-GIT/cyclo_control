@@ -19,7 +19,7 @@
 #include <memory>
 #include <string>
 
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
 #include "motion_controller_core/optimization/qp_base.hpp"
 

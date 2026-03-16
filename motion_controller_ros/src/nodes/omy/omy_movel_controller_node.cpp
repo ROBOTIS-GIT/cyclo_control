@@ -18,7 +18,7 @@
 
 #include <cmath>
 
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 
 namespace motion_controller_ros
 {

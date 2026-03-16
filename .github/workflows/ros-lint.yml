@@ -20,8 +20,15 @@ jobs:
           required-ros-distributions: jazzy
 
       - name: Run Linter
+        env:
+          AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS: 1
         uses: ros-tooling/action-ros-lint@master
         with:
           linter: ${{ matrix.linter }}
           distribution: jazzy
-          package-name: "*"
+          package-name: |
+            motion_controller
+            motion_controller_core
+            motion_controller_models
+            motion_controller_ros
+            motion_controller_ros_py

@@ -35,7 +35,6 @@
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
 #include "motion_controller_core/controllers/ai_worker/joint_space_controller.hpp"
 
-using Eigen::VectorXd;
 
 namespace motion_controller_ros
 {
@@ -89,10 +88,10 @@ private:
   std::shared_ptr<motion_controller::controllers::QPFilter> qp_filter_;
 
         // State variables
-  VectorXd q_;
-  VectorXd qdot_;
-  VectorXd q_desired_;
-  VectorXd qdot_desired_;
+  Eigen::VectorXd q_;
+  Eigen::VectorXd qdot_;
+  Eigen::VectorXd q_desired_;
+  Eigen::VectorXd qdot_desired_;
   bool right_traj_received_;
   bool left_traj_received_;
   bool joint_state_received_;
@@ -123,14 +122,14 @@ private:
 
         // Helper functions
   void initializeJointConfig();
-  void publishTrajectory(const VectorXd & q_desired);
+  void publishTrajectory(const Eigen::VectorXd & q_desired);
   void updateDesiredVelocityFromTrajectory(
     const trajectory_msgs::msg::JointTrajectory & msg,
-    VectorXd & qdot_desired);
+    Eigen::VectorXd & qdot_desired);
 
   trajectory_msgs::msg::JointTrajectory createTrajectoryMsgWithGripper(
     const std::vector<std::string> & arm_joint_names,
-    const VectorXd & positions,
+    const Eigen::VectorXd & positions,
     const std::vector<int> & arm_indices,
     const std::string & gripper_joint_name,
     double gripper_position,

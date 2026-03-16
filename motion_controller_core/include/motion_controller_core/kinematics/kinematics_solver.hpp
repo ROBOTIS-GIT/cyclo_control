@@ -43,16 +43,13 @@
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/parsers/srdf.hpp>
 
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 
 namespace motion_controller
 {
 namespace kinematics
 {
 using motion_controller::common::collision_checker::MinDistResult;
-using Eigen::Affine3d;
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
 
   /**
   * @brief Generic Kinematics Solver class that provides FK and IK using a selectable backend.
@@ -69,7 +66,7 @@ public:
     * @param qdot  (Eigen::VectorXd) Joint velocities.
     * @return (bool) True if state update is successful.
     */
-  virtual bool updateState(const VectorXd & q, const VectorXd & qdot);
+  virtual bool updateState(const Eigen::VectorXd & q, const Eigen::VectorXd & qdot);
 
     // ================================ Compute Functions ================================
     /**
@@ -78,7 +75,7 @@ public:
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::Affine3d) Pose of the link in the task space.
     */
-  virtual Affine3d computePose(const VectorXd & q, const std::string & link_name);
+  virtual Eigen::Affine3d computePose(const Eigen::VectorXd & q, const std::string & link_name);
 
     /**
     * @brief Compute the Jacobian of the link.
@@ -86,7 +83,7 @@ public:
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::MatrixXd) Jacobian of the link.
     */
-  virtual MatrixXd computeJacobian(const VectorXd & q, const std::string & link_name);
+  virtual Eigen::MatrixXd computeJacobian(const Eigen::VectorXd & q, const std::string & link_name);
 
     // ================================ Get Functions ================================
   virtual const std::string getURDFPath() const {return urdf_path_;}
@@ -118,19 +115,19 @@ public:
     * @brief Get the joint positions of the manipulator.
     * @return (Eigen::VectorXd) Joint positions of the manipulator.
     */
-  virtual VectorXd getJointPosition() const {return q_;}
+  virtual Eigen::VectorXd getJointPosition() const {return q_;}
 
     /**
     * @brief Get the joint velocities of the manipulator.
     * @return (Eigen::VectorXd) Joint velocities of the manipulator.
     */
-  virtual VectorXd getJointVelocity() const {return qdot_;}
+  virtual Eigen::VectorXd getJointVelocity() const {return qdot_;}
 
     /**
     * @brief Get lower and upper joint position limits of the manipulator.
     * @return (std::pair<Eigen::VectorXd, Eigen::VectorXd>) Joint position limits (lower, upper) of the manipulator.
     */
-  virtual std::pair<VectorXd, VectorXd> getJointPositionLimit() const
+  virtual std::pair<Eigen::VectorXd, Eigen::VectorXd> getJointPositionLimit() const
   {
     return std::make_pair(q_lb_, q_ub_);
   }
@@ -139,7 +136,7 @@ public:
     * @brief Get lower and upper joint velocity limits of the manipulator.
     * @return (std::pair<Eigen::VectorXd, Eigen::VectorXd>) Joint velocity limits (lower, upper) of the manipulator.
     */
-  virtual std::pair<VectorXd, VectorXd> getJointVelocityLimit() const
+  virtual std::pair<Eigen::VectorXd, Eigen::VectorXd> getJointVelocityLimit() const
   {
     return std::make_pair(qdot_lb_, qdot_ub_);
   }
@@ -158,14 +155,14 @@ public:
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::Affine3d) Pose of the link in the task space.
     */
-  Affine3d getPose(const std::string & link_name) const;
+  Eigen::Affine3d getPose(const std::string & link_name) const;
 
     /**
     * @brief Get the Jacobian of the link.
     * @param link_name (std::string) Name of the link.
     * @return (Eigen::MatrixXd) Jacobian of the link.
     */
-  virtual MatrixXd getJacobian(const std::string & link_name);
+  virtual Eigen::MatrixXd getJacobian(const std::string & link_name);
 
     /**
      * @brief Get the number of collision pairs in the model.
@@ -192,7 +189,7 @@ protected:
     * @param qdot  (Eigen::VectorXd) Joint velocities.
     * @return (bool) True if the update was successful.
     */
-  virtual bool updateKinematics(const VectorXd & q, const VectorXd & qdot);
+  virtual bool updateKinematics(const Eigen::VectorXd & q, const Eigen::VectorXd & qdot);
 
   std::string urdf_path_;
   std::string srdf_path_;
@@ -213,12 +210,12 @@ protected:
 
   int dof_;             // Total degrees of freedom.
 
-  VectorXd q_;          // Manipulator joint positions.
-  VectorXd qdot_;       // Manipulator joint velocities.
-  VectorXd q_lb_;       // Lower joint position limits of the manipulator.
-  VectorXd q_ub_;       // Upper joint position limits of the manipulator.
-  VectorXd qdot_lb_;    // Lower joint velocity limits of the manipulator.
-  VectorXd qdot_ub_;    // Upper joint velocity limits of the manipulator.
+  Eigen::VectorXd q_;          // Manipulator joint positions.
+  Eigen::VectorXd qdot_;       // Manipulator joint velocities.
+  Eigen::VectorXd q_lb_;       // Lower joint position limits of the manipulator.
+  Eigen::VectorXd q_ub_;       // Upper joint position limits of the manipulator.
+  Eigen::VectorXd qdot_lb_;    // Lower joint velocity limits of the manipulator.
+  Eigen::VectorXd qdot_ub_;    // Upper joint velocity limits of the manipulator.
 };
 
 }  // namespace kinematics

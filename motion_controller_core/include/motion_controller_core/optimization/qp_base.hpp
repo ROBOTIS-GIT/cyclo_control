@@ -26,9 +26,6 @@ namespace motion_controller
 {
 namespace optimization
 {
-using Eigen::MatrixXd;
-using Eigen::SparseMatrix;
-using Eigen::VectorXd;
 
     /**
      * @brief Base class for QP solver.
@@ -87,7 +84,7 @@ public:
              * @param sol (Eigen::MatrixXd&) Output solution matrix.
              * @return (bool) True if the QP was solved successfully.
              */
-  bool solveQP(MatrixXd & sol)
+  bool solveQP(Eigen::MatrixXd & sol)
   {
     setCost();
     if (nbc_ != 0) {setBoundConstraint();}
@@ -96,11 +93,11 @@ public:
     setConstraint();
 
                 // Convert to sparse format for OSQP
-    SparseMatrix<double> P = P_ds_.sparseView();
-    SparseMatrix<double> A = A_ds_.sparseView();
-    VectorXd q = q_ds_;
-    VectorXd l = l_ds_;
-    VectorXd u = u_ds_;
+    Eigen::SparseMatrix<double> P = P_ds_.sparseView();
+    Eigen::SparseMatrix<double> A = A_ds_.sparseView();
+    Eigen::VectorXd q = q_ds_;
+    Eigen::VectorXd l = l_ds_;
+    Eigen::VectorXd u = u_ds_;
 
     OsqpEigen::Solver solver;
 
@@ -182,22 +179,22 @@ protected:
   int nineqc_;           // number of inequality constraints
   int neqc_;             // number of equality constraints
 
-  MatrixXd P_ds_;                           // Hessian matrix
-  VectorXd q_ds_;                           // Gradient vector
+  Eigen::MatrixXd P_ds_;                           // Hessian matrix
+  Eigen::VectorXd q_ds_;                           // Gradient vector
 
-  MatrixXd A_ds_;                           // Constraint matrix
-  VectorXd l_ds_;                           // Lower bounds for constraints
-  VectorXd u_ds_;                           // Upper bounds for constraints
+  Eigen::MatrixXd A_ds_;                           // Constraint matrix
+  Eigen::VectorXd l_ds_;                           // Lower bounds for constraints
+  Eigen::VectorXd u_ds_;                           // Upper bounds for constraints
 
-  MatrixXd A_ineq_ds_;                      // Inequality constraint matrix
-  VectorXd l_ineq_ds_;                      // Lower bounds for inequality constraints
-  VectorXd u_ineq_ds_;                      // Upper bounds for inequality constraints
+  Eigen::MatrixXd A_ineq_ds_;                      // Inequality constraint matrix
+  Eigen::VectorXd l_ineq_ds_;                      // Lower bounds for inequality constraints
+  Eigen::VectorXd u_ineq_ds_;                      // Upper bounds for inequality constraints
 
-  VectorXd l_bound_ds_;                     // Lower bounds for bound constraints
-  VectorXd u_bound_ds_;                     // Upper bounds for bound constraints
+  Eigen::VectorXd l_bound_ds_;                     // Lower bounds for bound constraints
+  Eigen::VectorXd u_bound_ds_;                     // Upper bounds for bound constraints
 
-  MatrixXd A_eq_ds_;                        // Equality constraint matrix
-  VectorXd b_eq_ds_;                        // Bounds for equality constraints
+  Eigen::MatrixXd A_eq_ds_;                        // Equality constraint matrix
+  Eigen::VectorXd b_eq_ds_;                        // Bounds for equality constraints
 
 
   OsqpEigen::Status qp_status_;             // Status of the QP solver

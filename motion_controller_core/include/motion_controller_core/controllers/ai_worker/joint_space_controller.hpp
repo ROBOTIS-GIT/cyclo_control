@@ -20,7 +20,7 @@
 
 #include "motion_controller_core/optimization/qp_base.hpp"
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 
 namespace motion_controller
 {

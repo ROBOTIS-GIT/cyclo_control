@@ -31,7 +31,7 @@
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "robotis_interfaces/msg/move_l.hpp"
-#include "motion_controller_core/common/type_define.h"
+#include "motion_controller_core/common/type_define.hpp"
 #include "motion_controller_core/controllers/open_manipulator/open_manipulator_movel_controller.hpp"
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
 

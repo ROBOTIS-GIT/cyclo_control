@@ -334,18 +334,18 @@ void LeaderController::controlLoopCallback()
     kinematics_solver_->updateState(q_, qdot_);
 
     if (right_recent) {
-      const Affine3d r_pose =
+      const Eigen::Affine3d r_pose =
         computePoseInBaseFrame(kinematics_solver_->getPose(r_gripper_name_));
-      const Affine3d r_elbow_pose =
+      const Eigen::Affine3d r_elbow_pose =
         computePoseInBaseFrame(kinematics_solver_->getPose(r_elbow_name_));
       r_goal_pose_pub_->publish(makePoseStamped(r_pose));
       r_elbow_pose_pub_->publish(makePoseStamped(r_elbow_pose));
     }
 
     if (left_recent) {
-      const Affine3d l_pose =
+      const Eigen::Affine3d l_pose =
         computePoseInBaseFrame(kinematics_solver_->getPose(l_gripper_name_));
-      const Affine3d l_elbow_pose =
+      const Eigen::Affine3d l_elbow_pose =
         computePoseInBaseFrame(kinematics_solver_->getPose(l_elbow_name_));
       l_goal_pose_pub_->publish(makePoseStamped(l_pose));
       l_elbow_pose_pub_->publish(makePoseStamped(l_elbow_pose));
@@ -355,7 +355,8 @@ void LeaderController::controlLoopCallback()
   }
 }
 
-geometry_msgs::msg::PoseStamped LeaderController::makePoseStamped(const Affine3d & pose) const
+geometry_msgs::msg::PoseStamped LeaderController::makePoseStamped(
+  const Eigen::Affine3d & pose) const
 {
   geometry_msgs::msg::PoseStamped msg;
         // msg.header.stamp = this->now();
@@ -372,10 +373,11 @@ geometry_msgs::msg::PoseStamped LeaderController::makePoseStamped(const Affine3d
   return msg;
 }
 
-Affine3d LeaderController::computePoseInBaseFrame(const Affine3d & link_pose) const
+Eigen::Affine3d LeaderController::computePoseInBaseFrame(
+  const Eigen::Affine3d & link_pose) const
 {
   if (kinematics_solver_ && kinematics_solver_->hasLinkFrame("world")) {
-    const Affine3d base_pose = kinematics_solver_->getPose("world");
+    const Eigen::Affine3d base_pose = kinematics_solver_->getPose("world");
     return base_pose.inverse() * link_pose;
   }
   return link_pose;

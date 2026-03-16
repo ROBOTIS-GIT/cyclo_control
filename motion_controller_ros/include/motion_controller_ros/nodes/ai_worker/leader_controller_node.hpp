@@ -34,8 +34,6 @@
 
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
 
-using Eigen::Affine3d;
-using Eigen::VectorXd;
 
 namespace motion_controller_ros
 {
@@ -95,8 +93,8 @@ private:
   std::shared_ptr<motion_controller::kinematics::KinematicsSolver> kinematics_solver_;
 
         // State
-  VectorXd q_;
-  VectorXd qdot_;
+  Eigen::VectorXd q_;
+  Eigen::VectorXd qdot_;
   bool right_traj_received_;
   bool left_traj_received_;
   bool lift_joint_received_;
@@ -118,7 +116,7 @@ private:
   void updateJointPositionsFromTrajectory(const trajectory_msgs::msg::JointTrajectory & msg);
   void updateLiftJointFromJointState(const sensor_msgs::msg::JointState & msg);
   bool requestReactivateOnce();
-  geometry_msgs::msg::PoseStamped makePoseStamped(const Affine3d & pose) const;
-  Affine3d computePoseInBaseFrame(const Affine3d & link_pose) const;
+  geometry_msgs::msg::PoseStamped makePoseStamped(const Eigen::Affine3d & pose) const;
+  Eigen::Affine3d computePoseInBaseFrame(const Eigen::Affine3d & link_pose) const;
 };
 }  // namespace motion_controller_ros

@@ -272,7 +272,7 @@ void JointSpaceController::extractJointStates(const sensor_msgs::msg::JointState
 
 void JointSpaceController::updateDesiredVelocityFromTrajectory(
   const trajectory_msgs::msg::JointTrajectory & msg,
-  VectorXd & qdot_desired)
+  Eigen::VectorXd & qdot_desired)
 {
   if (msg.points.empty()) {
     return;
@@ -328,12 +328,14 @@ void JointSpaceController::controlLoopCallback()
             // qdot_desired_ is set by trajectory callbacks
     kinematics_solver_->updateState(q_, qdot_);
 
-    VectorXd w_tracking = VectorXd::Ones(kinematics_solver_->getDof()) * weight_tracking_;
-    VectorXd w_damping = VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
+    Eigen::VectorXd w_tracking =
+      Eigen::VectorXd::Ones(kinematics_solver_->getDof()) * weight_tracking_;
+    Eigen::VectorXd w_damping =
+      Eigen::VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
     qp_filter_->setWeight(w_tracking, w_damping);
     qp_filter_->setDesiredJointVel(qdot_desired_);
 
-    VectorXd optimal_velocities;
+    Eigen::VectorXd optimal_velocities;
     if (!qp_filter_->getOptJointVel(optimal_velocities)) {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                     "QP filter failed to converge");
@@ -350,7 +352,7 @@ void JointSpaceController::controlLoopCallback()
   }
 }
 
-void JointSpaceController::publishTrajectory(const VectorXd & q_desired)
+void JointSpaceController::publishTrajectory(const Eigen::VectorXd & q_desired)
 {
   try {
     std::vector<int> left_arm_indices, right_arm_indices;
@@ -389,7 +391,7 @@ void JointSpaceController::publishTrajectory(const VectorXd & q_desired)
 
 trajectory_msgs::msg::JointTrajectory JointSpaceController::createTrajectoryMsgWithGripper(
   const std::vector<std::string> & arm_joint_names,
-  const VectorXd & positions,
+  const Eigen::VectorXd & positions,
   const std::vector<int> & arm_indices,
   const std::string & gripper_joint_name,
   double gripper_position,
