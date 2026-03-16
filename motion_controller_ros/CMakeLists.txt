@@ -37,12 +37,12 @@ if(motion_controller_core_FOUND)
   message(STATUS "Found motion_controller_core via find_package")
 else()
   message(STATUS "motion_controller_core not found via find_package, using fallback paths")
-  
+
   # Check if library exists
   if(EXISTS "${MOTION_CONTROLLER_CORE_LIB_DIR}/libmotion_controller_core.so")
     set(MOTION_CONTROLLER_CORE_LIB "${MOTION_CONTROLLER_CORE_LIB_DIR}/libmotion_controller_core.so")
     message(STATUS "Found motion_controller_core library at: ${MOTION_CONTROLLER_CORE_LIB}")
-    
+
     # Create imported target
     if(NOT TARGET motion_controller_core)
       add_library(motion_controller_core SHARED IMPORTED GLOBAL)
@@ -60,11 +60,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Create executable
-add_executable(ai_worker_controller_node 
+add_executable(ai_worker_controller_node
   src/nodes/ai_worker/ai_worker_controller_node.cpp
 )
 
-add_executable(joint_space_controller_node 
+add_executable(joint_space_controller_node
   src/nodes/ai_worker/joint_space_controller_node.cpp
 )
 

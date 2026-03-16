@@ -9,8 +9,6 @@
   <license>Apache 2.0</license>
   <author email="kyu@robotis.com">Yeonguk Kim</author>
   <author email="nhw@robotis.com">Hyunwoo Nam</author>
-  <buildtool_depend>cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
   <exec_depend>motion_controller_core</exec_depend>
   <exec_depend>motion_controller_models</exec_depend>

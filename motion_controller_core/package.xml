@@ -16,8 +16,6 @@
   <exec_depend>pinocchio</exec_depend>
   <exec_depend>osqp-eigen</exec_depend>
 
-  <buildtool_depend>cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <test_depend>gtest</test_depend>
