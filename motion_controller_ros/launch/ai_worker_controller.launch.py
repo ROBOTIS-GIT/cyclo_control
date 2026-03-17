@@ -21,7 +21,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
@@ -124,8 +124,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'controller_type',
-            default_value='vr',
-            description='Controller type (without _controller_node).',
+            default_value='movel',
+            description='Controller type (movel, movej, leader, vr). Default: movel.',
         ),
     ]
 
@@ -142,13 +142,9 @@ def generate_launch_description():
     left_movel_topic = LaunchConfiguration('left_movel_topic')
     config_file = LaunchConfiguration('config_file')
     controller_type = LaunchConfiguration('controller_type')
-    controller_executable = PythonExpression(
-        ["'", controller_type, "_controller_node'"]
-    )
-
-    follower_controller_node = Node(
+    ai_worker_movel_controller_node = Node(
         package='motion_controller_ros',
-        executable=controller_executable,
+        executable='ai_worker_movel_controller_node',
         parameters=[
             config_file,
             {
@@ -157,8 +153,43 @@ def generate_launch_description():
             },
         ],
         output='screen',
-        condition=UnlessCondition(
-            PythonExpression(["'", controller_type, "' == 'leader'"])
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'movel'"])
+        ),
+    )
+
+    ai_worker_movej_controller_node = Node(
+        package='motion_controller_ros',
+        executable='ai_worker_movej_controller_node',
+        parameters=[
+            config_file,
+            {
+                'urdf_path': follower_urdf_path,
+                'srdf_path': follower_srdf_path,
+            },
+        ],
+        output='screen',
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'movej'"])
+        ),
+    )
+
+    vr_controller_node = Node(
+        package='motion_controller_ros',
+        executable='vr_controller_node',
+        parameters=[
+            config_file,
+            {
+                'urdf_path': follower_urdf_path,
+                'srdf_path': follower_srdf_path,
+                'reactivate_service': reactivate_service,
+            },
+        ],
+        output='screen',
+        condition=IfCondition(
+            PythonExpression(
+                ["'", controller_type, "' == 'vr' or '", controller_type, "' == 'leader'"]
+            )
         ),
     )
 
@@ -169,23 +200,6 @@ def generate_launch_description():
             config_file,
             {
                 'urdf_path': leader_urdf_path,
-                'reactivate_service': reactivate_service,
-            },
-        ],
-        output='screen',
-        condition=IfCondition(
-            PythonExpression(["'", controller_type, "' == 'leader'"])
-        ),
-    )
-
-    follower_with_leader_node = Node(
-        package='motion_controller_ros',
-        executable='vr_controller_node',
-        parameters=[
-            config_file,
-            {
-                'urdf_path': follower_urdf_path,
-                'srdf_path': follower_srdf_path,
                 'reactivate_service': reactivate_service,
             },
         ],
@@ -226,7 +240,7 @@ def generate_launch_description():
         output='screen',
         condition=IfCondition(
             PythonExpression(
-                ["'", controller_type, "' == 'ai_worker_movel' and '", start_interactive_marker, "' == 'true'"]
+                ["'", controller_type, "' == 'movel' and '", start_interactive_marker, "' == 'true'"]
             )
         ),
     )
@@ -252,7 +266,7 @@ def generate_launch_description():
         output='screen',
         condition=IfCondition(
             PythonExpression(
-                ["'", controller_type, "' == 'ai_worker_movel' and '", start_interactive_marker, "' == 'true'"]
+                ["'", controller_type, "' == 'movel' and '", start_interactive_marker, "' == 'true'"]
             )
         ),
     )
@@ -260,9 +274,10 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments
         + [
-            follower_controller_node,
+            ai_worker_movel_controller_node,
+            ai_worker_movej_controller_node,
             leader_controller_node,
-            follower_with_leader_node,
+            vr_controller_node,
             reference_checker_node,
             right_interactive_marker,
             left_interactive_marker,

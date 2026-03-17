@@ -64,7 +64,7 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
       std::string("~/controller_error"));
 
   if (urdf_path_.empty()) {
-    RCLCPP_FATAL(this->get_logger(), "The 'urdf_path' parameter must be provided.");
+    RCLCPP_FATAL(this->get_logger(), "URDF path not provided.");
     rclcpp::shutdown();
     return;
   }
@@ -90,10 +90,8 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
     } else {
       RCLCPP_INFO(this->get_logger(), "SRDF path: %s", srdf_path_.c_str());
     }
-    RCLCPP_INFO(this->get_logger(), "Loading URDF and initializing kinematics solver...");
     kinematics_solver_ =
       std::make_shared<motion_controller::kinematics::KinematicsSolver>(urdf_path_, srdf_path_);
-    RCLCPP_INFO(this->get_logger(), "Initializing QP controller...");
     qp_controller_ =
       std::make_shared<motion_controller::controllers::OpenManipulatorMoveLController>(
       kinematics_solver_, controlled_link_, time_step_);
@@ -106,8 +104,6 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
 
     initializeJointConfig();
 
-    RCLCPP_INFO(this->get_logger(), "Motion controller initialized (DOF: %d)",
-        kinematics_solver_->getDof());
   } catch (const std::exception & e) {
     RCLCPP_FATAL(this->get_logger(), "Failed to initialize OMY MoveL Controller: %s", e.what());
     rclcpp::shutdown();
@@ -127,15 +123,6 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
   }
 
   RCLCPP_INFO(this->get_logger(), "OMY MoveL Controller initialized successfully!");
-  RCLCPP_INFO(this->get_logger(), "  - Controlled link: %s", controlled_link_.c_str());
-  RCLCPP_INFO(
-            this->get_logger(),
-            "  - Control loop: %.1f Hz (period: %d ms)",
-            control_frequency_,
-            timer_period_ms);
-  RCLCPP_INFO(this->get_logger(), "  - MoveL command topic: %s", movel_topic_.c_str());
-  RCLCPP_INFO(this->get_logger(), "========================================");
-  RCLCPP_INFO(this->get_logger(), "Node is ready! Waiting for messages...");
 }
 
 OmyMoveLControllerNode::~OmyMoveLControllerNode()
@@ -250,7 +237,6 @@ void OmyMoveLControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
     movel_goal_pose_ = movel_start_pose_;
     movel_target_initialized_ = true;
 
-    RCLCPP_INFO(this->get_logger(), "Initial end-effector pose captured for moveL control.");
   }
 }
 
@@ -274,11 +260,6 @@ void OmyMoveLControllerNode::moveLCallback(const robotis_interfaces::msg::MoveL:
   motion_start_time_ = this->now();
   movel_target_initialized_ = true;
   movel_trajectory_active_ = true;
-
-  RCLCPP_INFO(
-            this->get_logger(),
-            "Received moveL command (duration: %.3f s)",
-            active_motion_duration_);
 }
 
 Eigen::Affine3d OmyMoveLControllerNode::poseMsgToEigen(
@@ -384,7 +365,6 @@ void OmyMoveLControllerNode::controlLoopCallback()
     } else {
       if (movel_trajectory_active_) {
         movel_trajectory_active_ = false;
-        RCLCPP_INFO(this->get_logger(), "moveL command completed.");
       }
       desired_task_vel = computeDesiredVelocity(current_pose, movel_goal_pose_);
     }

@@ -58,7 +58,7 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
       std::string("~/controller_error"));
 
   if (urdf_path_.empty()) {
-    RCLCPP_FATAL(this->get_logger(), "The 'urdf_path' parameter must be provided.");
+    RCLCPP_FATAL(this->get_logger(), "URDF path not provided.");
     rclcpp::shutdown();
     return;
   }
@@ -84,10 +84,8 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
     } else {
       RCLCPP_INFO(this->get_logger(), "SRDF path: %s", srdf_path_.c_str());
     }
-    RCLCPP_INFO(this->get_logger(), "Loading URDF and initializing kinematics solver...");
     kinematics_solver_ =
       std::make_shared<motion_controller::kinematics::KinematicsSolver>(urdf_path_, srdf_path_);
-    RCLCPP_INFO(this->get_logger(), "Initializing QP controller...");
     qp_controller_ =
       std::make_shared<motion_controller::controllers::OpenManipulatorMoveJController>(
       kinematics_solver_, time_step_);
@@ -102,8 +100,6 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
 
     initializeJointConfig();
 
-    RCLCPP_INFO(this->get_logger(), "Motion controller initialized (DOF: %d)",
-        kinematics_solver_->getDof());
   } catch (const std::exception & e) {
     RCLCPP_FATAL(this->get_logger(), "Failed to initialize OMY MoveJ Controller: %s", e.what());
     rclcpp::shutdown();
@@ -123,15 +119,6 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
   }
 
   RCLCPP_INFO(this->get_logger(), "OMY MoveJ Controller initialized successfully!");
-  RCLCPP_INFO(this->get_logger(), "  - Controlled link: %s", controlled_link_.c_str());
-  RCLCPP_INFO(
-            this->get_logger(),
-            "  - Control loop: %.1f Hz (period: %d ms)",
-            control_frequency_,
-            timer_period_ms);
-  RCLCPP_INFO(this->get_logger(), "  - MoveJ command topic: %s", movej_topic_.c_str());
-  RCLCPP_INFO(this->get_logger(), "========================================");
-  RCLCPP_INFO(this->get_logger(), "Node is ready! Waiting for messages...");
 }
 
 OmyMoveJControllerNode::~OmyMoveJControllerNode()
@@ -271,7 +258,6 @@ void OmyMoveJControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
     movej_start_ = q_;
     movej_goal_ = q_;
     commanded_state_initialized_ = true;
-    RCLCPP_INFO(this->get_logger(), "Initial joint state captured for moveJ control.");
     RCLCPP_INFO(this->get_logger(), "OMY MoveJ Controller activated. Waiting for moveJ commands...");
   }
 }
