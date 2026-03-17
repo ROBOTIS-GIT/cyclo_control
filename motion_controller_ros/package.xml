@@ -8,7 +8,6 @@
   <author email="kyu@robotis.com">Yeonguk Kim</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake_target_dependencies</buildtool_depend>
 
   <!-- Core dependencies -->
   <depend>rclcpp</depend>

@@ -10,7 +10,6 @@ endif()
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_target_dependencies REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
@@ -163,148 +162,290 @@ target_include_directories(omy_movel_controller_node PRIVATE
 )
 
 # Link libraries
-ament_target_dependencies(ai_worker_controller_node
-  rclcpp
-  std_msgs
-  std_srvs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
-  ament_index_cpp
+target_include_directories(ai_worker_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${std_srvs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+  ${ament_index_cpp_INCLUDE_DIRS}
+)
+target_link_libraries(ai_worker_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${std_srvs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${ament_index_cpp_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
+  ${ament_index_cpp_TARGETS}
 )
 
-ament_target_dependencies(joint_space_controller_node
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
-  ament_index_cpp
+target_include_directories(joint_space_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+  ${ament_index_cpp_INCLUDE_DIRS}
+)
+target_link_libraries(joint_space_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${ament_index_cpp_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
+  ${ament_index_cpp_TARGETS}
 )
 
-ament_target_dependencies(leader_controller_node
-  rclcpp
-  std_msgs
-  std_srvs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
-  ament_index_cpp
+target_include_directories(leader_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${std_srvs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+  ${ament_index_cpp_INCLUDE_DIRS}
+)
+target_link_libraries(leader_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${std_srvs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${ament_index_cpp_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
+  ${ament_index_cpp_TARGETS}
 )
 
-ament_target_dependencies(omx_controller_node
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omx_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omx_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(omx_movej_controller_node
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omx_movej_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omx_movej_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(omx_movel_controller_node
-  robotis_interfaces
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omx_movel_controller_node PRIVATE
+  ${robotis_interfaces_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omx_movel_controller_node PRIVATE
+  ${robotis_interfaces_LIBRARIES}
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${robotis_interfaces_TARGETS}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(omy_controller_node
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omy_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omy_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(omy_movej_controller_node
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omy_movej_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omy_movej_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(omy_movel_controller_node
-  robotis_interfaces
-  rclcpp
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  trajectory_msgs
+target_include_directories(omy_movel_controller_node PRIVATE
+  ${robotis_interfaces_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(omy_movel_controller_node PRIVATE
+  ${robotis_interfaces_LIBRARIES}
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${robotis_interfaces_TARGETS}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
-ament_target_dependencies(interactive_marker_node
-  rclcpp
-  geometry_msgs
-  visualization_msgs
-  interactive_markers
-  tf2_ros
+target_include_directories(interactive_marker_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${visualization_msgs_INCLUDE_DIRS}
+  ${interactive_markers_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+)
+target_link_libraries(interactive_marker_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${visualization_msgs_LIBRARIES}
+  ${interactive_markers_LIBRARIES}
+  ${tf2_ros_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${visualization_msgs_TARGETS}
+  ${interactive_markers_TARGETS}
+  ${tf2_ros_TARGETS}
 )
 
-ament_target_dependencies(reference_checker_node
-  rclcpp
-  std_msgs
-  geometry_msgs
+target_include_directories(reference_checker_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(reference_checker_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
 )
 
-target_link_libraries(ai_worker_controller_node
+target_link_libraries(ai_worker_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(joint_space_controller_node
+target_link_libraries(joint_space_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(leader_controller_node
+target_link_libraries(leader_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omx_controller_node
+target_link_libraries(omx_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omx_movej_controller_node
+target_link_libraries(omx_movej_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omx_movel_controller_node
+target_link_libraries(omx_movel_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omy_controller_node
+target_link_libraries(omy_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omy_movej_controller_node
+target_link_libraries(omy_movej_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(omy_movel_controller_node
+target_link_libraries(omy_movel_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
@@ -312,26 +453,26 @@ target_link_libraries(omy_movel_controller_node
 
 # Link motion_controller_core
 if(motion_controller_core_FOUND)
-  target_link_libraries(ai_worker_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(joint_space_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(leader_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omx_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omx_movej_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omx_movel_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omy_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omy_movej_controller_node motion_controller_core::motion_controller_core)
-  target_link_libraries(omy_movel_controller_node motion_controller_core::motion_controller_core)
+  target_link_libraries(ai_worker_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(joint_space_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(leader_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_movej_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omx_movel_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_movej_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(omy_movel_controller_node PRIVATE motion_controller_core::motion_controller_core)
 else()
   # Link with full path for fallback
-  target_link_libraries(ai_worker_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(joint_space_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(leader_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omx_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omx_movej_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omx_movel_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omy_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omy_movej_controller_node ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omy_movel_controller_node ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(ai_worker_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(joint_space_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(leader_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_movej_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omx_movel_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_movej_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(omy_movel_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
 endif()
 
 # Install executable
