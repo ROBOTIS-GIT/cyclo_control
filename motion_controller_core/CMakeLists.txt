@@ -13,9 +13,9 @@ find_package(ament_cmake_python REQUIRED)
 
 set(SOURCES
     src/kinematics/kinematics_solver.cpp
-    src/controllers/ai_worker/ai_worker_controller.cpp
-    src/controllers/ai_worker/joint_space_controller.cpp
-    src/controllers/open_manipulator/open_manipulator_controller.cpp
+    src/controllers/ai_worker/vr_controller.cpp
+    src/controllers/ai_worker/ai_worker_movej_controller.cpp
+    src/controllers/ai_worker/ai_worker_movel_controller.cpp
     src/controllers/open_manipulator/open_manipulator_movej_controller.cpp
     src/controllers/open_manipulator/open_manipulator_movel_controller.cpp
 )

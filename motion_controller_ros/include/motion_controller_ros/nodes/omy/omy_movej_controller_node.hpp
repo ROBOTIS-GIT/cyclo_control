@@ -52,6 +52,8 @@ private:
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
   void moveJCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
   void controlLoopCallback();
+  trajectory_msgs::msg::JointTrajectory makeOutputTrajectory(
+    const Eigen::VectorXd & q_command) const;
 
   double control_frequency_;
   double time_step_;
@@ -103,5 +105,7 @@ private:
   double active_motion_duration_;
   Eigen::VectorXd movej_start_;
   Eigen::VectorXd movej_goal_;
+  trajectory_msgs::msg::JointTrajectory latest_movej_command_;
+  bool latest_movej_command_received_ = false;
 };
 }  // namespace motion_controller_ros

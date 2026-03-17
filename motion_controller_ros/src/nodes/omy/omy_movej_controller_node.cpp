@@ -200,19 +200,48 @@ void OmyMoveJControllerNode::publishCurrentPose(const Eigen::Affine3d & pose) co
 
 void OmyMoveJControllerNode::publishTrajectory(const Eigen::VectorXd & q_command) const
 {
-  trajectory_msgs::msg::JointTrajectory traj_msg;
-  traj_msg.header.frame_id = "";
-  traj_msg.joint_names = model_joint_names_;
+  joint_command_pub_->publish(makeOutputTrajectory(q_command));
+}
 
-  trajectory_msgs::msg::JointTrajectoryPoint point;
-  point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
-  for (int idx = 0; idx < q_command.size(); ++idx) {
-    point.positions.push_back(q_command[idx]);
-    point.velocities.push_back(0.0);
+trajectory_msgs::msg::JointTrajectory OmyMoveJControllerNode::makeOutputTrajectory(
+  const Eigen::VectorXd & q_command) const
+{
+  trajectory_msgs::msg::JointTrajectory traj_msg;
+  if (latest_movej_command_received_) {
+    traj_msg = latest_movej_command_;
+  } else {
+    traj_msg.joint_names = model_joint_names_;
+    traj_msg.points.resize(1);
   }
 
-  traj_msg.points.push_back(point);
-  joint_command_pub_->publish(traj_msg);
+  if (traj_msg.points.empty()) {
+    traj_msg.points.resize(1);
+  }
+
+  auto & point = traj_msg.points.front();
+  if (point.positions.size() < traj_msg.joint_names.size()) {
+    point.positions.resize(traj_msg.joint_names.size(), 0.0);
+  }
+  if (!point.velocities.empty() && point.velocities.size() < traj_msg.joint_names.size()) {
+    point.velocities.resize(traj_msg.joint_names.size(), 0.0);
+  }
+  point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
+
+  for (size_t i = 0; i < traj_msg.joint_names.size(); ++i) {
+    const auto model_it = model_joint_index_map_.find(traj_msg.joint_names[i]);
+    if (model_it == model_joint_index_map_.end()) {
+      continue;
+    }
+    const int model_idx = model_it->second;
+    if (model_idx >= 0 && model_idx < q_command.size()) {
+      point.positions[i] = q_command[model_idx];
+      if (!point.velocities.empty()) {
+        point.velocities[i] = 0.0;
+      }
+    }
+  }
+
+  return traj_msg;
 }
 
 void OmyMoveJControllerNode::publishControllerError(const std::string & error) const
@@ -242,8 +271,8 @@ void OmyMoveJControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
     movej_start_ = q_;
     movej_goal_ = q_;
     commanded_state_initialized_ = true;
-    movej_target_initialized_ = true;
     RCLCPP_INFO(this->get_logger(), "Initial joint state captured for moveJ control.");
+    RCLCPP_INFO(this->get_logger(), "OMY MoveJ Controller activated. Waiting for moveJ commands...");
   }
 }
 
@@ -298,6 +327,8 @@ void OmyMoveJControllerNode::moveJCallback(
   motion_start_time_ = this->now();
   movej_target_initialized_ = true;
   movej_trajectory_active_ = true;
+  latest_movej_command_ = *msg;
+  latest_movej_command_received_ = true;
 
   RCLCPP_INFO(
             this->get_logger(),
@@ -307,12 +338,21 @@ void OmyMoveJControllerNode::moveJCallback(
 
 void OmyMoveJControllerNode::controlLoopCallback()
 {
-  if (!joint_state_received_ || !commanded_state_initialized_ || !movej_target_initialized_) {
+  if (!joint_state_received_ || !commanded_state_initialized_) {
     RCLCPP_WARN_THROTTLE(
                 this->get_logger(),
                 *this->get_clock(),
                 2000,
                 "Control loop waiting for joint states...");
+    return;
+  }
+
+  if (!movej_target_initialized_) {
+    RCLCPP_WARN_THROTTLE(
+                this->get_logger(),
+                *this->get_clock(),
+                2000,
+                "Controller activated. Waiting for moveJ commands...");
     return;
   }
 

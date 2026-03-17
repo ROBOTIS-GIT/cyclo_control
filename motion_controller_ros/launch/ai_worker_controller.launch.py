@@ -38,17 +38,17 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'start_interactive_marker',
             default_value='false',
-            description='Start interactive markers for goal poses.',
+            description='Start interactive markers for MoveL goals.',
         ),
         DeclareLaunchArgument(
             'base_frame',
             default_value='base_link',
-            description='Frame for interactive markers and goal poses.',
+            description='Frame for interactive markers and MoveL goals.',
         ),
         DeclareLaunchArgument(
-            'reactivate_topic',
-            default_value='/reset',
-            description='Topic to reactivate controller.',
+            'reactivate_service',
+            default_value='/reactivate',
+            description='Service used to reactivate the VR controller.',
         ),
         DeclareLaunchArgument(
             'marker_scale',
@@ -66,14 +66,14 @@ def generate_launch_description():
             description='Controlled link for the left interactive marker.',
         ),
         DeclareLaunchArgument(
-            'right_goal_topic',
-            default_value='/r_goal_pose',
-            description='Goal topic for the right interactive marker.',
+            'right_movel_topic',
+            default_value='/r_goal_move',
+            description='MoveL topic for the right interactive marker.',
         ),
         DeclareLaunchArgument(
-            'left_goal_topic',
-            default_value='/l_goal_pose',
-            description='Goal topic for the left interactive marker.',
+            'left_movel_topic',
+            default_value='/l_goal_move',
+            description='MoveL topic for the left interactive marker.',
         ),
         DeclareLaunchArgument(
             'follower_urdf_path',
@@ -124,7 +124,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'controller_type',
-            default_value='ai_worker',
+            default_value='vr',
             description='Controller type (without _controller_node).',
         ),
     ]
@@ -134,12 +134,12 @@ def generate_launch_description():
     follower_srdf_path = LaunchConfiguration('follower_srdf_path')
     leader_urdf_path = LaunchConfiguration('leader_urdf_path')
     base_frame = LaunchConfiguration('base_frame')
-    reactivate_topic = LaunchConfiguration('reactivate_topic')
+    reactivate_service = LaunchConfiguration('reactivate_service')
     marker_scale = LaunchConfiguration('marker_scale')
     right_controlled_link = LaunchConfiguration('right_controlled_link')
     left_controlled_link = LaunchConfiguration('left_controlled_link')
-    right_goal_topic = LaunchConfiguration('right_goal_topic')
-    left_goal_topic = LaunchConfiguration('left_goal_topic')
+    right_movel_topic = LaunchConfiguration('right_movel_topic')
+    left_movel_topic = LaunchConfiguration('left_movel_topic')
     config_file = LaunchConfiguration('config_file')
     controller_type = LaunchConfiguration('controller_type')
     controller_executable = PythonExpression(
@@ -169,7 +169,7 @@ def generate_launch_description():
             config_file,
             {
                 'urdf_path': leader_urdf_path,
-                'reactivate_topic': reactivate_topic,
+                'reactivate_service': reactivate_service,
             },
         ],
         output='screen',
@@ -180,13 +180,13 @@ def generate_launch_description():
 
     follower_with_leader_node = Node(
         package='motion_controller_ros',
-        executable='ai_worker_controller_node',
+        executable='vr_controller_node',
         parameters=[
             config_file,
             {
                 'urdf_path': follower_urdf_path,
                 'srdf_path': follower_srdf_path,
-                'reactivate_topic': reactivate_topic,
+                'reactivate_service': reactivate_service,
             },
         ],
         output='screen',
@@ -201,7 +201,7 @@ def generate_launch_description():
         parameters=[config_file],
         output='screen',
         condition=IfCondition(
-            PythonExpression(["'", controller_type, "' == 'ai_worker'"])
+            PythonExpression(["'", controller_type, "' == 'vr'"])
         ),
     )
 
@@ -213,7 +213,7 @@ def generate_launch_description():
             {
                 'base_frame': base_frame,
                 'controlled_link': right_controlled_link,
-                'goal_topic': right_goal_topic,
+                'goal_topic': right_movel_topic,
                 'server_name': 'right_goal_marker_server',
                 'marker_name': 'right_goal_marker',
                 'marker_description': 'Right gripper goal',
@@ -224,7 +224,11 @@ def generate_launch_description():
             }
         ],
         output='screen',
-        condition=IfCondition(start_interactive_marker),
+        condition=IfCondition(
+            PythonExpression(
+                ["'", controller_type, "' == 'ai_worker_movel' and '", start_interactive_marker, "' == 'true'"]
+            )
+        ),
     )
 
     left_interactive_marker = Node(
@@ -235,7 +239,7 @@ def generate_launch_description():
             {
                 'base_frame': base_frame,
                 'controlled_link': left_controlled_link,
-                'goal_topic': left_goal_topic,
+                'goal_topic': left_movel_topic,
                 'server_name': 'left_goal_marker_server',
                 'marker_name': 'left_goal_marker',
                 'marker_description': 'Left gripper goal',
@@ -246,7 +250,11 @@ def generate_launch_description():
             }
         ],
         output='screen',
-        condition=IfCondition(start_interactive_marker),
+        condition=IfCondition(
+            PythonExpression(
+                ["'", controller_type, "' == 'ai_worker_movel' and '", start_interactive_marker, "' == 'true'"]
+            )
+        ),
     )
 
     return LaunchDescription(

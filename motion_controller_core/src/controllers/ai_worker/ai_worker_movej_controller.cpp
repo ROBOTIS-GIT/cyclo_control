@@ -14,35 +14,21 @@
 //
 // Author: Yeonguk Kim
 
-#include "motion_controller_core/controllers/open_manipulator/open_manipulator_controller.hpp"
+#include "motion_controller_core/controllers/ai_worker/ai_worker_movej_controller.hpp"
 
 #include <algorithm>
-#include <stdexcept>
 
 namespace motion_controller
 {
 namespace controllers
 {
-OpenManipulatorController::OpenManipulatorController(
+
+AIWorkerMoveJController::AIWorkerMoveJController(
   std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data,
-  const std::string & controlled_link,
-  double dt)
-: motion_controller::optimization::QPBase(),
-  robot_data_(std::move(robot_data)),
-  controlled_link_(controlled_link),
-  dt_(dt),
-  joint_dof_(0),
-  slack_penalty_(1000.0),
-  cbf_alpha_(5.0),
-  collision_buffer_(0.05),
-  collision_safe_distance_(0.02)
+  const double dt)
+: motion_controller::optimization::QPBase(), robot_data_(robot_data), dt_(dt)
 {
   joint_dof_ = robot_data_->getDof();
-
-  if (!controlled_link_.empty() && !robot_data_->hasLinkFrame(controlled_link_)) {
-    throw std::runtime_error(
-                "Controlled link '" + controlled_link_ + "' does not exist in the model.");
-  }
 
   si_index_.qdot_size = joint_dof_;
   si_index_.slack_q_min_size = joint_dof_;
@@ -64,8 +50,9 @@ OpenManipulatorController::OpenManipulatorController(
     si_index_.con_q_max_size +
     si_index_.con_sing_size +
     si_index_.con_sel_col_size;
+  const int neq = 0;
 
-  QPBase::setQPsize(nx, nbound, nineq, 0);
+  QPBase::setQPsize(nx, nbound, nineq, neq);
 
   si_index_.qdot_start = 0;
   si_index_.slack_q_min_start = si_index_.qdot_start + si_index_.qdot_size;
@@ -77,41 +64,48 @@ OpenManipulatorController::OpenManipulatorController(
   si_index_.con_sing_start = si_index_.con_q_max_start + si_index_.con_q_max_size;
   si_index_.con_sel_col_start = si_index_.con_sing_start + si_index_.con_sing_size;
 
-  task_xdot_desired_.setZero();
-  task_tracking_weight_.setOnes();
-  damping_weight_.setOnes(joint_dof_);
+  qdot_desired_.setZero(joint_dof_);
+  w_tracking_.setOnes(joint_dof_);
+  w_damping_.setOnes(joint_dof_);
+  slack_penalty_ = 1000.0;
+  cbf_alpha_ = 5.0;
+  collision_buffer_ = 0.05;
+  collision_safe_distance_ = 0.02;
 }
 
-void OpenManipulatorController::setControlledLink(const std::string & controlled_link)
+void AIWorkerMoveJController::setDesiredJointVel(const Eigen::VectorXd & qdot_desired)
 {
-  if (!controlled_link.empty() && !robot_data_->hasLinkFrame(controlled_link)) {
-    throw std::runtime_error(
-                "Controlled link '" + controlled_link + "' does not exist in the model.");
-  }
-  controlled_link_ = controlled_link;
-}
-
-void OpenManipulatorController::setDesiredTaskVel(
-  const motion_controller::common::Vector6d & task_xdot_desired)
-{
-  task_xdot_desired_ = task_xdot_desired;
-}
-
-void OpenManipulatorController::setWeights(
-  const motion_controller::common::Vector6d & task_tracking_weight,
-  const Eigen::VectorXd & damping_weight)
-{
-  task_tracking_weight_ = task_tracking_weight;
-  if (damping_weight.size() == joint_dof_) {
-    damping_weight_ = damping_weight;
+  if (qdot_desired.size() == joint_dof_) {
+    qdot_desired_ = qdot_desired;
   }
 }
 
-void OpenManipulatorController::setControllerParams(
-  double slack_penalty,
-  double cbf_alpha,
-  double buffer_distance,
-  double safe_distance)
+bool AIWorkerMoveJController::getOptJointVel(Eigen::VectorXd & opt_qdot)
+{
+  Eigen::MatrixXd sol;
+  if (!solveQP(sol)) {
+    opt_qdot.setZero();
+    return false;
+  } else {
+    opt_qdot = sol.block(si_index_.qdot_start, 0, si_index_.qdot_size, 1);
+    return true;
+  }
+}
+
+void AIWorkerMoveJController::setWeight(
+  const Eigen::VectorXd & w_tracking, const Eigen::VectorXd & w_damping)
+{
+  if (w_tracking.size() == joint_dof_) {
+    w_tracking_ = w_tracking;
+  }
+  if (w_damping.size() == joint_dof_) {
+    w_damping_ = w_damping;
+  }
+}
+
+void AIWorkerMoveJController::setControllerParams(
+  const double slack_penalty, const double cbf_alpha,
+  const double buffer_distance, const double safe_distance)
 {
   slack_penalty_ = slack_penalty;
   cbf_alpha_ = cbf_alpha;
@@ -119,40 +113,20 @@ void OpenManipulatorController::setControllerParams(
   collision_safe_distance_ = safe_distance;
 }
 
-bool OpenManipulatorController::getOptJointVel(Eigen::VectorXd & opt_qdot)
-{
-  Eigen::MatrixXd sol;
-  if (!solveQP(sol)) {
-    opt_qdot.setZero(joint_dof_);
-    return false;
-  }
-
-  opt_qdot = sol.block(si_index_.qdot_start, 0, si_index_.qdot_size, 1);
-  return true;
-}
-
-void OpenManipulatorController::setCost()
+void AIWorkerMoveJController::setCost()
 {
   P_ds_.setZero(nx_, nx_);
   q_ds_.setZero(nx_);
 
-  if (!controlled_link_.empty()) {
-    const Eigen::MatrixXd jacobian = robot_data_->getJacobian(controlled_link_);
-    const Eigen::Matrix<double, 6, 6> w_task = task_tracking_weight_.asDiagonal();
-    P_ds_.block(
-                si_index_.qdot_start,
-                si_index_.qdot_start,
-                si_index_.qdot_size,
-                si_index_.qdot_size) += 2.0 * jacobian.transpose() * w_task * jacobian;
-    q_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) +=
-      -2.0 * jacobian.transpose() * w_task * task_xdot_desired_;
-  }
+  P_ds_.block(
+    si_index_.qdot_start, si_index_.qdot_start,
+    si_index_.qdot_size, si_index_.qdot_size) += 2.0 * w_tracking_.asDiagonal();
+  q_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) +=
+    -2.0 * w_tracking_.asDiagonal() * qdot_desired_;
 
   P_ds_.block(
-            si_index_.qdot_start,
-            si_index_.qdot_start,
-            si_index_.qdot_size,
-            si_index_.qdot_size) += 2.0 * damping_weight_.asDiagonal();
+    si_index_.qdot_start, si_index_.qdot_start,
+    si_index_.qdot_size, si_index_.qdot_size) += 2.0 * w_damping_.asDiagonal();
 
   q_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size) =
     Eigen::VectorXd::Constant(si_index_.slack_q_min_size, slack_penalty_);
@@ -165,7 +139,7 @@ void OpenManipulatorController::setCost()
   }
 }
 
-void OpenManipulatorController::setBoundConstraint()
+void AIWorkerMoveJController::setBoundConstraint()
 {
   l_bound_ds_.setConstant(nbc_, -OSQP_INFTY);
   u_bound_ds_.setConstant(nbc_, OSQP_INFTY);
@@ -179,12 +153,11 @@ void OpenManipulatorController::setBoundConstraint()
   l_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size).setZero();
   l_bound_ds_(si_index_.slack_sing_start) = 0.0;
   if (si_index_.slack_sel_col_size > 0) {
-    l_bound_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size)
-    .setZero();
+    l_bound_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size).setZero();
   }
 }
 
-void OpenManipulatorController::setIneqConstraint()
+void AIWorkerMoveJController::setIneqConstraint()
 {
   A_ineq_ds_.setZero(nineqc_, nx_);
   l_ineq_ds_.setConstant(nineqc_, -OSQP_INFTY);
@@ -195,31 +168,23 @@ void OpenManipulatorController::setIneqConstraint()
   const Eigen::VectorXd q = robot_data_->getJointPosition();
 
   A_ineq_ds_.block(
-            si_index_.con_q_min_start,
-            si_index_.qdot_start,
-            si_index_.con_q_min_size,
-            si_index_.qdot_size) =
+    si_index_.con_q_min_start, si_index_.qdot_start,
+    si_index_.con_q_min_size, si_index_.qdot_size) =
     Eigen::MatrixXd::Identity(si_index_.con_q_min_size, si_index_.qdot_size);
   A_ineq_ds_.block(
-            si_index_.con_q_min_start,
-            si_index_.slack_q_min_start,
-            si_index_.con_q_min_size,
-            si_index_.slack_q_min_size) =
+    si_index_.con_q_min_start, si_index_.slack_q_min_start,
+    si_index_.con_q_min_size, si_index_.slack_q_min_size) =
     Eigen::MatrixXd::Identity(si_index_.con_q_min_size, si_index_.slack_q_min_size);
   l_ineq_ds_.segment(si_index_.con_q_min_start, si_index_.con_q_min_size) =
     -cbf_alpha_ * (q - q_min);
 
   A_ineq_ds_.block(
-            si_index_.con_q_max_start,
-            si_index_.qdot_start,
-            si_index_.con_q_max_size,
-            si_index_.qdot_size) =
+    si_index_.con_q_max_start, si_index_.qdot_start,
+    si_index_.con_q_max_size, si_index_.qdot_size) =
     -Eigen::MatrixXd::Identity(si_index_.con_q_max_size, si_index_.qdot_size);
   A_ineq_ds_.block(
-            si_index_.con_q_max_start,
-            si_index_.slack_q_max_start,
-            si_index_.con_q_max_size,
-            si_index_.slack_q_max_size) =
+    si_index_.con_q_max_start, si_index_.slack_q_max_start,
+    si_index_.con_q_max_size, si_index_.slack_q_max_size) =
     Eigen::MatrixXd::Identity(si_index_.con_q_max_size, si_index_.slack_q_max_size);
   l_ineq_ds_.segment(si_index_.con_q_max_start, si_index_.con_q_max_size) =
     -cbf_alpha_ * (q_max - q);
@@ -229,15 +194,10 @@ void OpenManipulatorController::setIneqConstraint()
     const int pair_count = std::min<int>(si_index_.con_sel_col_size, pair_results.size());
     for (int i = 0; i < pair_count; ++i) {
       const auto & res = pair_results[i];
-      A_ineq_ds_.block(
-                    si_index_.con_sel_col_start + i,
-                    si_index_.qdot_start,
-                    1,
-                    si_index_.qdot_size) = res.grad.transpose();
+      A_ineq_ds_.block(si_index_.con_sel_col_start + i, si_index_.qdot_start, 1, si_index_.qdot_size) =
+        res.grad.transpose();
       if (si_index_.slack_sel_col_size > 0 && i < si_index_.slack_sel_col_size) {
-        A_ineq_ds_(
-                        si_index_.con_sel_col_start + i,
-                        si_index_.slack_sel_col_start + i) = 1.0;
+        A_ineq_ds_(si_index_.con_sel_col_start + i, si_index_.slack_sel_col_start + i) = 1.0;
       }
       if (res.distance <= collision_buffer_) {
         l_ineq_ds_(si_index_.con_sel_col_start + i) =
@@ -247,10 +207,11 @@ void OpenManipulatorController::setIneqConstraint()
   }
 }
 
-void OpenManipulatorController::setEqConstraint()
+void AIWorkerMoveJController::setEqConstraint()
 {
   A_eq_ds_.setZero(neqc_, nx_);
   b_eq_ds_.setZero(neqc_);
 }
+
 }  // namespace controllers
 }  // namespace motion_controller

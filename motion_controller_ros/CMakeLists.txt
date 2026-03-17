@@ -60,20 +60,20 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Create executable
-add_executable(ai_worker_controller_node
-  src/nodes/ai_worker/ai_worker_controller_node.cpp
+add_executable(vr_controller_node
+  src/nodes/ai_worker/vr_controller_node.cpp
 )
 
-add_executable(joint_space_controller_node
-  src/nodes/ai_worker/joint_space_controller_node.cpp
+add_executable(ai_worker_movej_controller_node
+  src/nodes/ai_worker/ai_worker_movej_controller_node.cpp
+)
+
+add_executable(ai_worker_movel_controller_node
+  src/nodes/ai_worker/ai_worker_movel_controller_node.cpp
 )
 
 add_executable(leader_controller_node
   src/nodes/ai_worker/leader_controller_node.cpp
-)
-
-add_executable(omx_controller_node
-  src/nodes/omx/omx_controller_node.cpp
 )
 
 add_executable(omx_movej_controller_node
@@ -82,10 +82,6 @@ add_executable(omx_movej_controller_node
 
 add_executable(omx_movel_controller_node
   src/nodes/omx/omx_movel_controller_node.cpp
-)
-
-add_executable(omy_controller_node
-  src/nodes/omy/omy_controller_node.cpp
 )
 
 add_executable(omy_movej_controller_node
@@ -107,25 +103,25 @@ add_executable(reference_checker_node
 # Add include directories to the target
 message(STATUS "MOTION_CONTROLLER_CORE_INCLUDE_DIR = ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}")
 
-target_include_directories(ai_worker_controller_node PRIVATE
+target_include_directories(vr_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
 )
 
-target_include_directories(joint_space_controller_node PRIVATE
+target_include_directories(ai_worker_movej_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
+)
+
+target_include_directories(ai_worker_movel_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
 )
 
 target_include_directories(leader_controller_node PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${EIGEN3_INCLUDE_DIR}
-  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
-)
-
-target_include_directories(omx_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
@@ -138,12 +134,6 @@ target_include_directories(omx_movej_controller_node PRIVATE
 )
 
 target_include_directories(omx_movel_controller_node PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${EIGEN3_INCLUDE_DIR}
-  ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
-)
-
-target_include_directories(omy_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${MOTION_CONTROLLER_CORE_INCLUDE_DIR}
@@ -162,7 +152,7 @@ target_include_directories(omy_movel_controller_node PRIVATE
 )
 
 # Link libraries
-target_include_directories(ai_worker_controller_node PRIVATE
+target_include_directories(vr_controller_node PRIVATE
   ${rclcpp_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
   ${std_srvs_INCLUDE_DIRS}
@@ -171,7 +161,7 @@ target_include_directories(ai_worker_controller_node PRIVATE
   ${trajectory_msgs_INCLUDE_DIRS}
   ${ament_index_cpp_INCLUDE_DIRS}
 )
-target_link_libraries(ai_worker_controller_node PRIVATE
+target_link_libraries(vr_controller_node PRIVATE
   ${rclcpp_LIBRARIES}
   ${std_msgs_LIBRARIES}
   ${std_srvs_LIBRARIES}
@@ -188,7 +178,7 @@ target_link_libraries(ai_worker_controller_node PRIVATE
   ${ament_index_cpp_TARGETS}
 )
 
-target_include_directories(joint_space_controller_node PRIVATE
+target_include_directories(ai_worker_movej_controller_node PRIVATE
   ${rclcpp_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
@@ -196,7 +186,7 @@ target_include_directories(joint_space_controller_node PRIVATE
   ${trajectory_msgs_INCLUDE_DIRS}
   ${ament_index_cpp_INCLUDE_DIRS}
 )
-target_link_libraries(joint_space_controller_node PRIVATE
+target_link_libraries(ai_worker_movej_controller_node PRIVATE
   ${rclcpp_LIBRARIES}
   ${std_msgs_LIBRARIES}
   ${geometry_msgs_LIBRARIES}
@@ -209,6 +199,29 @@ target_link_libraries(joint_space_controller_node PRIVATE
   ${sensor_msgs_TARGETS}
   ${trajectory_msgs_TARGETS}
   ${ament_index_cpp_TARGETS}
+)
+
+target_include_directories(ai_worker_movel_controller_node PRIVATE
+  ${robotis_interfaces_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
+target_link_libraries(ai_worker_movel_controller_node PRIVATE
+  ${robotis_interfaces_LIBRARIES}
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${robotis_interfaces_TARGETS}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
 target_include_directories(leader_controller_node PRIVATE
@@ -235,26 +248,6 @@ target_link_libraries(leader_controller_node PRIVATE
   ${sensor_msgs_TARGETS}
   ${trajectory_msgs_TARGETS}
   ${ament_index_cpp_TARGETS}
-)
-
-target_include_directories(omx_controller_node PRIVATE
-  ${rclcpp_INCLUDE_DIRS}
-  ${std_msgs_INCLUDE_DIRS}
-  ${geometry_msgs_INCLUDE_DIRS}
-  ${sensor_msgs_INCLUDE_DIRS}
-  ${trajectory_msgs_INCLUDE_DIRS}
-)
-target_link_libraries(omx_controller_node PRIVATE
-  ${rclcpp_LIBRARIES}
-  ${std_msgs_LIBRARIES}
-  ${geometry_msgs_LIBRARIES}
-  ${sensor_msgs_LIBRARIES}
-  ${trajectory_msgs_LIBRARIES}
-  ${rclcpp_TARGETS}
-  ${std_msgs_TARGETS}
-  ${geometry_msgs_TARGETS}
-  ${sensor_msgs_TARGETS}
-  ${trajectory_msgs_TARGETS}
 )
 
 target_include_directories(omx_movej_controller_node PRIVATE
@@ -293,26 +286,6 @@ target_link_libraries(omx_movel_controller_node PRIVATE
   ${sensor_msgs_LIBRARIES}
   ${trajectory_msgs_LIBRARIES}
   ${robotis_interfaces_TARGETS}
-  ${rclcpp_TARGETS}
-  ${std_msgs_TARGETS}
-  ${geometry_msgs_TARGETS}
-  ${sensor_msgs_TARGETS}
-  ${trajectory_msgs_TARGETS}
-)
-
-target_include_directories(omy_controller_node PRIVATE
-  ${rclcpp_INCLUDE_DIRS}
-  ${std_msgs_INCLUDE_DIRS}
-  ${geometry_msgs_INCLUDE_DIRS}
-  ${sensor_msgs_INCLUDE_DIRS}
-  ${trajectory_msgs_INCLUDE_DIRS}
-)
-target_link_libraries(omy_controller_node PRIVATE
-  ${rclcpp_LIBRARIES}
-  ${std_msgs_LIBRARIES}
-  ${geometry_msgs_LIBRARIES}
-  ${sensor_msgs_LIBRARIES}
-  ${trajectory_msgs_LIBRARIES}
   ${rclcpp_TARGETS}
   ${std_msgs_TARGETS}
   ${geometry_msgs_TARGETS}
@@ -364,6 +337,7 @@ target_link_libraries(omy_movel_controller_node PRIVATE
 )
 
 target_include_directories(interactive_marker_node PRIVATE
+  ${robotis_interfaces_INCLUDE_DIRS}
   ${rclcpp_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${visualization_msgs_INCLUDE_DIRS}
@@ -371,11 +345,13 @@ target_include_directories(interactive_marker_node PRIVATE
   ${tf2_ros_INCLUDE_DIRS}
 )
 target_link_libraries(interactive_marker_node PRIVATE
+  ${robotis_interfaces_LIBRARIES}
   ${rclcpp_LIBRARIES}
   ${geometry_msgs_LIBRARIES}
   ${visualization_msgs_LIBRARIES}
   ${interactive_markers_LIBRARIES}
   ${tf2_ros_LIBRARIES}
+  ${robotis_interfaces_TARGETS}
   ${rclcpp_TARGETS}
   ${geometry_msgs_TARGETS}
   ${visualization_msgs_TARGETS}
@@ -397,25 +373,25 @@ target_link_libraries(reference_checker_node PRIVATE
   ${geometry_msgs_TARGETS}
 )
 
-target_link_libraries(ai_worker_controller_node PRIVATE
+target_link_libraries(vr_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
-target_link_libraries(joint_space_controller_node PRIVATE
+target_link_libraries(ai_worker_movej_controller_node PRIVATE
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+
+target_link_libraries(ai_worker_movel_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
 )
 
 target_link_libraries(leader_controller_node PRIVATE
-  Eigen3::Eigen
-  pinocchio::pinocchio
-  OsqpEigen::OsqpEigen
-)
-
-target_link_libraries(omx_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
@@ -428,12 +404,6 @@ target_link_libraries(omx_movej_controller_node PRIVATE
 )
 
 target_link_libraries(omx_movel_controller_node PRIVATE
-  Eigen3::Eigen
-  pinocchio::pinocchio
-  OsqpEigen::OsqpEigen
-)
-
-target_link_libraries(omy_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
   OsqpEigen::OsqpEigen
@@ -453,42 +423,40 @@ target_link_libraries(omy_movel_controller_node PRIVATE
 
 # Link motion_controller_core
 if(motion_controller_core_FOUND)
-  target_link_libraries(ai_worker_controller_node PRIVATE motion_controller_core::motion_controller_core)
-  target_link_libraries(joint_space_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(vr_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(ai_worker_movej_controller_node PRIVATE motion_controller_core::motion_controller_core)
+  target_link_libraries(ai_worker_movel_controller_node PRIVATE motion_controller_core::motion_controller_core)
   target_link_libraries(leader_controller_node PRIVATE motion_controller_core::motion_controller_core)
-  target_link_libraries(omx_controller_node PRIVATE motion_controller_core::motion_controller_core)
   target_link_libraries(omx_movej_controller_node PRIVATE motion_controller_core::motion_controller_core)
   target_link_libraries(omx_movel_controller_node PRIVATE motion_controller_core::motion_controller_core)
-  target_link_libraries(omy_controller_node PRIVATE motion_controller_core::motion_controller_core)
   target_link_libraries(omy_movej_controller_node PRIVATE motion_controller_core::motion_controller_core)
   target_link_libraries(omy_movel_controller_node PRIVATE motion_controller_core::motion_controller_core)
 else()
   # Link with full path for fallback
-  target_link_libraries(ai_worker_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(joint_space_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(vr_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(ai_worker_movej_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(ai_worker_movel_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(leader_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omx_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omx_movej_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omx_movel_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
-  target_link_libraries(omy_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omy_movej_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omy_movel_controller_node PRIVATE ${MOTION_CONTROLLER_CORE_LIB})
 endif()
 
 # Install executable
-install(TARGETS ai_worker_controller_node
+install(TARGETS vr_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(TARGETS joint_space_controller_node
+install(TARGETS ai_worker_movej_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS ai_worker_movel_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(TARGETS leader_controller_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(TARGETS omx_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -497,10 +465,6 @@ install(TARGETS omx_movej_controller_node
 )
 
 install(TARGETS omx_movel_controller_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(TARGETS omy_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

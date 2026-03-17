@@ -17,7 +17,6 @@
 #pragma once
 
 #include <memory>
-#include <string>
 
 #include "motion_controller_core/common/type_define.hpp"
 #include "motion_controller_core/kinematics/kinematics_solver.hpp"
@@ -27,29 +26,20 @@ namespace motion_controller
 {
 namespace controllers
 {
-class OpenManipulatorController : public motion_controller::optimization::QPBase
+class AIWorkerMoveJController : public motion_controller::optimization::QPBase
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  OpenManipulatorController(
+  AIWorkerMoveJController(
     std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data,
-    const std::string & controlled_link,
-    double dt);
+    const double dt);
 
-  void setControlledLink(const std::string & controlled_link);
-  const std::string & getControlledLink() const {return controlled_link_;}
-
-  void setDesiredTaskVel(const motion_controller::common::Vector6d & task_xdot_desired);
-  void setWeights(
-    const motion_controller::common::Vector6d & task_tracking_weight,
-    const Eigen::VectorXd & damping_weight);
+  void setWeight(const Eigen::VectorXd & w_tracking, const Eigen::VectorXd & w_damping);
+  void setDesiredJointVel(const Eigen::VectorXd & qdot_desired);
   void setControllerParams(
-    double slack_penalty,
-    double cbf_alpha,
-    double buffer_distance,
-    double safe_distance);
-
+    const double slack_penalty, const double cbf_alpha,
+    const double buffer_distance, const double safe_distance);
   bool getOptJointVel(Eigen::VectorXd & opt_qdot);
 
 private:
@@ -79,14 +69,12 @@ private:
   } si_index_;
 
   std::shared_ptr<motion_controller::kinematics::KinematicsSolver> robot_data_;
-  std::string controlled_link_;
   double dt_;
   int joint_dof_;
 
-  motion_controller::common::Vector6d task_xdot_desired_;
-  motion_controller::common::Vector6d task_tracking_weight_;
-  Eigen::VectorXd damping_weight_;
-
+  Eigen::VectorXd qdot_desired_;
+  Eigen::VectorXd w_tracking_;
+  Eigen::VectorXd w_damping_;
   double slack_penalty_;
   double cbf_alpha_;
   double collision_buffer_;

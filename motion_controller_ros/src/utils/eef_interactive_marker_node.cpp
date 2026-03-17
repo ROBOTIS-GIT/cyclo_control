@@ -17,9 +17,9 @@
 #include <memory>
 #include <string>
 
-#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <interactive_markers/interactive_marker_server.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <robotis_interfaces/msg/move_l.hpp>
 #include <tf2_ros/buffer.h>  // NOLINT(build/include_order)
 #include <tf2_ros/transform_listener.h>  // NOLINT(build/include_order)
 #include <visualization_msgs/msg/interactive_marker.hpp>
@@ -55,7 +55,7 @@ public:
     marker_color_g_ = this->declare_parameter<double>("marker_color_g", 0.8);
     marker_color_b_ = this->declare_parameter<double>("marker_color_b", 0.2);
 
-    goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(goal_topic_, 10);
+    goal_pub_ = this->create_publisher<robotis_interfaces::msg::MoveL>(goal_topic_, 10);
 
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -229,15 +229,16 @@ private:
 
   void publishGoal(const geometry_msgs::msg::Pose & pose, const std::string & frame_id)
   {
-    geometry_msgs::msg::PoseStamped goal_msg;
-    goal_msg.header.stamp = this->get_clock()->now();
-    goal_msg.header.frame_id = frame_id;
-    goal_msg.pose = pose;
+    robotis_interfaces::msg::MoveL goal_msg;
+    goal_msg.pose.header.stamp = this->get_clock()->now();
+    goal_msg.pose.header.frame_id = frame_id;
+    goal_msg.pose.pose = pose;
+    goal_msg.time_from_start = builtin_interfaces::msg::Duration();
     goal_pub_->publish(goal_msg);
   }
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub_;
+  rclcpp::Publisher<robotis_interfaces::msg::MoveL>::SharedPtr goal_pub_;
   rclcpp::TimerBase::SharedPtr update_timer_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

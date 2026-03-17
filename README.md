@@ -168,38 +168,96 @@ source install/setup.bash
 
 ### AI Worker Controllers
 
-Launch AI Worker follower controller
+Launch AI Worker controllers:
 
 ```bash
-ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=ai_worker start_interactive_marker:=true
+ros2 launch motion_controller_ros ai_worker_controller.launch.py
 ```
 
 You can switch AI Worker controllers via `controller_type`:
 
-- `controller_type:=ai_worker` runs `ai_worker_controller_node`
-- `controller_type:=joint_space` runs `joint_space_controller_node`
+- default launch runs `vr_controller_node`
+- `controller_type:=vr` runs `vr_controller_node`
+- `controller_type:=ai_worker_movej` runs `ai_worker_movej_controller_node`
+- `controller_type:=ai_worker_movel` runs `ai_worker_movel_controller_node`
 - `controller_type:=leader` runs `leader_controller_node` and also starts the follower controller for leader/follower use
 
-When `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
+When `controller_type:=ai_worker_movel` and `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
 
-- right marker uses `right_controlled_link` and publishes to `right_goal_topic`
-- left marker uses `left_controlled_link` and publishes to `left_goal_topic`
+- right marker uses `right_controlled_link` and publishes MoveL commands to `right_movel_topic`
+- left marker uses `left_controlled_link` and publishes MoveL commands to `left_movel_topic`
+
+Example `movel` commands:
+
+```bash
+ros2 topic pub --once /r_goal_move robotis_interfaces/msg/MoveL "{
+  pose: {
+    header: {frame_id: 'base_link'},
+    pose: {
+      position: {x: 0.35, y: -0.20, z: 0.85},
+      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    }
+  },
+  time_from_start: {sec: 2, nanosec: 0}
+}"
+```
+
+```bash
+ros2 topic pub --once /l_goal_move robotis_interfaces/msg/MoveL "{
+  pose: {
+    header: {frame_id: 'base_link'},
+    pose: {
+      position: {x: 0.35, y: 0.20, z: 0.85},
+      orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    }
+  },
+  time_from_start: {sec: 2, nanosec: 0}
+}"
+```
+
+Example `movej` input commands:
+
+```bash
+ros2 topic pub --once /leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory trajectory_msgs/msg/JointTrajectory "{
+  joint_names: ['arm_r_joint1', 'arm_r_joint2', 'arm_r_joint3', 'arm_r_joint4', 'arm_r_joint5', 'arm_r_joint6', 'arm_r_joint7', 'gripper_r_joint1'],
+  points: [
+    {
+      positions: [0.3, -0.2, 0.1, 0.0, 0.2, -0.1, 0.0, 0.02],
+      time_from_start: {sec: 3, nanosec: 0}
+    }
+  ]
+}"
+```
+
+```bash
+ros2 topic pub --once /leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory trajectory_msgs/msg/JointTrajectory "{
+  joint_names: ['arm_l_joint1', 'arm_l_joint2', 'arm_l_joint3', 'arm_l_joint4', 'arm_l_joint5', 'arm_l_joint6', 'arm_l_joint7', 'gripper_l_joint1'],
+  points: [
+    {
+      positions: [-0.3, 0.2, -0.1, 0.0, -0.2, 0.1, 0.0, 0.02],
+      time_from_start: {sec: 3, nanosec: 0}
+    }
+  ]
+}"
+```
+
+`ai_worker_movej_controller` subscribes to the raw trajectory topics and republishes filtered trajectories while preserving gripper values from the input message.
 
 ### OMX Controllers
 
 Launch the OMX follower controller:
 
 ```bash
-ros2 launch motion_controller_ros omx_controller.launch.py controller_type:=omx start_interactive_marker:=true
+ros2 launch motion_controller_ros omx_controller.launch.py start_interactive_marker:=true
 ```
 
 You can switch OMX controllers via `controller_type`:
 
-- `controller_type:=omx` runs `omx_controller_node`
+- default launch runs `omx_movel_controller_node`
 - `controller_type:=movej` runs `omx_movej_controller_node`
 - `controller_type:=movel` runs `omx_movel_controller_node`
 
-When `controller_type:=omx` and `start_interactive_marker:=true`, `omx_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
+When `controller_type:=movel` and `start_interactive_marker:=true`, `omx_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
 
 Example `movel` command:
 
@@ -220,31 +278,33 @@ Example `movej` command:
 
 ```bash
 ros2 topic pub --once /omx_movej_controller/movej trajectory_msgs/msg/JointTrajectory "{
-  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5'],
+  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'gripper_joint_1'],
   points: [
     {
-      positions: [0.0, -0.5, 0.8, 0.0, 0.3],
+      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.02],
       time_from_start: {sec: 3, nanosec: 0}
     }
   ]
 }"
 ```
 
+`omx_movej_controller_node` republishes a patched copy of the input `movej` message, so gripper commands included in the input remain in the published trajectory.
+
 ### OMY Controllers
 
 Launch the OMY follower controller:
 
 ```bash
-ros2 launch motion_controller_ros omy_controller.launch.py controller_type:=omy start_interactive_marker:=true
+ros2 launch motion_controller_ros omy_controller.launch.py start_interactive_marker:=true
 ```
 
 You can switch OMY controllers via `controller_type`:
 
-- `controller_type:=omy` runs `omy_controller_node`
+- default launch runs `omy_movel_controller_node`
 - `controller_type:=movej` runs `omy_movej_controller_node`
 - `controller_type:=movel` runs `omy_movel_controller_node`
 
-When `controller_type:=omy` and `start_interactive_marker:=true`, `omy_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
+When `controller_type:=movel` and `start_interactive_marker:=true`, `omy_controller.launch.py` starts one configurable interactive marker that publishes to `marker_goal_topic`.
 
 Example `movel` command:
 
@@ -265,15 +325,17 @@ Example `movej` command:
 
 ```bash
 ros2 topic pub --once /omy_movej_controller/movej trajectory_msgs/msg/JointTrajectory "{
-  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6'],
+  joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'rh_r1_joint'],
   points: [                               
     {                                            
-      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.0],
+      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.0, 10.0],
       time_from_start: {sec: 3, nanosec: 0}
     }
   ]
 }"
 ```
+
+`omy_movej_controller_node` also republishes a patched copy of the input `movej` message, preserving gripper values when the gripper joint is included in the input.
 
 ### Model Visualization
 

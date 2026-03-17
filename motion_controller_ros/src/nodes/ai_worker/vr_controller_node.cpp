@@ -14,7 +14,7 @@
 //
 // Author: Yeonguk Kim
 
-#include "motion_controller_ros/nodes/ai_worker/ai_worker_controller_node.hpp"
+#include "motion_controller_ros/nodes/ai_worker/vr_controller_node.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -23,8 +23,8 @@
 
 namespace motion_controller_ros
 {
-AIWorkerController::AIWorkerController()
-: Node("ai_worker_controller"),
+VRController::VRController()
+: Node("vr_controller"),
   r_goal_pose_received_(false),
   l_goal_pose_received_(false),
   r_elbow_pose_received_(false),
@@ -35,7 +35,7 @@ AIWorkerController::AIWorkerController()
   dt_(0.01)
 {
   RCLCPP_INFO(this->get_logger(), "========================================");
-  RCLCPP_INFO(this->get_logger(), "AI Worker Controller - Starting up...");
+  RCLCPP_INFO(this->get_logger(), "VR Controller - Starting up...");
   RCLCPP_INFO(this->get_logger(), "Node name: %s", this->get_name());
   RCLCPP_INFO(this->get_logger(), "========================================");
   activate_start_ = this->get_clock()->now();
@@ -98,40 +98,40 @@ AIWorkerController::AIWorkerController()
         // Initialize subscribers
   r_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             r_goal_pose_topic_, 10,
-            std::bind(&AIWorkerController::rightGoalPoseCallback, this, std::placeholders::_1));
+            std::bind(&VRController::rightGoalPoseCallback, this, std::placeholders::_1));
 
   l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             l_goal_pose_topic_, 10,
-            std::bind(&AIWorkerController::leftGoalPoseCallback, this, std::placeholders::_1));
+            std::bind(&VRController::leftGoalPoseCallback, this, std::placeholders::_1));
 
   r_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             r_elbow_pose_topic_, 10,
-            std::bind(&AIWorkerController::rightElbowPoseCallback, this, std::placeholders::_1));
+            std::bind(&VRController::rightElbowPoseCallback, this, std::placeholders::_1));
 
   l_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             l_elbow_pose_topic_, 10,
-            std::bind(&AIWorkerController::leftElbowPoseCallback, this, std::placeholders::_1));
+            std::bind(&VRController::leftElbowPoseCallback, this, std::placeholders::_1));
 
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
-            std::bind(&AIWorkerController::jointStateCallback, this, std::placeholders::_1));
+            std::bind(&VRController::jointStateCallback, this, std::placeholders::_1));
 
   right_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
             right_raw_traj_topic_, 10,
-            std::bind(&AIWorkerController::rightRawTrajectoryCallback, this,
+            std::bind(&VRController::rightRawTrajectoryCallback, this,
       std::placeholders::_1));
   left_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
             left_raw_traj_topic_, 10,
-            std::bind(&AIWorkerController::leftRawTrajectoryCallback, this, std::placeholders::_1));
+            std::bind(&VRController::leftRawTrajectoryCallback, this, std::placeholders::_1));
 
   ref_divergence_sub_ = this->create_subscription<std_msgs::msg::Bool>(
             "/reference_diverged", 10,
-            std::bind(&AIWorkerController::referenceDivergenceCallback, this,
+            std::bind(&VRController::referenceDivergenceCallback, this,
       std::placeholders::_1));
 
   reactivate_srv_ = this->create_service<std_srvs::srv::Trigger>(
             reactivate_service_,
-            std::bind(&AIWorkerController::reactivateServiceCallback, this, std::placeholders::_1,
+            std::bind(&VRController::reactivateServiceCallback, this, std::placeholders::_1,
       std::placeholders::_2));
   if (!reactivate_srv_) {
     RCLCPP_FATAL(this->get_logger(),
@@ -185,7 +185,7 @@ AIWorkerController::AIWorkerController()
     kinematics_solver_ =
       std::make_shared<motion_controller::kinematics::KinematicsSolver>(urdf_path_, srdf_path_);
     RCLCPP_INFO(this->get_logger(), "Initializing QP controller...");
-    qp_controller_ = std::make_shared<motion_controller::controllers::QPIK>(kinematics_solver_,
+    qp_controller_ = std::make_shared<motion_controller::controllers::VRController>(kinematics_solver_,
         dt_);
     qp_controller_->setControllerParams(slack_penalty_, cbf_alpha_, collision_buffer_,
         collision_safe_distance_);
@@ -210,7 +210,7 @@ AIWorkerController::AIWorkerController()
   int timer_period_ms = static_cast<int>(1000.0 / control_frequency_);
   control_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(timer_period_ms),
-            std::bind(&AIWorkerController::controlLoopCallback, this));
+            std::bind(&VRController::controlLoopCallback, this));
 
   if (!control_timer_) {
     RCLCPP_FATAL(this->get_logger(), "Failed to create control loop timer!");
@@ -219,7 +219,7 @@ AIWorkerController::AIWorkerController()
   }
 
   RCLCPP_INFO(this->get_logger(),
-            "AI Worker Controller initialized successfully!");
+            "VR Controller initialized successfully!");
   RCLCPP_INFO(this->get_logger(),
             "  - Control loop: %.1f Hz (period: %d ms)", control_frequency_, timer_period_ms);
   RCLCPP_INFO(this->get_logger(),
@@ -233,12 +233,12 @@ AIWorkerController::AIWorkerController()
             reactivate_service_.c_str());
 }
 
-AIWorkerController::~AIWorkerController()
+VRController::~VRController()
 {
-  RCLCPP_INFO(this->get_logger(), "Shutting down AI Worker Controller");
+  RCLCPP_INFO(this->get_logger(), "Shutting down VR Controller");
 }
 
-void AIWorkerController::initializeJointConfig()
+void VRController::initializeJointConfig()
 {
         // Get actual joint names from the model (these should match joint_states topic)
   const auto joint_names = kinematics_solver_->getJointNames();
@@ -298,7 +298,7 @@ void AIWorkerController::initializeJointConfig()
   RCLCPP_DEBUG(this->get_logger(), "Lift joint: %s", lift_joint_.c_str());
 }
 
-void AIWorkerController::rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void VRController::rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   r_goal_pose_ = computePoseMat(*msg);
   r_goal_pose_received_ = true;
@@ -306,7 +306,7 @@ void AIWorkerController::rightGoalPoseCallback(const geometry_msgs::msg::PoseSta
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 }
 
-void AIWorkerController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void VRController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   l_goal_pose_ = computePoseMat(*msg);
   l_goal_pose_received_ = true;
@@ -314,7 +314,7 @@ void AIWorkerController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStam
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 }
 
-void AIWorkerController::rightElbowPoseCallback(
+void VRController::rightElbowPoseCallback(
   const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   r_elbow_pose_ = computePoseMat(*msg);
@@ -323,7 +323,7 @@ void AIWorkerController::rightElbowPoseCallback(
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 }
 
-void AIWorkerController::leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void VRController::leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
   l_elbow_pose_ = computePoseMat(*msg);
   l_elbow_pose_received_ = true;
@@ -331,7 +331,7 @@ void AIWorkerController::leftElbowPoseCallback(const geometry_msgs::msg::PoseSta
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 }
 
-void AIWorkerController::rightRawTrajectoryCallback(
+void VRController::rightRawTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
   if (!msg || msg->points.empty()) {
@@ -354,7 +354,7 @@ void AIWorkerController::rightRawTrajectoryCallback(
   }
 }
 
-void AIWorkerController::leftRawTrajectoryCallback(
+void VRController::leftRawTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
   if (!msg || msg->points.empty()) {
@@ -377,7 +377,7 @@ void AIWorkerController::leftRawTrajectoryCallback(
   }
 }
 
-void AIWorkerController::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
+void VRController::jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
 {
   try {
             // Build joint index map on first callback
@@ -401,7 +401,7 @@ void AIWorkerController::jointStateCallback(const sensor_msgs::msg::JointState::
   }
 }
 
-void AIWorkerController::referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg)
+void VRController::referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   if (!msg->data) {
     return;
@@ -416,7 +416,7 @@ void AIWorkerController::referenceDivergenceCallback(const std_msgs::msg::Bool::
   reference_diverged_ = true;
 }
 
-void AIWorkerController::reactivateServiceCallback(
+void VRController::reactivateServiceCallback(
   const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
   std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
@@ -432,7 +432,7 @@ void AIWorkerController::reactivateServiceCallback(
     "Start requested. Controller will start when goal-current pose error is within threshold.";
 }
 
-void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg)
+void VRController::extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg)
 {
   int dof = kinematics_solver_->getDof();
   q_.setZero(dof);
@@ -456,7 +456,7 @@ void AIWorkerController::extractJointStates(const sensor_msgs::msg::JointState::
   }
 }
 
-void AIWorkerController::controlLoopCallback()
+void VRController::controlLoopCallback()
 {
   static int loop_count = 0;
   static int debug_count = 0;
@@ -699,7 +699,7 @@ void AIWorkerController::controlLoopCallback()
   }
 }
 
-Eigen::Affine3d AIWorkerController::computePoseMat(
+Eigen::Affine3d VRController::computePoseMat(
   const geometry_msgs::msg::PoseStamped & pose) const
 {
   Eigen::Affine3d pose_mat = Eigen::Affine3d::Identity();
@@ -716,7 +716,7 @@ Eigen::Affine3d AIWorkerController::computePoseMat(
   return pose_mat;
 }
 
-motion_controller::common::Vector6d AIWorkerController::computeDesiredVelocity(
+motion_controller::common::Vector6d VRController::computeDesiredVelocity(
   const Eigen::Affine3d & current_pose,
   const Eigen::Affine3d & goal_pose) const
 {
@@ -736,7 +736,7 @@ motion_controller::common::Vector6d AIWorkerController::computeDesiredVelocity(
 }
 
 
-void AIWorkerController::publishTrajectory(const Eigen::VectorXd & q_desired)
+void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
 {
   try {
             // Build indices for each arm segment
@@ -800,7 +800,7 @@ void AIWorkerController::publishTrajectory(const Eigen::VectorXd & q_desired)
   }
 }
 
-trajectory_msgs::msg::JointTrajectory AIWorkerController::createTrajectoryMsgWithGripper(
+trajectory_msgs::msg::JointTrajectory VRController::createTrajectoryMsgWithGripper(
   const std::vector<std::string> & arm_joint_names,
   const Eigen::VectorXd & positions,
   const std::vector<int> & arm_indices,
@@ -833,7 +833,7 @@ trajectory_msgs::msg::JointTrajectory AIWorkerController::createTrajectoryMsgWit
   return traj_msg;
 }
 
-trajectory_msgs::msg::JointTrajectory AIWorkerController::createLiftTrajectoryMsg(
+trajectory_msgs::msg::JointTrajectory VRController::createLiftTrajectoryMsg(
   std::string lift_joint_name,
   const double position) const
 {
@@ -849,7 +849,7 @@ trajectory_msgs::msg::JointTrajectory AIWorkerController::createLiftTrajectoryMs
   return traj_msg;
 }
 
-void AIWorkerController::publishGripperPose(
+void VRController::publishGripperPose(
   const Eigen::Affine3d & r_gripper_pose,
   const Eigen::Affine3d & l_gripper_pose)
 {
@@ -888,7 +888,7 @@ void AIWorkerController::publishGripperPose(
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<motion_controller_ros::AIWorkerController>();
+  auto node = std::make_shared<motion_controller_ros::VRController>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

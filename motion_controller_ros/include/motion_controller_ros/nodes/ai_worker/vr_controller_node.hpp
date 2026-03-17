@@ -34,24 +34,24 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
-#include "motion_controller_core/kinematics/kinematics_solver.hpp"
-#include "motion_controller_core/controllers/ai_worker/ai_worker_controller.hpp"
 #include "motion_controller_core/common/type_define.hpp"
+#include "motion_controller_core/controllers/ai_worker/vr_controller.hpp"
+#include "motion_controller_core/kinematics/kinematics_solver.hpp"
 
 
 namespace motion_controller_ros
 {
     /**
-     * @brief ROS 2 wrapper node for AI Worker teleoperation controller.
+     * @brief ROS 2 wrapper node for VR teleoperation controller.
      *
      * This node subscribes to target end-effector pose and current joint states to solve
-     * inverse kinematics problems for AI Worker using Quadratic Programming.
+     * inverse kinematics problems for VR teleoperation using Quadratic Programming.
      */
-class AIWorkerController : public rclcpp::Node
+class VRController : public rclcpp::Node
 {
 public:
-  AIWorkerController();
-  ~AIWorkerController();
+  VRController();
+  ~VRController();
 
 private:
         // Configurable parameters
@@ -119,7 +119,7 @@ private:
 
         // Motion controller components
   std::shared_ptr<motion_controller::kinematics::KinematicsSolver> kinematics_solver_;
-  std::shared_ptr<motion_controller::controllers::QPIK> qp_controller_;
+  std::shared_ptr<motion_controller::controllers::VRController> qp_controller_;
 
         // State variables (measured)
   Eigen::VectorXd q_;

@@ -89,13 +89,13 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'controller_type',
-            default_value='omx',
-            description='Controller type (omx, movej, movel).',
+            default_value='movel',
+            description='Controller type (movej, movel). Default: movel.',
         ),
         DeclareLaunchArgument(
             'marker_goal_topic',
-            default_value='/eef_goal_pose',
-            description='Goal topic published by the interactive marker.',
+            default_value='/omx_movel_controller/movel',
+            description='MoveL topic published by the interactive marker.',
         ),
         DeclareLaunchArgument(
             'marker_scale',
@@ -113,24 +113,6 @@ def generate_launch_description():
     controller_type = LaunchConfiguration('controller_type')
     marker_goal_topic = LaunchConfiguration('marker_goal_topic')
     marker_scale = LaunchConfiguration('marker_scale')
-
-    omx_controller_node = Node(
-        package='motion_controller_ros',
-        executable='omx_controller_node',
-        parameters=[
-            config_file,
-            {
-                'urdf_path': urdf_path,
-                'srdf_path': srdf_path,
-                'base_frame': base_frame,
-                'controlled_link': controlled_link,
-            },
-        ],
-        output='screen',
-        condition=IfCondition(
-            PythonExpression(["'", controller_type, "' == 'omx'"])
-        ),
-    )
 
     omx_movej_controller_node = Node(
         package='motion_controller_ros',
@@ -192,7 +174,7 @@ def generate_launch_description():
                 [
                     "'",
                     controller_type,
-                    "' == 'omx' and '",
+                    "' == 'movel' and '",
                     start_interactive_marker,
                     "' == 'true'",
                 ]
@@ -203,7 +185,6 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments
         + [
-            omx_controller_node,
             omx_movej_controller_node,
             omx_movel_controller_node,
             interactive_marker_node,
