@@ -1,0 +1,78 @@
+omy_controller:
+  ros__parameters:
+    control_frequency: 100.0
+    time_step: 0.01
+    trajectory_time: 0.0
+
+    kp_position: 50.0
+    kp_orientation: 50.0
+
+    weight_task_position: 10.0
+    weight_task_orientation: 1.0
+    weight_damping: 0.001
+
+    collision_buffer: 0.03
+    collision_safe_distance: 0.01
+    slack_penalty: 1000.0
+    cbf_alpha: 50.0
+
+    base_frame: "link0"
+    controlled_link: "end_effector_flange_link"
+
+    joint_states_topic: "/joint_states"
+    joint_command_topic: "/leader/joint_trajectory"
+    marker_goal_topic: "/omy_eef_goal_pose"
+    ee_pose_topic: "~/current_pose"
+    controller_error_topic: "~/controller_error"
+
+omy_movej_controller:
+  ros__parameters:
+    control_frequency: 100.0
+    time_step: 0.01
+    trajectory_time: 0.0
+
+    kp_joint: 10.0
+
+    weight_joint_tracking: 2.0
+    weight_damping: 0.001
+
+    slack_penalty: 1000.0
+    cbf_alpha: 5.0
+    collision_buffer: 0.03
+    collision_safe_distance: 0.01
+
+    base_frame: "link0"
+    controlled_link: "end_effector_flange_link"
+
+    joint_states_topic: "/joint_states"
+    joint_command_topic: "/leader/joint_trajectory"
+    movej_topic: "~/movej"
+    ee_pose_topic: "~/current_pose"
+    controller_error_topic: "~/controller_error"
+
+omy_movel_controller:
+  ros__parameters:
+    control_frequency: 100.0
+    time_step: 0.01
+    trajectory_time: 0.0
+
+    kp_position: 50.0
+    kp_orientation: 50.0
+
+    weight_task_position: 10.0
+    weight_task_orientation: 1.0
+    weight_damping: 0.001
+
+    slack_penalty: 1000.0
+    cbf_alpha: 5.0
+    collision_buffer: 0.03
+    collision_safe_distance: 0.01
+
+    base_frame: "link0"
+    controlled_link: "end_effector_flange_link"
+
+    joint_states_topic: "/joint_states"
+    joint_command_topic: "/leader/joint_trajectory"
+    movel_topic: "~/movel"
+    ee_pose_topic: "~/current_pose"
+    controller_error_topic: "~/controller_error"
