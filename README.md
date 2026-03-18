@@ -176,13 +176,22 @@ ros2 launch motion_controller_ros ai_worker_controller.launch.py
 
 You can switch AI Worker controllers via `controller_type`:
 
-- default launch runs `vr_controller_node`
-- `controller_type:=vr` runs `vr_controller_node`
-- `controller_type:=ai_worker_movej` runs `ai_worker_movej_controller_node`
-- `controller_type:=ai_worker_movel` runs `ai_worker_movel_controller_node`
-- `controller_type:=leader` runs `leader_controller_node` and also starts the follower controller for leader/follower use
+- default launch runs `ai_worker_movel_controller_node`
+- `controller_type:=movel` runs `ai_worker_movel_controller_node`
+- `controller_type:=movej` runs `ai_worker_movej_controller_node`
+- `controller_type:=vr` runs `vr_controller_node` and `reference_checker_node`
+- `controller_type:=leader` runs `leader_controller_node` together with `vr_controller_node`
 
-When `controller_type:=ai_worker_movel` and `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
+Example launch commands:
+
+```bash
+ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=movel start_interactive_marker:=true
+ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=movej
+ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=vr
+ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=leader
+```
+
+When `controller_type:=movel` and `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
 
 - right marker uses `right_controlled_link` and publishes MoveL commands to `right_movel_topic`
 - left marker uses `left_controlled_link` and publishes MoveL commands to `left_movel_topic`
@@ -328,7 +337,7 @@ ros2 topic pub --once /omy_movej_controller/movej trajectory_msgs/msg/JointTraje
   joint_names: ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'rh_r1_joint'],
   points: [                               
     {                                            
-      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.0, 10.0],
+      positions: [0.0, -0.5, 0.8, 0.0, 0.3, 0.0, 1.0],
       time_from_start: {sec: 3, nanosec: 0}
     }
   ]
