@@ -2,6 +2,12 @@
 Changelog for package motion_controller
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.0.2 (2026-03-18)
+------------------
+* Added movel_controller and movel_controller_node for AI Worker
+* Renamed the AI Worker joint_space_controller and joint_space_controller_node to movej_controller and movej_controller_node
+* Contributors: Yeonguk Kim
+
 0.0.1 (2026-03-12)
 ------------------
 * Added motion controller library for control of articulated robots
