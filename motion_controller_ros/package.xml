@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>motion_controller_ros</name>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <description>ROS 2 wrapper for motion controller using QP-based inverse kinematics</description>
   <maintainer email="pyo@robotis.com">Pyo</maintainer>
   <license>Apache 2.0</license>

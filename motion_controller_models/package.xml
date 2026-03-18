@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>motion_controller_models</name>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <description>Robot models for motion controllers</description>
   <maintainer email="pyo@robotis.com">Pyo</maintainer>
   <license>Apache 2.0</license>
