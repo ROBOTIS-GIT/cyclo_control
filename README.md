@@ -354,6 +354,10 @@ Examples:
 
 ```bash
 ros2 launch motion_controller_models view_ffw_sg2_follower.launch.py
+```
+```bash
 ros2 launch motion_controller_models view_omx_f.launch.py
+```
+```bash
 ros2 launch motion_controller_models view_omy_f3m.launch.py
 ```
