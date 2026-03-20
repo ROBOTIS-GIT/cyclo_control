@@ -13,6 +13,7 @@
   <build_export_depend>osqp_eigen_vendor</build_export_depend>
   <exec_depend>eigen</exec_depend>
   <exec_depend>pinocchio</exec_depend>
+  <exec_depend>python3-nlopt</exec_depend>
   <exec_depend>osqp_eigen_vendor</exec_depend>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
