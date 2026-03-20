@@ -339,10 +339,11 @@ class DexPilotOptimizer:
             task_pos = body_pos[self.task_link_indices, :]
             robot_vec = task_pos - origin_pos
             len_proj = self.num_fingers * (self.num_fingers - 1) // 2
-            vec_diff = robot_vec - target_vec[:len_proj]
+            num_robot_vecs = len(self.origin_link_indices)
+            vec_diff = robot_vec - target_vec[:num_robot_vecs]
             vec_dist = np.linalg.norm(vec_diff, axis=1)
             huber_per_vec = huber_loss(vec_dist, np.zeros_like(vec_dist), self.huber_delta)
-            pos_loss = (huber_per_vec * weight_array[:len_proj]).sum() / num_vec
+            pos_loss = (huber_per_vec * weight_array[:num_robot_vecs]).sum() / num_vec
 
             if target_dir_array is not None:
                 r_prox = body_pos[self.proximal_indices, :]
@@ -376,7 +377,8 @@ class DexPilotOptimizer:
                 vec_diff_grad = (
                     vec_dist_grad[:, None] * vec_diff / vec_dist_normalized[:, None]
                 )
-                vec_diff_grad *= weight_array[:len_proj, None] / num_vec
+                num_robot_vecs = len(self.origin_link_indices)
+                vec_diff_grad *= weight_array[:num_robot_vecs, None] / num_vec
                 
                 # Gradient w.r.t. body_pos
                 grad_pos = np.zeros_like(body_pos)
