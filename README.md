@@ -70,35 +70,38 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
     └── package.xml
 ```
 ### Directory Description
-| Directory | Description |
-|-----------|-------------|
-| `robotis_motion_controller/` | Meta package that groups all motion controller packages |
-| `robotis_motion_controller_core/` | Core package containing kinematics solver, controllers, and retargeting utilities |
-| `robotis_motion_controller_core/include/robotis_motion_controller_core/common/` | Common headers containing shared types and utility functions |
-| `robotis_motion_controller_core/include/robotis_motion_controller_core/optimization/` | QP definitions and solver interfaces |
-| `robotis_motion_controller_core/src/controllers/` | Controller implementations for AI Worker and OpenManipulator |
-| `robotis_motion_controller_core/src/kinematics/` | Kinematics solver implementation |
-| `robotis_motion_controller_core/src/retargeting/` | Python retargeting utilities |
+`robotis_motion_controller/`
 
-| Directory | Description |
-|-----------|-------------|
-| `robotis_motion_controller_ros/` | ROS 2 package containing controller nodes, launch files, and runtime configs |
-| `robotis_motion_controller_ros/config/` | YAML configuration files for AI Worker, OMX, and OMY controllers |
-| `robotis_motion_controller_ros/launch/` | Launch files for running the controller nodes |
-| `robotis_motion_controller_ros/src/nodes/` | ROS 2 node executables organized by robot family |
-| `robotis_motion_controller_ros/src/utils/` | Utility nodes such as interactive markers and reference checking |
+- Meta package that groups all motion controller packages
 
-| Directory | Description |
-|-----------|-------------|
-| `robotis_motion_controller_ros_py/` | ROS 2 Python package containing retargeting-related scripts and tests |
-| `robotis_motion_controller_ros_py/scripts/` | Python entrypoints such as `teleop_retargeting.py` |
+`robotis_motion_controller_core/`
 
-| Directory | Description |
-|-----------|-------------|
-| `robotis_motion_controller_models/` | Robot model descriptions and RViz resources package |
-| `robotis_motion_controller_models/launch/` | Launch files for visualizing robot models |
-| `robotis_motion_controller_models/models/` | URDF/SRDF robot models used by the controller |
-| `robotis_motion_controller_models/rviz/` | RViz configurations for each supported robot model |
+- Core package containing kinematics solver, controllers, and retargeting utilities
+- `include/robotis_motion_controller_core/common/`: Shared types and utility functions
+- `include/robotis_motion_controller_core/optimization/`: QP definitions and solver interfaces
+- `src/controllers/`: Controller implementations for AI Worker and OpenManipulator
+- `src/kinematics/`: Kinematics solver implementation
+- `src/retargeting/`: Python retargeting utilities
+
+`robotis_motion_controller_ros/`
+
+- ROS 2 package containing controller nodes, launch files, and runtime configs
+- `config/`: YAML configuration files for AI Worker, OMX, and OMY controllers
+- `launch/`: Launch files for running the controller nodes
+- `src/nodes/`: ROS 2 node executables organized by robot family
+- `src/utils/`: Utility nodes such as interactive markers and reference checking
+
+`robotis_motion_controller_ros_py/`
+
+- ROS 2 Python package containing retargeting-related scripts and tests
+- `scripts/`: Python entrypoints such as `teleop_retargeting.py`
+
+`robotis_motion_controller_models/`
+
+- Robot model descriptions and RViz resources package
+- `launch/`: Launch files for visualizing robot models
+- `models/`: URDF/SRDF robot models used by the controller
+- `rviz/`: RViz configurations for each supported robot model
 
 ## Install (from source)
 
