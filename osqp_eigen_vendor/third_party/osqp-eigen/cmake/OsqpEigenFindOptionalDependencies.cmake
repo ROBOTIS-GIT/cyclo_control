@@ -1,3 +1,9 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT). All rights reserved.
 #
 # This software may be modified and distributed under the terms of the
@@ -37,8 +43,9 @@ macro(checkandset_optional_dependency package)
   endif()
 
   # OSQPEIGEN_USE_${package}
-  cmake_dependent_option(${PREFIX}_USE_${package} "Use package ${package}" TRUE
-                         ${PREFIX}_HAS_SYSTEM_${package} FALSE)
+  cmake_dependent_option(
+    ${PREFIX}_USE_${package} "Use package ${package}" TRUE
+    ${PREFIX}_HAS_SYSTEM_${package} FALSE)
   mark_as_advanced(${PREFIX}_USE_${package})
 
   # OSQPEIGEN_USE_SYSTEM_${package}
@@ -76,16 +83,21 @@ macro(OSQPEIGEN_DEPENDENT_OPTION _option _doc _default _deps _force)
         CACHE ${_option}
         PROPERTY STRINGS)
       list(GET _option_strings 0 _option_strings_first)
-      string(REGEX REPLACE ".+\"(.+)\".+" "\\1" _option_strings_first
-                           "${_option_strings_first}")
+      string(
+        REGEX REPLACE ".+\"(.+)\".+" "\\1" _option_strings_first
+        "${_option_strings_first}")
       list(LENGTH _option_strings _option_strings_length)
       math(EXPR _option_strings_last_index "${_option_strings_length} - 1")
       list(GET _option_strings ${_option_strings_last_index}
-           _option_strings_last)
+        _option_strings_last)
       if("${${_option}}" STREQUAL "${_option_strings_last}")
         message(
           SEND_ERROR
-            "That was a trick, you cannot outsmart me! I will never let you win! ${_option} stays OFF until I say so! \"${_option_strings_first}\" is needed to enable ${_option}. Now stop bothering me, and install your dependencies, if you really want to enable this option."
+            "That was a trick, you cannot outsmart me! I will never let you "
+            "win! ${_option} stays OFF until I say so! "
+            "\"${_option_strings_first}\" is needed to enable ${_option}. "
+            "Now stop bothering me, and install your dependencies, if you "
+            "really want to enable this option."
         )
       endif()
       unset(${_option} CACHE)

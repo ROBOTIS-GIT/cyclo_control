@@ -1,13 +1,21 @@
+# Copyright (C) 2020 Istituto Italiano di Tecnologia (IIT)
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # Copyright (C) 2020 Istituto Italiano di Tecnologia (IIT). All rights reserved.
 #
 # This software may be modified and distributed under the terms of the
 # BSD-3-Clause license. See the accompanying LICENSE file for details.
 
-osqpeigen_dependent_option(OSQPEIGEN_COMPILE_tests "Compile tests?" ON
-                           "OSQPEIGEN_HAS_Catch2;BUILD_TESTING" OFF)
+osqpeigen_dependent_option(
+  OSQPEIGEN_COMPILE_tests "Compile tests?" ON
+  "OSQPEIGEN_HAS_Catch2;BUILD_TESTING" OFF)
 
-osqpeigen_dependent_option(OSQPEIGEN_RUN_Valgrind_tests "Run Valgrind tests?"
-                           OFF "OSQPEIGEN_COMPILE_tests;VALGRIND_FOUND" OFF)
+osqpeigen_dependent_option(
+  OSQPEIGEN_RUN_Valgrind_tests "Run Valgrind tests?" OFF
+  "OSQPEIGEN_COMPILE_tests;VALGRIND_FOUND" OFF)
 
 if(OSQPEIGEN_RUN_Valgrind_tests)
   set(CTEST_MEMORYCHECK_COMMAND ${VALGRIND_PROGRAM})
@@ -54,12 +62,13 @@ function(add_osqpeigen_test)
     target_compile_features(${targetname} PUBLIC cxx_std_14)
 
     add_test(NAME ${targetname} COMMAND ${targetname})
-    target_compile_definitions(${targetname}
-                               PRIVATE ${${prefix}_COMPILE_DEFINITIONS})
+    target_compile_definitions(
+      ${targetname} PRIVATE ${${prefix}_COMPILE_DEFINITIONS})
 
     if(OSQPEIGEN_RUN_Valgrind_tests)
-      add_test(NAME memcheck_${targetname} COMMAND ${MEMCHECK_COMMAND_COMPLETE}
-                                                   $<TARGET_FILE:${targetname}>)
+      add_test(
+        NAME memcheck_${targetname}
+        COMMAND ${MEMCHECK_COMMAND_COMPLETE} $<TARGET_FILE:${targetname}>)
     endif()
 
   endif()

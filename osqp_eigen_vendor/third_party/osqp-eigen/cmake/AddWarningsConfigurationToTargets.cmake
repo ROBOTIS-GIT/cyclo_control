@@ -1,3 +1,9 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 
 include(CMakeParseArguments)
 
@@ -51,8 +57,8 @@ function(ADD_WARNINGS_CONFIGURATION_TO_TARGETS)
         endif()
       endif()
 
-      target_compile_options(${TARGET} ${VISIBILITY}
-                             "$<$<CONFIG:Debug>:${COMPILE_OPTIONS}>")
+      target_compile_options(
+        ${TARGET} ${VISIBILITY} "$<$<CONFIG:Debug>:${COMPILE_OPTIONS}>")
 
     endforeach()
   endforeach()

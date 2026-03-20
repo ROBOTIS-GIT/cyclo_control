@@ -1,3 +1,10 @@
+# Copyright (C) 2012-2021 Istituto Italiano di Tecnologia (IIT) Copyright (C)
+# 2008-2013 Kitware Inc.
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # SPDX-FileCopyrightText: 2012-2021 Istituto Italiano di Tecnologia (IIT)
 # SPDX-License-Identifier: BSD-3-Clause
 
@@ -14,32 +21,32 @@ projects.
 Create and install a basic version of cmake config files for your
 project::
 
- install_basic_package_files(<Name>
-                             COMPATIBILITY <compatibility>
-                             [VERSION <version>]
-                             [ARCH_INDEPENDENT]
-                             [NO_EXPORT | EXPORT <export>] # (default = "EXPORT <Name>")
-                             [NO_SET_AND_CHECK_MACRO]
-                             [NO_CHECK_REQUIRED_COMPONENTS_MACRO]
-                             [VARS_PREFIX <prefix>] # (default = "<Name>")
-                             [EXPORT_DESTINATION <destination>]
-                             [INSTALL_DESTINATION <destination>]
-                             [NAMESPACE <namespace>] # (default = "<Name>::")
-                             [EXTRA_PATH_VARS_SUFFIX path1 [path2 ...]]
-                             [CONFIG_TEMPLATE <file>]
-                             [UPPERCASE_FILENAMES | LOWERCASE_FILENAMES]
-                             [DEPENDENCIES <dependency1> "<dependency2> [...]" ...]
-                             [PRIVATE_DEPENDENCIES <dependency1> "<dependency2> [...]" ...]
-                             [INCLUDE_FILE <file> | INCLUDE_CONTENT <content>]
-                             [COMPONENT <component>] # (default = "<Name>")
-                            )
+  install_basic_package_files(<Name>
+    COMPATIBILITY <compatibility>
+    [VERSION <version>]
+    [ARCH_INDEPENDENT]
+    [NO_EXPORT | EXPORT <export>] # (default = "EXPORT <Name>")
+    [NO_SET_AND_CHECK_MACRO]
+    [NO_CHECK_REQUIRED_COMPONENTS_MACRO]
+    [VARS_PREFIX <prefix>] # (default = "<Name>")
+    [EXPORT_DESTINATION <destination>]
+    [INSTALL_DESTINATION <destination>]
+    [NAMESPACE <namespace>] # (default = "<Name>::")
+    [EXTRA_PATH_VARS_SUFFIX path1 [path2 ...]]
+    [CONFIG_TEMPLATE <file>]
+    [UPPERCASE_FILENAMES | LOWERCASE_FILENAMES]
+    [DEPENDENCIES <dependency1> "<dependency2> [...]" ...]
+    [PRIVATE_DEPENDENCIES <dependency1> "<dependency2> [...]" ...]
+    [INCLUDE_FILE <file> | INCLUDE_CONTENT <content>]
+    [COMPONENT <component>] # (default = "<Name>")
+  )
 
 Depending on ``UPPERCASE_FILENAMES`` and ``LOWERCASE_FILENAMES``, this
 function generates 3 files:
 
- - ``<Name>ConfigVersion.cmake`` or ``<name>-config-version.cmake``
- - ``<Name>Config.cmake`` or ``<name>-config.cmake``
- - ``<Name>Targets.cmake`` or ``<name>-targets.cmake``
+  - ``<Name>ConfigVersion.cmake`` or ``<name>-config-version.cmake``
+  - ``<Name>Config.cmake`` or ``<name>-config.cmake``
+  - ``<Name>Targets.cmake`` or ``<name>-targets.cmake``
 
 If neither ``UPPERCASE_FILENAMES`` nor ``LOWERCASE_FILENAMES`` is
 set, a file ``<Name>Config.cmake.in`` or
@@ -73,11 +80,11 @@ architecture than the requested architecture.
 Each file is generated twice, one for the build directory and one for
 the installation directory.  The ``INSTALL_DESTINATION`` argument can be
 passed to install the files in a location different from the default
-one (``${CMAKE_INSTALL_DATADIR}/cmake/${Name}`` if the ``ARCH_INDEPENDENT``
+one: ``${CMAKE_INSTALL_DATADIR}/cmake/${Name}`` if the ``ARCH_INDEPENDENT``
 option is enabled, ``${CMAKE_INSTALL_LIBDIR}/cmake/${Name}`` otherwise).
 The ``EXPORT_DESTINATION`` argument can be passed to
 generate the files in the build tree in a location different from the default
-one (``CMAKE_BINARY_DIR``).  If this is a relative path, it is
+one: ``CMAKE_BINARY_DIR``. If this is a relative path, it is
 considered relative to the ``CMAKE_CURRENT_BINARY_DIR`` directory.
 
 The build directory is exported to the CMake user package registry if the
@@ -190,7 +197,7 @@ in the build tree and :cmake:command:`install(EXPORT)` in the installation
 directory. The targets are exported using the value for the ``NAMESPACE``
 argument as namespace.
 The export can be passed using the ``EXPORT`` argument. If no export is
-used (e.g. for a CMake script library), pass ``NO_EXPORT``.
+needed, for example for a CMake script library, pass ``NO_EXPORT``.
 
 If the ``INCLUDE_FILE`` argument is passed, the content of the specified file
 (which might contain ``@variables@``) is appended to the generated
@@ -294,10 +301,11 @@ function(INSTALL_BASIC_PACKAGE_FILES _Name)
   set(_export_cmd EXPORT ${_Name})
 
   if(DEFINED _IBPF_EXPORT)
-    if(_IBPF_NO_EXPORT
-       OR DEFINED _IBPF_TARGETS
-       OR DEFINED _IBPF_TARGETS_PROPERTIES
-       OR DEFINED _IBPF_TARGETS_PROPERTIES)
+    if(
+      _IBPF_NO_EXPORT
+      OR DEFINED _IBPF_TARGETS
+      OR DEFINED _IBPF_TARGETS_PROPERTIES
+      OR DEFINED _IBPF_TARGETS_PROPERTIES)
       message(
         FATAL_ERROR
           "EXPORT cannot be used with NO_EXPORT, TARGETS, TARGETS_PROPERTY, or TARGETS_PROPERTIES"
@@ -308,9 +316,10 @@ function(INSTALL_BASIC_PACKAGE_FILES _Name)
     set(_install_cmd EXPORT ${_IBPF_EXPORT})
 
   elseif(_IBPF_NO_EXPORT)
-    if(DEFINED _IBPF_TARGETS
-       OR DEFINED _IBPF_TARGETS_PROPERTIES
-       OR DEFINED _IBPF_TARGETS_PROPERTIES)
+    if(
+      DEFINED _IBPF_TARGETS
+      OR DEFINED _IBPF_TARGETS_PROPERTIES
+      OR DEFINED _IBPF_TARGETS_PROPERTIES)
       message(
         FATAL_ERROR
           "NO_EXPORT cannot be used with TARGETS, TARGETS_PROPERTY, or TARGETS_PROPERTIES"
@@ -395,12 +404,16 @@ function(INSTALL_BASIC_PACKAGE_FILES _Name)
     message(FATAL_ERROR "ENABLE_COMPATIBILITY_VARS does not work with EXPORT")
   endif()
   # ENABLE_COMPATIBILITY_VARS can be enabled for projects still using targets
-  if(DEFINED _targets
-     AND NOT _IBPF_NO_COMPATIBILITY_VARS
-     AND NOT _IBPF_ENABLE_COMPATIBILITY_VARS)
+  if(
+    DEFINED _targets
+    AND NOT _IBPF_NO_COMPATIBILITY_VARS
+    AND NOT _IBPF_ENABLE_COMPATIBILITY_VARS)
     message(
       DEPRECATION
-        "Compatibility variables are no longer generated. Use ENABLE_COMPATIBILITY_VARS to re-enable them (deprecated) or define them using either INCLUDE_FILE or INCLUDE_CONTENT (recommended)."
+        "Compatibility variables are no longer generated. "
+        "Use ENABLE_COMPATIBILITY_VARS to re-enable them "
+        "(deprecated) or define them using either "
+        "INCLUDE_FILE or INCLUDE_CONTENT (recommended)."
     )
   endif()
 
@@ -424,8 +437,9 @@ function(INSTALL_BASIC_PACKAGE_FILES _Name)
   endif()
 
   if(_IBPF_NO_CHECK_REQUIRED_COMPONENTS_MACRO)
-    list(APPEND configure_package_config_file_extra_args
-         NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+    list(
+      APPEND configure_package_config_file_extra_args
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO)
   endif()
 
   # Set input file for config, and ensure that _IBPF_UPPERCASE_FILENAMES and
@@ -534,19 +548,22 @@ ${_IBPF_INCLUDE_CONTENT}
       foreach(_target ${_targets})
         list(APPEND _target_list ${_IBPF_NAMESPACE}${_target})
       endforeach()
-      if(DEFINED ${_IBPF_VARS_PREFIX}_BUILD_INCLUDEDIR
-         OR DEFINED BUILD_${_IBPF_VARS_PREFIX}_INCLUDEDIR
-         OR DEFINED ${_IBPF_VARS_PREFIX}_INSTALL_INCLUDEDIR
-         OR DEFINED INSTALL_${_IBPF_VARS_PREFIX}_INCLUDEDIR)
-        list(APPEND _include_dir_list
-             "\"\@PACKAGE_${_IBPF_VARS_PREFIX}_INCLUDEDIR\@\"")
+      if(
+        DEFINED ${_IBPF_VARS_PREFIX}_BUILD_INCLUDEDIR
+        OR DEFINED BUILD_${_IBPF_VARS_PREFIX}_INCLUDEDIR
+        OR DEFINED ${_IBPF_VARS_PREFIX}_INSTALL_INCLUDEDIR
+        OR DEFINED INSTALL_${_IBPF_VARS_PREFIX}_INCLUDEDIR)
+        list(
+          APPEND _include_dir_list
+            "\"\@PACKAGE_${_IBPF_VARS_PREFIX}_INCLUDEDIR\@\"")
       elseif(
         DEFINED ${_IBPF_VARS_PREFIX}_BUILD_INCLUDE_DIR
         OR DEFINED BUILD_${_IBPF_VARS_PREFIX}_INCLUDE_DIR
         OR DEFINED ${_IBPF_VARS_PREFIX}_INSTALL_INCLUDE_DIR
         OR DEFINED INSTALL_${_IBPF_VARS_PREFIX}_INCLUDE_DIR)
-        list(APPEND _include_dir_list
-             "\"\@PACKAGE_${_IBPF_VARS_PREFIX}_INCLUDE_DIR\@\"")
+        list(
+          APPEND _include_dir_list
+            "\"\@PACKAGE_${_IBPF_VARS_PREFIX}_INCLUDE_DIR\@\"")
       else()
         unset(_include_dir_list)
         foreach(_target ${_targets})

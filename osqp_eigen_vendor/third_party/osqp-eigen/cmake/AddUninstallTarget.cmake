@@ -1,3 +1,10 @@
+# Copyright (C) 2012-2021 Istituto Italiano di Tecnologia (IIT) Copyright (C)
+# 2008-2013 Kitware Inc.
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # SPDX-FileCopyrightText: 2012-2021 Istituto Italiano di Tecnologia (IIT)
 # SPDX-FileCopyrightText: 2008-2013 Kitware Inc. SPDX-License-Identifier:
 # BSD-3-Clause
@@ -71,7 +78,7 @@ foreach(file \${files})
   else()
     message(STATUS \"Not-found: \$ENV{DESTDIR}\${file}\")
   endif()
-endforeach(file)
+endforeach()
 ")
 
 set(_desc "Uninstall the project...")

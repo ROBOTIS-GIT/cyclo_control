@@ -1,3 +1,9 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT). All rights reserved.
 #
 # This software may be modified and distributed under the terms of the
