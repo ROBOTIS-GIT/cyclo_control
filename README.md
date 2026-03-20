@@ -5,95 +5,124 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
 ## Repository Structure
 
 ```text
-├── motion_controller/
+├── robotis_motion_controller/
 │   ├── CMakeLists.txt
+│   ├── CHANGELOG.rst
 │   └── package.xml
-├── motion_controller_core/
-│   ├── include/motion_controller_core/
-│   │   ├── common/
-│   │   │   └── ...
-│   │   ├── controllers/
-│   │   │   └── ...
-│   │   ├── kinematics/
-│   │   │   └── ...
-│   │   ├── optimization/
-│   │   │   └── ...
-│   │   └── retargeting/
+├── robotis_motion_controller_core/
+│   ├── cmake/
+│   │   └── robotis_motion_controller_coreConfig.cmake.in
+│   ├── include/robotis_motion_controller_core/
+│   │   ├── common/
+│   │   │   └── ...
+│   │   ├── controllers/
+│   │   │   ├── ai_worker/
+│   │   │   │   └── ...
+│   │   │   └── open_manipulator/
+│   │   │       └── ...
+│   │   ├── kinematics/
+│   │   │   └── ...
+│   │   └── optimization/
 │   │       └── ...
-│   ├── src/
-│   │   ├── controllers/
-│   │   │   └── ...
-│   │   ├── kinematics/
-│   │   │   └── ...
-│   │   └── retargeting/
+│   ├── src/
+│   │   ├── controllers/
+│   │   │   ├── ai_worker/
+│   │   │   │   └── ...
+│   │   │   └── open_manipulator/
+│   │   │       └── ...
+│   │   ├── kinematics/
+│   │   │   └── ...
+│   │   └── retargeting/
 │   │       └── ...
 │   ├── CMakeLists.txt
+│   ├── CHANGELOG.rst
 │   └── package.xml
 │
-├── motion_controller_ros/
+├── robotis_motion_controller_ros/
 │   ├── config/
-│   │   └── ...
-│   ├── include/motion_controller_ros/
-│   │   ├── nodes/
-│   │   │   └── ...
-│   │   └── utils/
-│   │       └── ...
+│   │   ├── ai_worker_config.yaml
+│   │   ├── omx_config.yaml
+│   │   └── omy_config.yaml
+│   ├── include/robotis_motion_controller_ros/
+│   │   ├── nodes/
+│   │   │   ├── ai_worker/
+│   │   │   │   └── ...
+│   │   │   ├── omx/
+│   │   │   │   └── ...
+│   │   │   └── omy/
+│   │   │       └── ...
+│   │   └── utils/
+│   │       └── ...
 │   ├── launch/
-│   │   └── ...
+│   │   ├── ai_worker_controller.launch.py
+│   │   ├── omx_controller.launch.py
+│   │   └── omy_controller.launch.py
 │   ├── src/
 │   │   ├── nodes/
-│   │   │   └── ...
+│   │   │   ├── ai_worker/
+│   │   │   │   └── ...
+│   │   │   ├── omx/
+│   │   │   │   └── ...
+│   │   │   └── omy/
+│   │   │       └── ...
 │   │   └── utils/
 │   │       └── ...
 │   ├── CMakeLists.txt
+│   ├── CHANGELOG.rst
 │   └── package.xml
 │
-├── motion_controller_ros_py/
-│   ├── resources/
-│   │   └── ...
+├── robotis_motion_controller_ros_py/
 │   ├── scripts/
-│   │   └── ...
+│   │   ├── __init__.py
+│   │   └── teleop_retargeting.py
 │   ├── test/
-│   │   └── ...
+│   │   └── ...
+│   ├── CHANGELOG.rst
 │   ├── package.xml
 │   ├── setup.cfg
 │   └── setup.py
 │
-└── motion_controller_models/
+└── robotis_motion_controller_models/
     ├── launch/
-    │   └── ...
+    │   └── ...
     ├── models/
-    │   └── ...
+    │   └── ...
+    ├── rviz/
+    │   └── ...
     ├── CMakeLists.txt
+    ├── CHANGELOG.rst
     └── package.xml
 ```
 ### Directory Description
 | Directory | Description |
 |-----------|-------------|
-| `motion_controller_core/` | Core package containing kinematics solver & motion control library |
-| `motion_controller_core/include/motion_controller_core/common/` | Common headers containing shared types and utility functions |
-| `motion_controller_core/include/motion_controller_core/optimization/` | QP definitions and solver interfaces |
-| `motion_controller_core/src/controllers/` | Controller implementations |
-| `motion_controller_core/src/kinematics/` | Kinematics solver implementation |
-| `motion_controller_core/src/retargeting/` | Retargeting module |
+| `robotis_motion_controller/` | Meta package that groups all motion controller packages |
+| `robotis_motion_controller_core/` | Core package containing kinematics solver, controllers, and retargeting utilities |
+| `robotis_motion_controller_core/include/robotis_motion_controller_core/common/` | Common headers containing shared types and utility functions |
+| `robotis_motion_controller_core/include/robotis_motion_controller_core/optimization/` | QP definitions and solver interfaces |
+| `robotis_motion_controller_core/src/controllers/` | Controller implementations for AI Worker and OpenManipulator |
+| `robotis_motion_controller_core/src/kinematics/` | Kinematics solver implementation |
+| `robotis_motion_controller_core/src/retargeting/` | Python retargeting utilities |
 
 | Directory | Description |
 |-----------|-------------|
-| `motion_controller_ros/` | ROS 2 package containing controller nodes, launch files, and configs |
-| `motion_controller_ros/launch/` | Launch files for running the controller nodes |
-| `motion_controller_ros/src/nodes/` | ROS 2 node executables for each controller type |
-| `motion_controller_ros/src/utils/` | Utility nodes |
+| `robotis_motion_controller_ros/` | ROS 2 package containing controller nodes, launch files, and runtime configs |
+| `robotis_motion_controller_ros/config/` | YAML configuration files for AI Worker, OMX, and OMY controllers |
+| `robotis_motion_controller_ros/launch/` | Launch files for running the controller nodes |
+| `robotis_motion_controller_ros/src/nodes/` | ROS 2 node executables organized by robot family |
+| `robotis_motion_controller_ros/src/utils/` | Utility nodes such as interactive markers and reference checking |
 
 | Directory | Description |
 |-----------|-------------|
-| `motion_controller_ros_py/` | ROS 2 Python package containing controller nodes |
-| `motion_controller_ros_py/scripts/` | Script files for running the controller nodes |
+| `robotis_motion_controller_ros_py/` | ROS 2 Python package containing retargeting-related scripts and tests |
+| `robotis_motion_controller_ros_py/scripts/` | Python entrypoints such as `teleop_retargeting.py` |
 
 | Directory | Description |
 |-----------|-------------|
-| `motion_controller_models/` | Robot model descriptions package |
-| `motion_controller_models/launch/` | Launch files for visualizing robot models |
-| `motion_controller_models/models/` | URDF/SRDF robot models used by the controller |
+| `robotis_motion_controller_models/` | Robot model descriptions and RViz resources package |
+| `robotis_motion_controller_models/launch/` | Launch files for visualizing robot models |
+| `robotis_motion_controller_models/models/` | URDF/SRDF robot models used by the controller |
+| `robotis_motion_controller_models/rviz/` | RViz configurations for each supported robot model |
 
 ## Install (from source)
 
@@ -158,7 +187,7 @@ pip3 install torch
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/ROBOTIS-GIT/motion_controller.git
+git clone https://github.com/ROBOTIS-GIT/robotis_motion_controller.git
 cd ~/ros2_ws
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
@@ -171,7 +200,7 @@ source install/setup.bash
 Launch AI Worker controllers:
 
 ```bash
-ros2 launch motion_controller_ros ai_worker_controller.launch.py
+ros2 launch robotis_motion_controller_ros ai_worker_controller.launch.py
 ```
 
 You can switch AI Worker controllers via `controller_type`:
@@ -185,10 +214,10 @@ You can switch AI Worker controllers via `controller_type`:
 Example launch commands:
 
 ```bash
-ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=movel start_interactive_marker:=true
-ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=movej
-ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=vr
-ros2 launch motion_controller_ros ai_worker_controller.launch.py controller_type:=leader
+ros2 launch robotis_motion_controller_ros ai_worker_controller.launch.py controller_type:=movel start_interactive_marker:=true
+ros2 launch robotis_motion_controller_ros ai_worker_controller.launch.py controller_type:=movej
+ros2 launch robotis_motion_controller_ros ai_worker_controller.launch.py controller_type:=vr
+ros2 launch robotis_motion_controller_ros ai_worker_controller.launch.py controller_type:=leader
 ```
 
 When `controller_type:=movel` and `start_interactive_marker:=true`, `ai_worker_controller.launch.py` starts two configurable interactive markers:
@@ -257,7 +286,7 @@ ros2 topic pub --once /leader/joint_trajectory_command_broadcaster_left/raw_join
 Launch the OMX follower controller:
 
 ```bash
-ros2 launch motion_controller_ros omx_controller.launch.py start_interactive_marker:=true
+ros2 launch robotis_motion_controller_ros omx_controller.launch.py start_interactive_marker:=true
 ```
 
 You can switch OMX controllers via `controller_type`:
@@ -304,7 +333,7 @@ ros2 topic pub --once /omx_movej_controller/movej trajectory_msgs/msg/JointTraje
 Launch the OMY follower controller:
 
 ```bash
-ros2 launch motion_controller_ros omy_controller.launch.py start_interactive_marker:=true
+ros2 launch robotis_motion_controller_ros omy_controller.launch.py start_interactive_marker:=true
 ```
 
 You can switch OMY controllers via `controller_type`:
@@ -353,11 +382,11 @@ You can visualize the robot models used by the controllers with the launch files
 Examples:
 
 ```bash
-ros2 launch motion_controller_models view_ffw_sg2_follower.launch.py
+ros2 launch robotis_motion_controller_models view_ffw_sg2_follower.launch.py
 ```
 ```bash
-ros2 launch motion_controller_models view_omx_f.launch.py
+ros2 launch robotis_motion_controller_models view_omx_f.launch.py
 ```
 ```bash
-ros2 launch motion_controller_models view_omy_f3m.launch.py
+ros2 launch robotis_motion_controller_models view_omy_f3m.launch.py
 ```

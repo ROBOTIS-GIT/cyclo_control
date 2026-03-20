@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robotis_motion_controller_ros_py</name>
+  <version>0.0.3</version>
+  <description>Motion Controller ROS 2 Python package</description>
+  <maintainer email="pyo@robotis.com">Pyo</maintainer>
+  <license>Apache 2.0</license>
+  <author email="nhw@robotis.com">Hyunwoo Nam</author>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>robotis_motion_controller_core</exec_depend>
+  <exec_depend>robotis_interfaces</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robotis_motion_controller_core</name>
+  <version>0.0.3</version>
+  <description>Core motion controller library for inverse kinematics and QP-based control without ROS dependencies</description>
+  <maintainer email="pyo@robotis.com">Pyo</maintainer>
+  <license>Apache 2.0</license>
+  <author email="kyu@robotis.com">Yeonguk Kim</author>
+  <author email="nhw@robotis.com">Hyunwoo Nam</author>
+  <build_depend>eigen</build_depend>
+  <build_depend>pinocchio</build_depend>
+  <build_depend>osqp-eigen</build_depend>
+  <exec_depend>eigen</exec_depend>
+  <exec_depend>pinocchio</exec_depend>
+  <exec_depend>osqp-eigen</exec_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <test_depend>gtest</test_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

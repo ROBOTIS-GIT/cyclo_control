@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robotis_motion_controller_ros</name>
+  <version>0.0.3</version>
+  <description>ROS 2 wrapper for motion controller using QP-based inverse kinematics</description>
+  <maintainer email="pyo@robotis.com">Pyo</maintainer>
+  <license>Apache 2.0</license>
+  <author email="kyu@robotis.com">Yeonguk Kim</author>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <!-- Core dependencies -->
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>interactive_markers</depend>
+  <depend>tf2_ros</depend>
+  <depend>robotis_interfaces</depend>
+  <depend>robotis_motion_controller_core</depend>
+  <depend>ament_index_cpp</depend>
+  <exec_depend>robotis_motion_controller_models</exec_depend>
+  <!-- Build dependencies -->
+  <build_depend>eigen</build_depend>
+  <build_depend>pinocchio</build_depend>
+  <build_depend>osqp-eigen</build_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
