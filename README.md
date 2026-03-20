@@ -7,7 +7,6 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
 ```text
 ├── robotis_motion_controller/
 │   ├── CMakeLists.txt
-│   ├── CHANGELOG.rst
 │   └── package.xml
 ├── robotis_motion_controller_core/
 │   ├── cmake/
@@ -16,68 +15,46 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
 │   │   ├── common/
 │   │   │   └── ...
 │   │   ├── controllers/
-│   │   │   ├── ai_worker/
-│   │   │   │   └── ...
-│   │   │   └── open_manipulator/
-│   │   │       └── ...
+│   │   │   └── ...
 │   │   ├── kinematics/
 │   │   │   └── ...
 │   │   └── optimization/
 │   │       └── ...
 │   ├── src/
 │   │   ├── controllers/
-│   │   │   ├── ai_worker/
-│   │   │   │   └── ...
-│   │   │   └── open_manipulator/
-│   │   │       └── ...
+│   │   │   └── ...
 │   │   ├── kinematics/
 │   │   │   └── ...
 │   │   └── retargeting/
 │   │       └── ...
 │   ├── CMakeLists.txt
-│   ├── CHANGELOG.rst
 │   └── package.xml
 │
 ├── robotis_motion_controller_ros/
 │   ├── config/
-│   │   ├── ai_worker_config.yaml
-│   │   ├── omx_config.yaml
-│   │   └── omy_config.yaml
+│   │   └── ...
 │   ├── include/robotis_motion_controller_ros/
 │   │   ├── nodes/
-│   │   │   ├── ai_worker/
-│   │   │   │   └── ...
-│   │   │   ├── omx/
-│   │   │   │   └── ...
-│   │   │   └── omy/
-│   │   │       └── ...
+│   │   │   └── ...
 │   │   └── utils/
 │   │       └── ...
 │   ├── launch/
-│   │   ├── ai_worker_controller.launch.py
-│   │   ├── omx_controller.launch.py
-│   │   └── omy_controller.launch.py
+│   │   └── ...
 │   ├── src/
 │   │   ├── nodes/
-│   │   │   ├── ai_worker/
-│   │   │   │   └── ...
-│   │   │   ├── omx/
-│   │   │   │   └── ...
-│   │   │   └── omy/
-│   │   │       └── ...
+│   │   │   └── ...
 │   │   └── utils/
 │   │       └── ...
 │   ├── CMakeLists.txt
-│   ├── CHANGELOG.rst
 │   └── package.xml
 │
 ├── robotis_motion_controller_ros_py/
+│   ├── resource/
+│   │   └── ...
 │   ├── scripts/
-│   │   ├── __init__.py
-│   │   └── teleop_retargeting.py
+│   │   └── ...
 │   ├── test/
 │   │   └── ...
-│   ├── CHANGELOG.rst
 │   ├── package.xml
 │   ├── setup.cfg
 │   └── setup.py
@@ -90,7 +67,6 @@ This repository contains motion controller packages for the ROBOTIS Physical AI 
     ├── rviz/
     │   └── ...
     ├── CMakeLists.txt
-    ├── CHANGELOG.rst
     └── package.xml
 ```
 ### Directory Description
