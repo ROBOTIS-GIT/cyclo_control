@@ -4,8 +4,8 @@
  * @copyright  Released under the terms of the BSD 3-Clause License
  * @date 2018
  */
-#ifndef OSQPEIGEN_OSQPEIGEN_H
-#define OSQPEIGEN_OSQPEIGEN_H
+#ifndef OSQPEIGEN__OSQPEIGEN_H_
+#define OSQPEIGEN__OSQPEIGEN_H_
 
 #include <OsqpEigen/Constants.hpp>
 #include <OsqpEigen/Data.hpp>
@@ -13,4 +13,4 @@
 #include <OsqpEigen/Solver.hpp>
 #include <OsqpEigen/SparseMatrixHelper.hpp>
 
-#endif // OSQPEIGEN_OSQPEIGEN_H
+#endif  // OSQPEIGEN__OSQPEIGEN_H_

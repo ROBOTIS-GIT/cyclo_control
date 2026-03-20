@@ -12,29 +12,29 @@ namespace OsqpEigen
 class NullStream : public std::ostream
 {
 public:
-    NullStream()
-        : std::ostream(nullptr)
-    {
-    }
-    NullStream(const NullStream&)
-        : std::ostream(nullptr)
-    {
-    }
+  NullStream()
+  : std::ostream(nullptr)
+  {
+  }
+  NullStream(const NullStream &)
+  : std::ostream(nullptr)
+  {
+  }
 };
 
-template <class T> const NullStream& operator<<(NullStream&& os, const T&)
+template<class T> const NullStream & operator<<(NullStream && os, const T &)
 {
-    return os;
+  return os;
 }
 
 NullStream theStream;
 
-std::ostream& debugStream()
+std::ostream & debugStream()
 {
 #ifdef OSQP_EIGEN_DEBUG_OUTPUT
-    return std::cerr;
+  return std::cerr;
 #else
-    return theStream;
+  return theStream;
 #endif
 }
-} // namespace OsqpEigen
+}  // namespace OsqpEigen

@@ -5,90 +5,90 @@
  * @date 2020
  */
 
+#include <OsqpEigen/OsqpEigen.h>
+
 // Catch2
 #include <catch2/catch_test_macros.hpp>
 
-#include <OsqpEigen/OsqpEigen.h>
-
 TEST_CASE("QPProblem - Unconstrained")
 {
-    constexpr double tolerance = 1e-4;
+  constexpr double tolerance = 1e-4;
 
-    Eigen::SparseMatrix<c_float> H_s(2, 2);
-    H_s.insert(0, 0) = 3;
-    H_s.insert(0, 1) = 2;
-    H_s.insert(1, 0) = 2;
-    H_s.insert(1, 1) = 4;
+  Eigen::SparseMatrix<c_float> H_s(2, 2);
+  H_s.insert(0, 0) = 3;
+  H_s.insert(0, 1) = 2;
+  H_s.insert(1, 0) = 2;
+  H_s.insert(1, 1) = 4;
 
-    Eigen::Matrix<c_float, 2, 1> gradient;
-    gradient << 3, 1;
+  Eigen::Matrix<c_float, 2, 1> gradient;
+  gradient << 3, 1;
 
-    OsqpEigen::Solver solver;
-    solver.settings()->setVerbosity(true);
-    solver.settings()->setAlpha(1.0);
+  OsqpEigen::Solver solver;
+  solver.settings()->setVerbosity(true);
+  solver.settings()->setAlpha(1.0);
 
-    solver.data()->setNumberOfVariables(2);
-    solver.data()->setNumberOfConstraints(0);
+  solver.data()->setNumberOfVariables(2);
+  solver.data()->setNumberOfConstraints(0);
 
-    REQUIRE(solver.data()->setHessianMatrix(H_s));
-    REQUIRE(solver.data()->setGradient(gradient));
+  REQUIRE(solver.data()->setHessianMatrix(H_s));
+  REQUIRE(solver.data()->setGradient(gradient));
 
-    REQUIRE(solver.initSolver());
-    REQUIRE(solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError);
+  REQUIRE(solver.initSolver());
+  REQUIRE(solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError);
 
-    // expected solution
-    Eigen::Matrix<c_float, 2, 1> expectedSolution;
-    expectedSolution << -1.2500, 0.3750;
+  // expected solution
+  Eigen::Matrix<c_float, 2, 1> expectedSolution;
+  expectedSolution << -1.2500, 0.3750;
 
-    REQUIRE(solver.getSolution().isApprox(expectedSolution, tolerance));
+  REQUIRE(solver.getSolution().isApprox(expectedSolution, tolerance));
 }
 
 TEST_CASE("QPProblem")
 {
-    constexpr double tolerance = 1e-4;
+  constexpr double tolerance = 1e-4;
 
-    Eigen::SparseMatrix<c_float> H_s(2, 2);
-    H_s.insert(0, 0) = 4;
-    H_s.insert(0, 1) = 1;
-    H_s.insert(1, 0) = 1;
-    H_s.insert(1, 1) = 2;
+  Eigen::SparseMatrix<c_float> H_s(2, 2);
+  H_s.insert(0, 0) = 4;
+  H_s.insert(0, 1) = 1;
+  H_s.insert(1, 0) = 1;
+  H_s.insert(1, 1) = 2;
 
-    Eigen::SparseMatrix<c_float> A_s(3, 2);
-    A_s.insert(0, 0) = 1;
-    A_s.insert(0, 1) = 1;
-    A_s.insert(1, 0) = 1;
-    A_s.insert(2, 1) = 1;
+  Eigen::SparseMatrix<c_float> A_s(3, 2);
+  A_s.insert(0, 0) = 1;
+  A_s.insert(0, 1) = 1;
+  A_s.insert(1, 0) = 1;
+  A_s.insert(2, 1) = 1;
 
-    Eigen::Matrix<c_float, 2, 1> gradient;
-    gradient << 1, 1;
+  Eigen::Matrix<c_float, 2, 1> gradient;
+  gradient << 1, 1;
 
-    Eigen::Matrix<c_float, 3, 1> lowerBound;
-    lowerBound << 1, 0, 0;
+  Eigen::Matrix<c_float, 3, 1> lowerBound;
+  lowerBound << 1, 0, 0;
 
-    Eigen::Matrix<c_float, 3, 1> upperBound;
-    upperBound << 1, 0.7, 0.7;
+  Eigen::Matrix<c_float, 3, 1> upperBound;
+  upperBound << 1, 0.7, 0.7;
 
-    OsqpEigen::Solver solver;
-    solver.settings()->setVerbosity(true);
-    solver.settings()->setAlpha(1.0);
-    // This is required to avoid non-deterministic non-accurate solutions
-    solver.settings()->setPolish(true);
+  OsqpEigen::Solver solver;
+  solver.settings()->setVerbosity(true);
+  solver.settings()->setAlpha(1.0);
+  // This is required to avoid non-deterministic non-accurate solutions
+  solver.settings()->setPolish(true);
 
-    REQUIRE_FALSE(solver.data()->setHessianMatrix(H_s));
-    solver.data()->setNumberOfVariables(2);
+  REQUIRE_FALSE(solver.data()->setHessianMatrix(H_s));
+  solver.data()->setNumberOfVariables(2);
 
-    solver.data()->setNumberOfConstraints(3);
-    REQUIRE(solver.data()->setHessianMatrix(H_s));
-    REQUIRE(solver.data()->setGradient(gradient));
-    REQUIRE(solver.data()->setLinearConstraintsMatrix(A_s));
-    REQUIRE(solver.data()->setLowerBound(lowerBound));
-    REQUIRE(solver.data()->setUpperBound(upperBound));
+  solver.data()->setNumberOfConstraints(3);
+  REQUIRE(solver.data()->setHessianMatrix(H_s));
+  REQUIRE(solver.data()->setGradient(gradient));
+  REQUIRE(solver.data()->setLinearConstraintsMatrix(A_s));
+  REQUIRE(solver.data()->setLowerBound(lowerBound));
+  REQUIRE(solver.data()->setUpperBound(upperBound));
 
-    REQUIRE(solver.initSolver());
+  REQUIRE(solver.initSolver());
 
-    REQUIRE(solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError);
-    Eigen::Matrix<c_float, 2, 1> expectedSolution;
-    expectedSolution << 0.3, 0.7;
+  REQUIRE(solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError);
+  Eigen::Matrix<c_float, 2, 1> expectedSolution;
+  expectedSolution << 0.3, 0.7;
 
-    REQUIRE(solver.getSolution().isApprox(expectedSolution, tolerance));
+  REQUIRE(solver.getSolution().isApprox(expectedSolution, tolerance));
 }

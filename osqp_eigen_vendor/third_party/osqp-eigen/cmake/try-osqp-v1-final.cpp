@@ -1,3 +1,5 @@
+// Copyright 2023 Giulio Romualdi
+
 #include <osqp_api_functions.h>
 
 int main()

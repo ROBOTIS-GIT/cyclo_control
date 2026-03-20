@@ -5,8 +5,8 @@
  * @date 2018
  */
 
-#ifndef OSQPEIGEN_SETTINGS_HPP
-#define OSQPEIGEN_SETTINGS_HPP
+#ifndef OSQPEIGEN__SETTINGS_HPP_
+#define OSQPEIGEN__SETTINGS_HPP_
 
 // OSQP
 #include <osqp.h>
@@ -24,189 +24,190 @@ namespace OsqpEigen
  */
 class Settings
 {
-    OSQPSettings* m_settings; /**< OSQPSettings struct. */
+  OSQPSettings * m_settings;  /**< OSQPSettings struct. */
+
 public:
     /**
      * Constructor.
      */
-    Settings();
+  Settings();
 
     /**
      * Deconstructor.
      */
-    ~Settings();
+  ~Settings();
 
     /**
      * Reset the default settings for the optimization problem.
      */
-    void resetDefaultSettings();
+  void resetDefaultSettings();
 
     /**
      * Set the ADMM step rho.
      * @param rho a ADMM step constant.
      */
-    void setRho(const double rho);
+  void setRho(const double rho);
 
     /**
      * Set the ADMM step sigma.
      * @param sigma a ADMM step constant.
      */
-    void setSigma(const double sigma);
+  void setSigma(const double sigma);
 
     /**
      * Set the heuristic data scaling iterations. If 0, scaling disabled.
      * @param scaling is the heuristic data scaling iteration.
      */
-    void setScaling(const int scaling);
+  void setScaling(const int scaling);
 
     /**
      * Set if the rho step size adaptive feature is active.
      * @param isRhoStepSizeAdactive if True the feature is active.
      */
-    void setAdaptiveRho(const bool isRhoStepSizeAdactive);
+  void setAdaptiveRho(const bool isRhoStepSizeAdactive);
 
     /**
      * Set the number of iterations between rho adaptations rho. If 0, it is automatic.
      * @param rhoInterval number of iterations.
      */
-    void setAdaptiveRhoInterval(const int rhoInterval);
+  void setAdaptiveRhoInterval(const int rhoInterval);
 
     /**
      * Set the tolerance for adapting rho. The new rho has to be X times larger or 1/X times
      * smaller than the current one to trigger a new factorization.
      * @param adaptiveRhoTolerance is the tolerance.
      */
-    void setAdaptiveRhoTolerance(const double adaptiveRhoTolerance);
+  void setAdaptiveRhoTolerance(const double adaptiveRhoTolerance);
 
     /**
      * Set the interval for adapting rho (fraction of the setup time).
      * @param adaptiveRhoFraction interval of the adapting rho.
      */
-    void setAdaptiveRhoFraction(const double adaptiveRhoFraction);
+  void setAdaptiveRhoFraction(const double adaptiveRhoFraction);
 
     /**
      * Set the max number of iterations.
      * @param maxIteration max number of iteration
      */
-    [[deprecated("Use setMaxIteration(int) instead.")]] void
-    setMaxIteraction(const int maxIteration);
+  [[deprecated("Use setMaxIteration(int) instead.")]] void
+  setMaxIteraction(const int maxIteration);
 
     /**
      * Set the max number of iterations.
      * @param maxIteration max number of iteration
      */
-    void setMaxIteration(const int maxIteration);
+  void setMaxIteration(const int maxIteration);
 
     /**
      * Set the absolute convergence tolerance.
      * @param absoluteTolerance absolute tolerance of the solver.
      */
-    void setAbsoluteTolerance(const double absoluteTolerance);
+  void setAbsoluteTolerance(const double absoluteTolerance);
 
     /**
      * Set the relative convergence tolerance.
      * @param relativeTolerance relative tolerance of the solver.
      */
-    void setRelativeTolerance(const double relativeTolerance);
+  void setRelativeTolerance(const double relativeTolerance);
 
     /**
      * Set the primal infeasibility tolerance.
      * @param primalInfeasibilityTolerance tolerance of the primal variables.
      */
-    [[deprecated("Use setPrimalInfeasibilityTolerance() instead.")]] void
-    setPrimalInfeasibilityTollerance(const double primalInfeasibilityTolerance);
+  [[deprecated("Use setPrimalInfeasibilityTolerance() instead.")]] void
+  setPrimalInfeasibilityTollerance(const double primalInfeasibilityTolerance);
 
     /**
      * Set the primal infeasibility tolerance.
      * @param primalInfeasibilityTolerance tolerance of the primal variables.
      */
-    void setPrimalInfeasibilityTolerance(const double primalInfeasibilityTolerance);
+  void setPrimalInfeasibilityTolerance(const double primalInfeasibilityTolerance);
 
     /**
      * Set the dual infeasibility tolerance.
      * @param dualInfeasibilityTolerance tolerance of the dual variables.
      */
-    [[deprecated("Use setDualInfeasibilityTolerance() instead.")]] void
-    setDualInfeasibilityTollerance(const double dualInfeasibilityTolerance);
+  [[deprecated("Use setDualInfeasibilityTolerance() instead.")]] void
+  setDualInfeasibilityTollerance(const double dualInfeasibilityTolerance);
 
     /**
      * Set the dual infeasibility tolerance.
      * @param dualInfeasibilityTolerance tolerance of the dual variables.
      */
-    void setDualInfeasibilityTolerance(const double dualInfeasibilityTolerance);
+  void setDualInfeasibilityTolerance(const double dualInfeasibilityTolerance);
 
     /**
      * Set the relaxation parameter.
      * @param alpha is the relaxation parameter.
      */
-    void setAlpha(const double alpha);
+  void setAlpha(const double alpha);
 
     /**
      * Set linear solver
      * @param linsysSolver is the name of the solver
      */
-    void setLinearSystemSolver(const int linsysSolver);
+  void setLinearSystemSolver(const int linsysSolver);
 
     /**
      * Set the relaxation parameter for polish.
      * @param delta is the relaxation parameter.
      */
-    void setDelta(const double delta);
+  void setDelta(const double delta);
 
     /**
      * Set if the polish feature is active.
      * @param polish if True the feature is active.
      */
-    void setPolish(const bool polish);
+  void setPolish(const bool polish);
 
     /**
      * Set the iterative refinement steps in polish.
      * @param polishRefineIter iterative refinement step.
      */
-    void setPolishRefineIter(const int polishRefineIter);
+  void setPolishRefineIter(const int polishRefineIter);
 
     /**
      * Set the Verbose mode.
      * @param isVerbose if true the verbose mode is activate.
      */
-    void setVerbosity(const bool isVerbose);
+  void setVerbosity(const bool isVerbose);
 
     /**
      * Set the scaled termination criteria.
      * @param scaledTermination if true the scaled termination criteria is used.
      */
-    void setScaledTerimination(const bool scaledTermination);
+  void setScaledTerimination(const bool scaledTermination);
 
     /**
      * Set check termination interval. If 0, termination checking is disabled.
      * @param checkTermination if 0 the termination checking is disabled.
      */
-    void setCheckTermination(const int checkTermination);
+  void setCheckTermination(const int checkTermination);
 
     /**
      * Set check duality gap termination criteria.
      * @param checkDualGap If true, duality gap checking is enabled.
      */
-    void setCheckDualGap(const bool checkDualGap);
+  void setCheckDualGap(const bool checkDualGap);
 
     /**
      * Set warm start.
      * @param warmStart if true the warm start is set.
      */
-    void setWarmStart(const bool warmStart);
+  void setWarmStart(const bool warmStart);
 
     /**
      * Set the maximum number of seconds allowed to solve the problem.
      * @param timeLimit is the time limit in seconds. If 0, then disabled.
      */
-    void setTimeLimit(const double timeLimit);
+  void setTimeLimit(const double timeLimit);
 
     /**
      * Get a pointer to Settings struct.
      * @return a const pointer to OSQPSettings struct.
      */
-    OSQPSettings* const& getSettings() const;
+  OSQPSettings * const & getSettings() const;
 };
-} // namespace OsqpEigen
+}  // namespace OsqpEigen
 
-#endif
+#endif  // OSQPEIGEN__SETTINGS_HPP_

@@ -5,14 +5,14 @@
  * @date 2018
  */
 
-#ifndef OSQPEIGEN_DATA_HPP
-#define OSQPEIGEN_DATA_HPP
-
-// Eigen
-#include <Eigen/Dense>
+#ifndef OSQPEIGEN__DATA_HPP_
+#define OSQPEIGEN__DATA_HPP_
 
 // OSQP
 #include <osqp.h>
+
+// Eigen
+#include <Eigen/Dense>
 
 // OsqpEigen
 #include <OsqpEigen/SparseMatrixHelper.hpp>
@@ -27,54 +27,54 @@ namespace OsqpEigen
  */
 class Data
 {
-    OSQPData* m_data; /**< OSQPData struct. */
-    bool m_isNumberOfVariablesSet; /**< Boolean true if the number of variables is set. */
-    bool m_isNumberOfConstraintsSet; /**< Boolean true if the number of constraints is set. */
-    bool m_isHessianMatrixSet; /**< Boolean true if the hessian matrix is set. */
-    bool m_isGradientSet; /**< Boolean true if the gradient vector is set. */
-    bool m_isLinearConstraintsMatrixSet; /**< Boolean true if the linear constrain matrix is set. */
-    bool m_isLowerBoundSet; /**< Boolean true if the lower bound vector is set. */
-    bool m_isUpperBoundSet; /**< Boolean true if the upper bound vector is set. */
+  OSQPData * m_data;  /**< OSQPData struct. */
+  bool m_isNumberOfVariablesSet;  /**< Boolean true if the number of variables is set. */
+  bool m_isNumberOfConstraintsSet;  /**< Boolean true if the number of constraints is set. */
+  bool m_isHessianMatrixSet;  /**< Boolean true if the hessian matrix is set. */
+  bool m_isGradientSet;  /**< Boolean true if the gradient vector is set. */
+  bool m_isLinearConstraintsMatrixSet;  /**< Boolean true if the linear constrain matrix is set. */
+  bool m_isLowerBoundSet;  /**< Boolean true if the lower bound vector is set. */
+  bool m_isUpperBoundSet;  /**< Boolean true if the upper bound vector is set. */
 
 public:
     /**
      * Constructor.
      */
-    Data();
+  Data();
 
     /**
      * Constructor.
      * @param n is the number of variables;
      * @param m is the number of constraints.
      */
-    Data(int n, int m);
+  Data(int n, int m);
 
     /**
      * Deconstructor.
      */
-    ~Data();
+  ~Data();
 
     /**
      * Clear the hessian matrix.
      */
-    void clearHessianMatrix();
+  void clearHessianMatrix();
 
     /**
      * Clear the linear constraints matrix.
      */
-    void clearLinearConstraintsMatrix();
+  void clearLinearConstraintsMatrix();
 
     /**
      * Set the number of variables.
      * @param n is the number of variables.
      */
-    void setNumberOfVariables(int n);
+  void setNumberOfVariables(int n);
 
     /**
      * Set the number of constraints.
      * @param m is the number of constraints.
      */
-    void setNumberOfConstraints(int m);
+  void setNumberOfConstraints(int m);
 
     /**
      * Set the quadratic part of the cost function (Hessian).
@@ -82,8 +82,8 @@ public:
      * @param hessianMatrix is the Hessian matrix.
      * @return true/false in case of success/failure.
      */
-    template <typename Derived>
-    bool setHessianMatrix(const Eigen::SparseCompressedBase<Derived>& hessianMatrix);
+  template<typename Derived>
+  bool setHessianMatrix(const Eigen::SparseCompressedBase<Derived> & hessianMatrix);
 
     /**
      * Set the linear part of the cost function (Gradient).
@@ -93,18 +93,18 @@ public:
      * OsqpEigen object
      * @return true/false in case of success/failure.
      */
-    bool setGradient(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> gradientVector);
+  bool setGradient(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> gradientVector);
 
-    Eigen::Matrix<c_float, Eigen::Dynamic, 1> getGradient();
+  Eigen::Matrix<c_float, Eigen::Dynamic, 1> getGradient();
 
     /**
      * Set the linear constraint matrix A (size m x n)
      * @param linearConstraintsMatrix is the linear constraints matrix A.
      * @return true/false in case of success/failure.
      */
-    template <typename Derived>
-    bool
-    setLinearConstraintsMatrix(const Eigen::SparseCompressedBase<Derived>& linearConstraintsMatrix);
+  template<typename Derived>
+  bool
+  setLinearConstraintsMatrix(const Eigen::SparseCompressedBase<Derived> & linearConstraintsMatrix);
 
     /**
      * Set the array for lower bound (size m).
@@ -114,7 +114,7 @@ public:
      * OsqpEigen object
      * @return true/false in case of success/failure.
      */
-    bool setLowerBound(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> lowerBoundVector);
+  bool setLowerBound(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> lowerBoundVector);
 
     /**
      * Set the array for upper bound (size m).
@@ -124,7 +124,7 @@ public:
      * OsqpEigen object.
      * @return true/false in case of success/failure.
      */
-    bool setUpperBound(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> upperBoundVector);
+  bool setUpperBound(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> upperBoundVector);
 
     /**
      * Set the array for upper and lower bounds (size m).
@@ -135,23 +135,24 @@ public:
      * OsqpEigen object.
      * @return true/false in case of success/failure.
      */
-    bool setBounds(Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> lowerBound,
-                   Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> upperBound);
+  bool setBounds(
+    Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> lowerBound,
+    Eigen::Ref<Eigen::Matrix<c_float, Eigen::Dynamic, 1>> upperBound);
 
     /**
      * Get the OSQPData struct.
      * @return a const point to the OSQPData struct.
      */
-    OSQPData* const& getData() const;
+  OSQPData * const & getData() const;
 
     /**
      * Verify if all the matrix and vectors are already set.
      * @return true if all the OSQPData struct are set.
      */
-    bool isSet() const;
+  bool isSet() const;
 };
-} // namespace OsqpEigen
+}  // namespace OsqpEigen
 
-#include <OsqpEigen/Data.tpp>
+#include <OsqpEigen/Data.tpp>  // NOLINT(build/include_order)
 
-#endif
+#endif  // OSQPEIGEN__DATA_HPP_
