@@ -4,26 +4,18 @@
   <name>osqp_eigen_vendor</name>
   <version>0.10.3</version>
   <description>Vendor package for osqp-eigen.</description>
-
   <maintainer email="pyo@robotis.com">Pyo</maintainer>
-
   <license>Apache 2.0</license>
   <license>BSD-3-Clause</license>
-
   <url type="website">https://github.com/robotology/osqp-eigen</url>
-
   <author email="kyu@robotis.com">Yeonguk Kim</author>
   <author email="nhw@robotis.com">Hyunwoo Nam</author>
-
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_vendor_package</buildtool_depend>
-
   <depend>eigen</depend>
   <depend>osqp_vendor</depend>
-
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
   <export>
     <build_type>ament_cmake</build_type>
   </export>

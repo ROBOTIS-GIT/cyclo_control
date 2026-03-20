@@ -1,8 +1,8 @@
 // Copyright (C) 2018 Giulio Romualdi
 //
-// Use of this source code is governed by a BSD-style
+// Use of this source code is governed by a BSD-3-Clause
 // license that can be found in the LICENSE file or at
-// https://developers.google.com/open-source/licenses/bsd
+// https://opensource.org/licenses/BSD-3-Clause
 
 /**
  * @file Data.tpp
