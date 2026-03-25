@@ -65,9 +65,9 @@ right_arm_relative_controller:
     collision_safe_distance: 0.02
     slack_penalty: 1000.0
     cbf_alpha: 50.0
-    command_hz: 20.0
-    relative_pose_topic: "/r_relative_pose"
-    delta_pose_topic: ""  # deprecated compatibility
+    command_hz: 30.0
+    relative_pose_topic: "/odom/camera_pose"
+    delta_pose_topic: "/odom/camera_pose"  # deprecated compatibility
     delta_in_ee_frame: false
     lock_other_joints: true
     joint_states_topic: "/joint_states"
@@ -75,7 +75,7 @@ right_arm_relative_controller:
     right_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
     raw_traj_timeout: 0.5
     r_gripper_pose_topic: "/r_gripper_pose"
-    base_frame_id: "base_link"
+    base_frame_id: "odom"
     r_gripper_name: "arm_r_link7"
     right_gripper_joint: "gripper_r_joint1"
 
