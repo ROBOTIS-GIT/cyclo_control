@@ -152,8 +152,6 @@ You can switch AI Worker controllers via `controller_type`:
 - `controller_type:=vr` runs `vr_controller_node` and `reference_checker_node`
 - `controller_type:=leader` runs `leader_controller_node` together with `vr_controller_node`
 
-To disable collision checking only between the two grippers, set `disable_gripper_collisions:=true`. This helps maintain smooth handover-style motions when the grippers come into contact.
-
 Example launch commands:
 
 ```bash
@@ -176,6 +174,8 @@ When `controller_type:=movel` and `start_interactive_marker:=true`, `ai_worker_c
 
 - right marker uses `right_controlled_link` and publishes MoveL commands to `right_movel_topic`
 - left marker uses `left_controlled_link` and publishes MoveL commands to `left_movel_topic`
+
+To disable collision checking only between the two grippers, set `disable_gripper_collisions:=true`. This helps maintain smooth handover-style motions when the grippers come into contact.
 
 Example `movel` commands:
 
