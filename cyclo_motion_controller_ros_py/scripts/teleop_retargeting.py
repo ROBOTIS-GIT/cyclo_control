@@ -20,17 +20,12 @@ import os
 from typing import Sequence
 
 from ament_index_python.packages import get_package_share_directory
-
 import numpy as np
-
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-
 from retargeting.seq_retarget import ROBOTISHandRetargeter
-
 from robotis_interfaces.msg import HandJoints
-
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
