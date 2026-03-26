@@ -2,7 +2,7 @@
 <package format="3">
   <name>cyclo_motion_controller_core</name>
   <version>0.1.0</version>
-  <description>Core motion controller library for inverse kinematics and QP-based control without ROS dependencies</description>
+  <description>Core Cyclo motion controller library for inverse kinematics and QP-based control without ROS dependencies</description>
   <maintainer email="pyo@robotis.com">Pyo</maintainer>
   <license>Apache 2.0</license>
   <url type="website">http://ai.robotis.com</url>
