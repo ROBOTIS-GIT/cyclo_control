@@ -19,7 +19,7 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions>
 
-#include <algorithm>
+#include <cassert>
 
 namespace cyclo_motion_controller
 {
@@ -133,23 +133,6 @@ static double cubicDot(
   }
 
   return x_t;
-}
-
-/**
-* @brief Construct a 3x3 skew-symmetric matrix from a 3D vector.
-*/
-static Eigen::Matrix3d skew(Eigen::Vector3d src)
-{
-  Eigen::Matrix3d skew;
-  skew.setZero();
-  skew(0, 1) = -src[2];
-  skew(0, 2) = src[1];
-  skew(1, 0) = src[2];
-  skew(1, 2) = -src[0];
-  skew(2, 0) = -src[1];
-  skew(2, 1) = src[0];
-
-  return skew;
 }
 
 template<int N>
@@ -267,14 +250,11 @@ static const Eigen::Vector3d rotationCubicDot(
 {
   Eigen::Matrix3d r_skew;
   r_skew = (rotation_0.transpose() * rotation_f).log();
-  Eigen::Vector3d a, b, c, r;
+  Eigen::Vector3d r;
   double tau = (time - time_0) / (time_f - time_0);
   r(0) = r_skew(2, 1);
   r(1) = r_skew(0, 2);
   r(2) = r_skew(1, 0);
-  c = w_0;
-  b = a_0 / 2;
-  a = r - b - c;
   Eigen::Vector3d rd;
   for (int i = 0; i < 3; i++) {
     rd(i) = cubicDot(time, time_0, time_f, 0, r(i), 0, 0);
