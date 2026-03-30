@@ -1,4 +1,5 @@
 # Copyright 2026 ROBOTIS CO., LTD.
+# SPDX-License-Identifier: MIT
 #
 # This file is derived from `dex_retargeting/robot_wrapper.py` in the
 # dexsuite/dex-retargeting project:
