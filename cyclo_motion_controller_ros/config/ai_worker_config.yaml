@@ -27,8 +27,8 @@ ai_worker_movel_controller:
 
     r_gripper_pose_topic: "/r_gripper_pose"
     l_gripper_pose_topic: "/l_gripper_pose"
-    r_gripper_name: "end_effector_r_link"
-    l_gripper_name: "end_effector_l_link"
+    r_gripper_name: "arm_r_link7"
+    l_gripper_name: "arm_l_link7"
     right_gripper_joint: "gripper_r_joint1"
     left_gripper_joint: "gripper_l_joint1"
     controller_error_topic: "~/controller_error"
@@ -75,7 +75,7 @@ vr_controller:
     slack_penalty: 1000.0
     cbf_alpha: 50.0
     
-    reactivate_service: "/reactivate"
+    reactivate_service: "/arm/reactivate"
     joint_states_topic: "/joint_states"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
@@ -96,8 +96,8 @@ vr_controller:
     right_gripper_joint: "gripper_r_joint1"
     left_gripper_joint: "gripper_l_joint1"
 
-    startup_ref_pos_threshold: 0.3
-    startup_ref_ori_threshold_deg: 120.0
+    startup_ref_pos_threshold: 1.0
+    startup_ref_ori_threshold_deg: 360.0
 
 leader_controller:
   ros__parameters:
@@ -106,7 +106,7 @@ leader_controller:
     joint_states_topic: "/joint_states" 
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"
-    reactivate_service: "/reactivate"
+    reactivate_service: "/arm/reactivate"
 
     command_timeout: 0.1
 

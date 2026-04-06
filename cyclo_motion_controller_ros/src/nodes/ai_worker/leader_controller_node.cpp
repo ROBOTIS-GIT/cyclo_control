@@ -45,7 +45,7 @@ LeaderController::LeaderController()
   left_traj_topic_ = this->declare_parameter(
             "left_traj_topic",
             std::string("/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"));
-  reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/reactivate"));
+  reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/arm/reactivate"));
   command_timeout_ = this->declare_parameter("command_timeout", 0.1);
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));

@@ -47,7 +47,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'reactivate_service',
-            default_value='/reactivate',
+            default_value='/arm/reactivate',
             description='Service used to reactivate the VR controller.',
         ),
         DeclareLaunchArgument(
@@ -57,12 +57,12 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'right_controlled_link',
-            default_value='end_effector_r_link',
+            default_value='arm_r_link7',
             description='Controlled link for the right interactive marker.',
         ),
         DeclareLaunchArgument(
             'left_controlled_link',
-            default_value='end_effector_l_link',
+            default_value='arm_l_link7',
             description='Controlled link for the left interactive marker.',
         ),
         DeclareLaunchArgument(

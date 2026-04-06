@@ -194,12 +194,10 @@ private:
         // Helper functions
   void initializeJointConfig();
   void publishTrajectory(const Eigen::VectorXd & q_desired);
-  trajectory_msgs::msg::JointTrajectory createTrajectoryMsgWithGripper(
+  trajectory_msgs::msg::JointTrajectory createArmTrajectoryMsg(
     const std::vector<std::string> & arm_joint_names,
     const Eigen::VectorXd & positions,
-    const std::vector<int> & arm_indices,
-    const std::string & gripper_joint_name,
-    const double gripper_position) const;
+    const std::vector<int> & arm_indices) const;
   trajectory_msgs::msg::JointTrajectory createLiftTrajectoryMsg(
     std::string lift_joint_name,
     const double position) const;

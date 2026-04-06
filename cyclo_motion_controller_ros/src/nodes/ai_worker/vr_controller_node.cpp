@@ -56,7 +56,7 @@ VRController::VRController()
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
-  reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/reactivate"));
+  reactivate_service_ = this->declare_parameter("reactivate_service", std::string("/arm/reactivate"));
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
   r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_elbow_pose"));
@@ -769,9 +769,8 @@ void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
       {
         gripper_pos = left_raw_gripper_position_;
       }
-      auto traj_left = createTrajectoryMsgWithGripper(
-                    left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_,
-          gripper_pos);
+      auto traj_left = createArmTrajectoryMsg(
+                    left_arm_joints_, q_desired, left_arm_indices);
       arm_l_pub_->publish(traj_left);
     }
 
@@ -783,9 +782,8 @@ void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
       {
         gripper_pos = right_raw_gripper_position_;
       }
-      auto traj_right = createTrajectoryMsgWithGripper(
-                    right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_,
-          gripper_pos);
+      auto traj_right = createArmTrajectoryMsg(
+                    right_arm_joints_, q_desired, right_arm_indices);
       arm_r_pub_->publish(traj_right);
     }
 
@@ -805,35 +803,22 @@ void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
   }
 }
 
-trajectory_msgs::msg::JointTrajectory VRController::createTrajectoryMsgWithGripper(
+trajectory_msgs::msg::JointTrajectory VRController::createArmTrajectoryMsg(
   const std::vector<std::string> & arm_joint_names,
   const Eigen::VectorXd & positions,
-  const std::vector<int> & arm_indices,
-  const std::string & gripper_joint_name,
-  const double gripper_position) const
+  const std::vector<int> & arm_indices) const
 {
   trajectory_msgs::msg::JointTrajectory traj_msg;
   traj_msg.header.frame_id = "";
-
-        // Add arm joint names
   traj_msg.joint_names = arm_joint_names;
-
-        // Always add gripper joint name (required by controllers)
-  traj_msg.joint_names.push_back(gripper_joint_name);
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
-
-        // Add arm joint positions
   for (int idx : arm_indices) {
     if (idx >= 0 && idx < static_cast<int>(positions.size())) {
       point.positions.push_back(positions[idx]);
     }
   }
-
-        // Add gripper joint position
-  point.positions.push_back(gripper_position);
-
   traj_msg.points.push_back(point);
   return traj_msg;
 }

@@ -462,15 +462,13 @@ void AIWorkerMoveLController::publishTrajectory(const Eigen::VectorXd & q_desire
   }
 
   if (!left_arm_indices.empty()) {
-    arm_l_pub_->publish(createTrajectoryMsgWithGripper(
-      left_arm_joints_, q_desired, left_arm_indices, left_gripper_joint_name_,
-        left_gripper_position_));
+    arm_l_pub_->publish(createArmTrajectoryMsg(
+      left_arm_joints_, q_desired, left_arm_indices));
   }
 
   if (!right_arm_indices.empty()) {
-    arm_r_pub_->publish(createTrajectoryMsgWithGripper(
-      right_arm_joints_, q_desired, right_arm_indices, right_gripper_joint_name_,
-        right_gripper_position_));
+    arm_r_pub_->publish(createArmTrajectoryMsg(
+      right_arm_joints_, q_desired, right_arm_indices));
   }
 
   if (lift_joint_index_ >= 0 && !lift_joint_.empty() && lift_vel_bound_ != 0.0 &&
@@ -480,17 +478,14 @@ void AIWorkerMoveLController::publishTrajectory(const Eigen::VectorXd & q_desire
   }
 }
 
-trajectory_msgs::msg::JointTrajectory AIWorkerMoveLController::createTrajectoryMsgWithGripper(
+trajectory_msgs::msg::JointTrajectory AIWorkerMoveLController::createArmTrajectoryMsg(
   const std::vector<std::string> & arm_joint_names,
   const Eigen::VectorXd & positions,
-  const std::vector<int> & arm_indices,
-  const std::string & gripper_joint_name,
-  double gripper_position) const
+  const std::vector<int> & arm_indices) const
 {
   trajectory_msgs::msg::JointTrajectory traj_msg;
   traj_msg.header.frame_id = "";
   traj_msg.joint_names = arm_joint_names;
-  traj_msg.joint_names.push_back(gripper_joint_name);
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
@@ -499,7 +494,6 @@ trajectory_msgs::msg::JointTrajectory AIWorkerMoveLController::createTrajectoryM
       point.positions.push_back(positions[idx]);
     }
   }
-  point.positions.push_back(gripper_position);
   traj_msg.points.push_back(point);
   return traj_msg;
 }
