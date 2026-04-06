@@ -96,8 +96,8 @@ vr_controller:
     right_gripper_joint: "gripper_r_joint1"
     left_gripper_joint: "gripper_l_joint1"
 
-    startup_ref_pos_threshold: 1.0
-    startup_ref_ori_threshold_deg: 360.0
+    startup_ref_pos_threshold: 0.3
+    startup_ref_ori_threshold_deg: 120.0
 
 leader_controller:
   ros__parameters:
