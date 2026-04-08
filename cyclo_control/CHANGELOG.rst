@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.3 (2026-04-09)
+------------------
+* Updated the `ai_worker_controller` launch file to run the hand retargeting node alongside the motion controller
+* Updated the reference checker node topic QoS to best effort
+* Contributors: Yeonguk Kim
+
 0.1.2 (2026-04-06)
 ------------------
 * Removed gripper joint from the trajectory messages
