@@ -150,7 +150,7 @@ You can switch AI Worker controllers via `controller_type`:
 - default launch runs `ai_worker_movel_controller_node`
 - `controller_type:=movel` runs `ai_worker_movel_controller_node`
 - `controller_type:=movej` runs `ai_worker_movej_controller_node`
-- `controller_type:=vr` runs `vr_controller_node` and `reference_checker_node`
+- `controller_type:=vr` runs `vr_controller_node` and `reference_checker_node`; when `hand:=true`, it also runs `retargeting_teleop`
 - `controller_type:=leader` runs `leader_controller_node` together with `vr_controller_node`
 
 Example launch commands:
@@ -165,6 +165,9 @@ ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controlle
 ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=vr
 ```
 ```bash
+ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=vr hand:=false
+```
+```bash
 ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=leader
 ```
 ```bash
@@ -177,6 +180,8 @@ When `controller_type:=movel` and `start_interactive_marker:=true`, `ai_worker_c
 - left marker uses `left_controlled_link` and publishes MoveL commands to `left_movel_topic`
 
 To disable collision checking only between the two grippers, set `disable_gripper_collisions:=true`. This helps maintain smooth handover-style motions when the grippers come into contact.
+
+In `vr` mode, the `hand` launch argument enables hand teleoperation through the retargeting algorithm. It defaults to `false`.
 
 Example `movel` commands:
 
