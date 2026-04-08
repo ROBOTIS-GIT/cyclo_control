@@ -146,8 +146,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'hand',
-            default_value='true',
-            description='Whether to run hand retargeting node. Default: true.',
+            default_value='false',
+            description='Whether to run hand retargeting node. Default: false.',
         ),
     ]
 
