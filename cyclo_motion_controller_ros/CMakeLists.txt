@@ -109,6 +109,10 @@ add_executable(movel_showcase_demo_node
   src/utils/movel_showcase_demo_node.cpp
 )
 
+add_executable(orientation_reference_demo_node
+  src/utils/orientation_reference_demo_node.cpp
+)
+
 # Add include directories to the target
 message(STATUS "CYCLO_MOTION_CONTROLLER_CORE_INCLUDE_DIR = ${CYCLO_MOTION_CONTROLLER_CORE_INCLUDE_DIR}")
 
@@ -423,6 +427,23 @@ target_link_libraries(movel_showcase_demo_node PRIVATE
   ${ament_index_cpp_TARGETS}
 )
 
+target_include_directories(orientation_reference_demo_node PRIVATE
+  ${robotis_interfaces_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+)
+target_link_libraries(orientation_reference_demo_node PRIVATE
+  ${robotis_interfaces_LIBRARIES}
+  ${rclcpp_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${tf2_ros_LIBRARIES}
+  ${robotis_interfaces_TARGETS}
+  ${rclcpp_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${tf2_ros_TARGETS}
+)
+
 target_link_libraries(vr_controller_node PRIVATE
   Eigen3::Eigen
   pinocchio::pinocchio
@@ -541,6 +562,10 @@ install(TARGETS leader_trajectory_sequence_node
 )
 
 install(TARGETS movel_showcase_demo_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS orientation_reference_demo_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

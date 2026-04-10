@@ -57,12 +57,12 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'right_controlled_link',
-            default_value='arm_r_link7',
+            default_value='end_effector_r_link',
             description='Controlled link for the right interactive marker.',
         ),
         DeclareLaunchArgument(
             'left_controlled_link',
-            default_value='arm_l_link7',
+            default_value='end_effector_l_link',
             description='Controlled link for the left interactive marker.',
         ),
         DeclareLaunchArgument(

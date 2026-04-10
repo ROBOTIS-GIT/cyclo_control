@@ -7,7 +7,7 @@ ai_worker_movel_controller:
     kp_position: 50.0
     kp_orientation: 50.0
 
-    weight_position: 10.0
+    weight_position: 500.0
     weight_orientation: 1.0
     weight_damping: 0.1
 
@@ -20,7 +20,7 @@ ai_worker_movel_controller:
     right_movel_topic: "/r_goal_move"
     left_movel_topic: "/l_goal_move"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
-    left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory_1"
+    left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
     lift_topic: "/leader/joystick_controller_right/joint_trajectory"
 
     lift_vel_bound: 0.0
