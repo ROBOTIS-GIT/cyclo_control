@@ -65,8 +65,8 @@ vr_controller:
     kp_position: 50.0
     kp_orientation: 50.0
 
-    weight_position: 10.0
-    weight_orientation: 1.0
+    weight_position: 500.0
+    weight_orientation: 100.0
     weight_elbow_position: 8.0
     weight_damping: 0.1
 
@@ -81,7 +81,7 @@ vr_controller:
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
     lift_topic: "/leader/joystick_controller_right/joint_trajectory"
 
-    lift_vel_bound: 0.0
+    lift_vel_bound: 0.0 #4.8
 
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"

@@ -110,7 +110,7 @@
     <child link="arm_base_link"/>
     <origin rpy="0 0 0" xyz="-0.0199 0 1.4316"/>
     <axis xyz="0 0 1"/>
-    <limit effort="1000" lower="-0.5" upper="0.0" velocity="4.8"/>
+    <limit effort="1000" lower="-0.5" upper="0.0" velocity="2.5"/>
     <dynamics damping="0.1"/>
   </joint>
   <!-- <joint name="lift_joint" type="fixed">

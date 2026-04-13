@@ -77,6 +77,10 @@ add_executable(leader_controller_node
   src/nodes/ai_worker/leader_controller_node.cpp
 )
 
+add_executable(wholebody_controller_node
+  src/nodes/ai_worker/wholebody_controller_node.cpp
+)
+
 add_executable(omx_movej_controller_node
   src/nodes/omx/omx_movej_controller_node.cpp
 )
@@ -113,6 +117,14 @@ add_executable(orientation_reference_demo_node
   src/utils/orientation_reference_demo_node.cpp
 )
 
+add_executable(vr_redundancy_reference_node
+  src/utils/vr_redundancy_reference_node.cpp
+)
+
+add_executable(wholebody_reference_node
+  src/utils/wholebody_reference_node.cpp
+)
+
 # Add include directories to the target
 message(STATUS "CYCLO_MOTION_CONTROLLER_CORE_INCLUDE_DIR = ${CYCLO_MOTION_CONTROLLER_CORE_INCLUDE_DIR}")
 
@@ -135,6 +147,12 @@ target_include_directories(ai_worker_movel_controller_node PRIVATE
 )
 
 target_include_directories(leader_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${CYCLO_MOTION_CONTROLLER_CORE_NAMESPACE_INCLUDE_DIR}
+)
+
+target_include_directories(wholebody_controller_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${CYCLO_MOTION_CONTROLLER_CORE_NAMESPACE_INCLUDE_DIR}
@@ -377,6 +395,28 @@ target_include_directories(reference_checker_node PRIVATE
   ${std_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
 )
+target_include_directories(vr_redundancy_reference_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${CYCLO_MOTION_CONTROLLER_CORE_NAMESPACE_INCLUDE_DIR}
+)
+target_include_directories(wholebody_reference_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+)
+target_include_directories(wholebody_controller_node PRIVATE
+  ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${std_srvs_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${trajectory_msgs_INCLUDE_DIRS}
+)
 target_link_libraries(reference_checker_node PRIVATE
   ${rclcpp_LIBRARIES}
   ${std_msgs_LIBRARIES}
@@ -384,6 +424,38 @@ target_link_libraries(reference_checker_node PRIVATE
   ${rclcpp_TARGETS}
   ${std_msgs_TARGETS}
   ${geometry_msgs_TARGETS}
+)
+target_link_libraries(vr_redundancy_reference_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${tf2_ros_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${tf2_ros_TARGETS}
+)
+target_link_libraries(wholebody_reference_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${tf2_ros_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${tf2_ros_TARGETS}
+)
+target_link_libraries(wholebody_controller_node PRIVATE
+  ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
+  ${std_srvs_LIBRARIES}
+  ${geometry_msgs_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
+  ${trajectory_msgs_LIBRARIES}
+  ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${trajectory_msgs_TARGETS}
 )
 
 target_include_directories(leader_trajectory_sequence_node PRIVATE
@@ -492,28 +564,46 @@ target_link_libraries(omy_movel_controller_node PRIVATE
   OsqpEigen::OsqpEigen
 )
 
+target_link_libraries(vr_redundancy_reference_node PRIVATE
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+target_link_libraries(wholebody_controller_node PRIVATE
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  OsqpEigen::OsqpEigen
+)
+target_link_libraries(wholebody_reference_node PRIVATE
+  Eigen3::Eigen
+)
+
 # Link cyclo_motion_controller_core
 if(cyclo_motion_controller_core_FOUND)
   target_link_libraries(vr_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(ai_worker_movej_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(ai_worker_movel_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(leader_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
+  target_link_libraries(wholebody_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(omx_movej_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(omx_movel_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(omy_movej_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(omy_movel_controller_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
   target_link_libraries(movel_showcase_demo_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
+  target_link_libraries(vr_redundancy_reference_node PRIVATE cyclo_motion_controller_core::cyclo_motion_controller_core)
 else()
   # Link with full path for fallback
   target_link_libraries(vr_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(ai_worker_movej_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(ai_worker_movel_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(leader_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(wholebody_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omx_movej_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omx_movel_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omy_movej_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(omy_movel_controller_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
   target_link_libraries(movel_showcase_demo_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
+  target_link_libraries(vr_redundancy_reference_node PRIVATE ${CYCLO_MOTION_CONTROLLER_CORE_LIB})
 endif()
 
 # Install executable
@@ -530,6 +620,10 @@ install(TARGETS ai_worker_movel_controller_node
 )
 
 install(TARGETS leader_controller_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS wholebody_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -566,6 +660,14 @@ install(TARGETS movel_showcase_demo_node
 )
 
 install(TARGETS orientation_reference_demo_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS vr_redundancy_reference_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS wholebody_reference_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
