@@ -7,8 +7,8 @@ ai_worker_movel_controller:
     kp_position: 50.0
     kp_orientation: 50.0
 
-    weight_position: 500.0
-    weight_orientation: 1.0
+    weight_position: 5000.0
+    weight_orientation: 10.0
     weight_damping: 0.1
 
     collision_buffer: 0.05

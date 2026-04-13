@@ -61,6 +61,7 @@ private:
   double cbf_alpha_;
   double collision_buffer_;
   double collision_safe_distance_;
+  double goal_ref_timeout_;
   std::string joint_states_topic_;
   std::string right_movel_topic_;
   std::string left_movel_topic_;
@@ -116,6 +117,8 @@ private:
 
   rclcpp::Time right_motion_start_time_;
   rclcpp::Time left_motion_start_time_;
+  rclcpp::Time last_right_goal_time_;
+  rclcpp::Time last_left_goal_time_;
   double right_active_motion_duration_;
   double left_active_motion_duration_;
 

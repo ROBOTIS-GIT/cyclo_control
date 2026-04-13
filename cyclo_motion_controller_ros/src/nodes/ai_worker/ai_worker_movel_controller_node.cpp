@@ -30,6 +30,8 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   left_movel_trajectory_active_(false),
   right_motion_start_time_(this->now()),
   left_motion_start_time_(this->now()),
+  last_right_goal_time_(this->now()),
+  last_left_goal_time_(this->now()),
   right_active_motion_duration_(0.0),
   left_active_motion_duration_(0.0),
   right_gripper_position_(0.0),
@@ -52,6 +54,7 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  goal_ref_timeout_ = this->declare_parameter("goal_ref_timeout", 0.2);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
@@ -255,6 +258,7 @@ void AIWorkerMoveLController::rightMoveLCallback(
   right_movel_goal_pose_ = poseMsgToEigen(msg->pose);
   right_active_motion_duration_ = commandDurationSeconds(msg->time_from_start);
   right_motion_start_time_ = this->now();
+  last_right_goal_time_ = right_motion_start_time_;
   right_movel_target_initialized_ = true;
   right_movel_trajectory_active_ = right_active_motion_duration_ > 1e-6;
 }
@@ -270,6 +274,7 @@ void AIWorkerMoveLController::leftMoveLCallback(const robotis_interfaces::msg::M
   left_movel_goal_pose_ = poseMsgToEigen(msg->pose);
   left_active_motion_duration_ = commandDurationSeconds(msg->time_from_start);
   left_motion_start_time_ = this->now();
+  last_left_goal_time_ = left_motion_start_time_;
   left_movel_target_initialized_ = true;
   left_movel_trajectory_active_ = left_active_motion_duration_ > 1e-6;
 }
@@ -331,15 +336,29 @@ void AIWorkerMoveLController::controlLoopCallback()
       return;
     }
 
-    const double right_elapsed = (this->now() - right_motion_start_time_).seconds();
-    const double left_elapsed = (this->now() - left_motion_start_time_).seconds();
+    const rclcpp::Time now = this->now();
+    const bool right_goal_active =
+      (now - last_right_goal_time_).seconds() < goal_ref_timeout_;
+    const bool left_goal_active =
+      (now - last_left_goal_time_).seconds() < goal_ref_timeout_;
+    if (!right_goal_active && !left_goal_active) {
+      right_movel_trajectory_active_ = false;
+      left_movel_trajectory_active_ = false;
+      q_desired_ = q_;
+      return;
+    }
+
+    const double right_elapsed = (now - right_motion_start_time_).seconds();
+    const double left_elapsed = (now - left_motion_start_time_).seconds();
 
     cyclo_motion_controller::common::Vector6d right_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
     cyclo_motion_controller::common::Vector6d left_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
 
-    if (right_movel_trajectory_active_ && right_elapsed < right_active_motion_duration_) {
+    if (!right_goal_active) {
+      right_desired_vel.setZero();
+    } else if (right_movel_trajectory_active_ && right_elapsed < right_active_motion_duration_) {
       const Eigen::Vector3d linear_ref =
         cyclo_motion_controller::common::math_utils::cubicDotVector<3>(
         right_elapsed, 0.0, right_active_motion_duration_,
@@ -372,7 +391,9 @@ void AIWorkerMoveLController::controlLoopCallback()
       right_desired_vel = computeDesiredVelocity(right_gripper_pose_, right_movel_goal_pose_);
     }
 
-    if (left_movel_trajectory_active_ && left_elapsed < left_active_motion_duration_) {
+    if (!left_goal_active) {
+      left_desired_vel.setZero();
+    } else if (left_movel_trajectory_active_ && left_elapsed < left_active_motion_duration_) {
       const Eigen::Vector3d linear_ref =
         cyclo_motion_controller::common::math_utils::cubicDotVector<3>(
         left_elapsed, 0.0, left_active_motion_duration_,

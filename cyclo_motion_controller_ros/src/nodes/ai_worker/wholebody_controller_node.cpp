@@ -392,6 +392,14 @@ private:
         !arm_base_ref_moving_recently &&
         (right_elbow_active || left_elbow_active);
 
+      if (!right_goal_active && !left_goal_active && !right_elbow_active &&
+        !left_elbow_active && !arm_base_active)
+      {
+        lift_transition_active_ = false;
+        q_desired_ = q_;
+        return;
+      }
+
       updateLiftVelocityBound(fixed_base_phase_active ? lift_vel_bound_fixed_base_ : lift_vel_bound_);
 
       Eigen::VectorXd q_feedback = (q_desired_.size() == q_.size()) ? q_desired_ : q_;

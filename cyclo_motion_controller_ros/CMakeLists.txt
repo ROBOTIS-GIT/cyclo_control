@@ -405,6 +405,7 @@ target_include_directories(vr_redundancy_reference_node PRIVATE
 )
 target_include_directories(wholebody_reference_node PRIVATE
   ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${tf2_ros_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
@@ -437,9 +438,11 @@ target_link_libraries(vr_redundancy_reference_node PRIVATE
 )
 target_link_libraries(wholebody_reference_node PRIVATE
   ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
   ${geometry_msgs_LIBRARIES}
   ${tf2_ros_LIBRARIES}
   ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
   ${geometry_msgs_TARGETS}
   ${tf2_ros_TARGETS}
 )
@@ -502,16 +505,19 @@ target_link_libraries(movel_showcase_demo_node PRIVATE
 target_include_directories(orientation_reference_demo_node PRIVATE
   ${robotis_interfaces_INCLUDE_DIRS}
   ${rclcpp_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${tf2_ros_INCLUDE_DIRS}
 )
 target_link_libraries(orientation_reference_demo_node PRIVATE
   ${robotis_interfaces_LIBRARIES}
   ${rclcpp_LIBRARIES}
+  ${std_msgs_LIBRARIES}
   ${geometry_msgs_LIBRARIES}
   ${tf2_ros_LIBRARIES}
   ${robotis_interfaces_TARGETS}
   ${rclcpp_TARGETS}
+  ${std_msgs_TARGETS}
   ${geometry_msgs_TARGETS}
   ${tf2_ros_TARGETS}
 )
