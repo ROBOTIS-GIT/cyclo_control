@@ -44,9 +44,9 @@ public:
     kp_position_ = this->declare_parameter("kp_position", 50.0);
     kp_orientation_ = this->declare_parameter("kp_orientation", 50.0);
     weight_position_ = this->declare_parameter("weight_position", 1000.0);
-    weight_orientation_ = this->declare_parameter("weight_orientation", 100.0);
-    weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 80.0);
-    weight_arm_base_position_ = this->declare_parameter("weight_arm_base_position", 50.0);
+    weight_orientation_ = this->declare_parameter("weight_orientation", 10.0);
+    weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 5.0);
+    weight_arm_base_position_ = this->declare_parameter("weight_arm_base_position", 5.0);
     weight_damping_ = this->declare_parameter("weight_damping", 0.1);
     slack_penalty_ = this->declare_parameter("slack_penalty", 1000.0);
     cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
@@ -107,9 +107,9 @@ public:
     l_gripper_pose_topic_ = this->declare_parameter(
       "l_gripper_pose_topic", std::string("/l_gripper_pose"));
     r_gripper_name_ = this->declare_parameter(
-      "r_gripper_name", std::string("arm_r_link7"));
+      "r_gripper_name", std::string("end_effector_r_link"));
     l_gripper_name_ = this->declare_parameter(
-      "l_gripper_name", std::string("arm_l_link7"));
+      "l_gripper_name", std::string("end_effector_l_link"));
     r_elbow_name_ = this->declare_parameter("r_elbow_name", std::string("arm_r_link4"));
     l_elbow_name_ = this->declare_parameter("l_elbow_name", std::string("arm_l_link4"));
     arm_base_name_ = this->declare_parameter("arm_base_name", std::string("arm_base_link"));

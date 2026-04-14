@@ -109,7 +109,7 @@ public:
     arm_base_cycle_duration_ = this->declare_parameter("arm_base_cycle_duration", 2.5);
     arm_base_phase_cycles_ = this->declare_parameter("arm_base_phase_cycles", 2);
     arm_base_entry_duration_ = this->declare_parameter("arm_base_entry_duration", 1.0);
-    elbow_arc_angle_deg_ = this->declare_parameter("elbow_arc_angle_deg", 40.0);
+    elbow_arc_angle_deg_ = this->declare_parameter("elbow_arc_angle_deg", 30.0);
     minimum_elbow_radius_ = this->declare_parameter("minimum_elbow_radius", 0.0);
     transition_move_duration_ = this->declare_parameter("transition_move_duration", 2.0);
     arm_base_transition_duration_ = this->declare_parameter("arm_base_transition_duration", 2.0);
@@ -117,7 +117,7 @@ public:
       this->declare_parameter("cycle2_transition_outward_y_offset", 0.08);
     gripper_position_tolerance_ = this->declare_parameter("gripper_position_tolerance", 0.02);
     gripper_orientation_tolerance_deg_ =
-      this->declare_parameter("gripper_orientation_tolerance_deg", 10.0);
+      this->declare_parameter("gripper_orientation_tolerance_deg", 30.0);
     right_elbow_start_y_offset_ = this->declare_parameter("right_elbow_start_y_offset", 0.15);
     left_elbow_start_y_offset_ = this->declare_parameter("left_elbow_start_y_offset", -0.15);
     arm_base_upper_z_offset_ = this->declare_parameter("arm_base_upper_z_offset", 0.0);
@@ -136,9 +136,9 @@ public:
       "arm_base_goal_pose_topic", std::string("/arm_base_goal_pose"));
 
     right_gripper_frame_ = this->declare_parameter(
-      "right_gripper_frame", std::string("arm_r_link7"));
+      "right_gripper_frame", std::string("end_effector_r_link"));
     left_gripper_frame_ = this->declare_parameter(
-      "left_gripper_frame", std::string("arm_l_link7"));
+      "left_gripper_frame", std::string("end_effector_l_link"));
     right_shoulder_frame_ = this->declare_parameter(
       "right_shoulder_frame", std::string("arm_r_link1"));
     left_shoulder_frame_ = this->declare_parameter(
@@ -152,25 +152,25 @@ public:
     cycle1_r_goal_pose_ = declarePoseParameter(
       "cycle1_right_target_pose",
       makePose(
-        Eigen::Vector3d(0.25, -0.18, 1.0),
+        Eigen::Vector3d(0.5, -0.22, 1.0),
         Eigen::Quaterniond(0.707, 0.0, -0.707, 0.0)));
     cycle1_l_goal_pose_ = declarePoseParameter(
       "cycle1_left_target_pose",
       makePose(
-        Eigen::Vector3d(0.25, 0.18, 1.0),
+        Eigen::Vector3d(0.5, 0.22, 1.0),
         Eigen::Quaterniond(0.707, 0.0, -0.707, 0.0)));
     cycle2_r_goal_pose_ = declarePoseParameter(
       "cycle2_right_target_pose",
-      makePose(Eigen::Vector3d(0.25, -0.18, 1.0), Eigen::Quaterniond(0.5, 0.5, -0.5, 0.5)));
+      makePose(Eigen::Vector3d(0.4, 0.0, 0.85), Eigen::Quaterniond(0.5, 0.5, -0.5, 0.5)));
     cycle2_l_goal_pose_ = declarePoseParameter(
       "cycle2_left_target_pose",
-      makePose(Eigen::Vector3d(0.25, 0.18, 1.1), Eigen::Quaterniond(0.5, -0.5, -0.5, -0.5)));
+      makePose(Eigen::Vector3d(0.4, 0.0, 1.0), Eigen::Quaterniond(0.5, -0.5, -0.5, -0.5)));
     cycle3_r_goal_pose_ = declarePoseParameter(
       "cycle3_right_target_pose",
-      makePose(Eigen::Vector3d(0.3, -0.18, 0.85), Eigen::Quaterniond::Identity()));
+      makePose(Eigen::Vector3d(0.3, -0.18, 0.7), Eigen::Quaterniond::Identity()));
     cycle3_l_goal_pose_ = declarePoseParameter(
       "cycle3_left_target_pose",
-      makePose(Eigen::Vector3d(0.3, 0.18, 0.85), Eigen::Quaterniond::Identity()));
+      makePose(Eigen::Vector3d(0.3, 0.18, 0.7), Eigen::Quaterniond::Identity()));
 
     r_goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(r_goal_pose_topic_, 10);
     l_goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(l_goal_pose_topic_, 10);
