@@ -44,9 +44,9 @@ public:
     kp_position_ = this->declare_parameter("kp_position", 50.0);
     kp_orientation_ = this->declare_parameter("kp_orientation", 50.0);
     weight_position_ = this->declare_parameter("weight_position", 1000.0);
-    weight_orientation_ = this->declare_parameter("weight_orientation", 10.0);
-    weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 5.0);
-    weight_arm_base_position_ = this->declare_parameter("weight_arm_base_position", 5.0);
+    weight_orientation_ = this->declare_parameter("weight_orientation", 100.0);
+    weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 80.0);
+    weight_arm_base_position_ = this->declare_parameter("weight_arm_base_position", 100.0);
     weight_damping_ = this->declare_parameter("weight_damping", 0.1);
     slack_penalty_ = this->declare_parameter("slack_penalty", 1000.0);
     cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
@@ -174,6 +174,13 @@ public:
       qp_controller_ =
         std::make_shared<cyclo_motion_controller::controllers::VRController>(kinematics_solver_, dt_);
       qp_controller_->setControllerParams(
+        slack_penalty_, cbf_alpha_, collision_buffer_, collision_safe_distance_);
+      fixed_base_kinematics_solver_ =
+        std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(urdf_path_, srdf_path_);
+      fixed_base_qp_controller_ =
+        std::make_shared<cyclo_motion_controller::controllers::VRController>(
+        fixed_base_kinematics_solver_, dt_);
+      fixed_base_qp_controller_->setControllerParams(
         slack_penalty_, cbf_alpha_, collision_buffer_, collision_safe_distance_);
       const int dof = kinematics_solver_->getDof();
       q_.setZero(dof);
@@ -390,6 +397,10 @@ private:
       const bool fixed_base_phase_active =
         arm_base_active &&
         !arm_base_ref_moving_recently &&
+        !goal_ref_moving_recently &&
+        (right_elbow_active || left_elbow_active);
+      const bool hard_pose_constraint_active =
+        !goal_ref_moving_recently &&
         (right_elbow_active || left_elbow_active);
 
       if (!right_goal_active && !left_goal_active && !right_elbow_active &&
@@ -405,13 +416,18 @@ private:
       Eigen::VectorXd q_feedback = (q_desired_.size() == q_.size()) ? q_desired_ : q_;
       blendLiftStateForGoalTransition(
         q_feedback, now, fixed_base_phase_active && goal_ref_moving_recently);
-      kinematics_solver_->updateState(q_feedback, qdot_);
+      const auto & active_solver =
+        hard_pose_constraint_active ? fixed_base_kinematics_solver_ : kinematics_solver_;
+      const auto & active_controller =
+        hard_pose_constraint_active ? fixed_base_qp_controller_ : qp_controller_;
+      const Eigen::VectorXd & solver_state = hard_pose_constraint_active ? q_ : q_feedback;
+      active_solver->updateState(solver_state, qdot_);
 
-      const Eigen::Affine3d right_gripper_pose = kinematics_solver_->getPose(r_gripper_name_);
-      const Eigen::Affine3d left_gripper_pose = kinematics_solver_->getPose(l_gripper_name_);
-      const Eigen::Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
-      const Eigen::Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
-      const Eigen::Affine3d arm_base_pose = kinematics_solver_->getPose(arm_base_name_);
+      const Eigen::Affine3d right_gripper_pose = active_solver->getPose(r_gripper_name_);
+      const Eigen::Affine3d left_gripper_pose = active_solver->getPose(l_gripper_name_);
+      const Eigen::Affine3d right_elbow_pose = active_solver->getPose(r_elbow_name_);
+      const Eigen::Affine3d left_elbow_pose = active_solver->getPose(l_elbow_name_);
+      const Eigen::Affine3d arm_base_pose = active_solver->getPose(arm_base_name_);
 
       if (!right_goal_active) {
         r_goal_pose_ = right_gripper_pose;
@@ -421,10 +437,15 @@ private:
       }
 
       std::map<std::string, cyclo_motion_controller::common::Vector6d> desired_task_velocities;
+      std::map<std::string, cyclo_motion_controller::common::Vector6d> hard_constraint_task_velocities;
       desired_task_velocities[r_gripper_name_] =
         computeDesiredVelocity(right_gripper_pose, r_goal_pose_);
       desired_task_velocities[l_gripper_name_] =
         computeDesiredVelocity(left_gripper_pose, l_goal_pose_);
+      if (hard_pose_constraint_active) {
+        hard_constraint_task_velocities[r_gripper_name_] = desired_task_velocities[r_gripper_name_];
+        hard_constraint_task_velocities[l_gripper_name_] = desired_task_velocities[l_gripper_name_];
+      }
 
       if (right_elbow_active) {
         cyclo_motion_controller::common::Vector6d right_elbow_desired_vel =
@@ -480,16 +501,17 @@ private:
       }
 
       Eigen::VectorXd damping =
-        Eigen::VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
-      qp_controller_->setWeight(weights, damping);
-      qp_controller_->setDesiredTaskVel(desired_task_velocities);
+        Eigen::VectorXd::Ones(active_solver->getDof()) * weight_damping_;
+      active_controller->setWeight(weights, damping);
+      active_controller->setDesiredTaskVel(desired_task_velocities);
+      active_controller->setHardConstraintTaskVel(hard_constraint_task_velocities);
 
       Eigen::VectorXd optimal_velocities;
-      if (!qp_controller_->getOptJointVel(optimal_velocities)) {
+      if (!active_controller->getOptJointVel(optimal_velocities)) {
         return;
       }
 
-      q_desired_ = q_feedback + optimal_velocities * dt_;
+      q_desired_ = solver_state + optimal_velocities * dt_;
       Eigen::VectorXd q_command = q_desired_;
       applyLiftCommandBlend(
         q_command, now, fixed_base_phase_active && goal_ref_moving_recently);
@@ -512,6 +534,10 @@ private:
 
     (void)kinematics_solver_->setJointVelocityBoundsByIndex(
       lift_joint_index_, -clamped_bound, clamped_bound);
+    if (fixed_base_kinematics_solver_) {
+      (void)fixed_base_kinematics_solver_->setJointVelocityBoundsByIndex(
+        lift_joint_index_, -clamped_bound, clamped_bound);
+    }
     current_lift_vel_bound_ = clamped_bound;
   }
 
@@ -808,7 +834,10 @@ private:
   rclcpp::TimerBase::SharedPtr control_timer_;
 
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> kinematics_solver_;
+  std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
+    fixed_base_kinematics_solver_;
   std::shared_ptr<cyclo_motion_controller::controllers::VRController> qp_controller_;
+  std::shared_ptr<cyclo_motion_controller::controllers::VRController> fixed_base_qp_controller_;
 
   Eigen::VectorXd q_;
   Eigen::VectorXd qdot_;

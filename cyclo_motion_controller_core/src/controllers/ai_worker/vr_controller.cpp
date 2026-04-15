@@ -50,7 +50,7 @@ VRController::VRController(
     si_index_.con_q_max_size +
     si_index_.con_sing_size +
     si_index_.con_sel_col_size;
-  const int neq = 0;
+  const int neq = kTaskSpaceDim * kMaxHardConstraintLinks;
 
   QPBase::setQPsize(nx, nbound, nineq, neq);
 
@@ -71,6 +71,12 @@ void VRController::setDesiredTaskVel(
   const std::map<std::string, cyclo_motion_controller::common::Vector6d> & link_xdot_desired)
 {
   link_xdot_desired_ = link_xdot_desired;
+}
+
+void VRController::setHardConstraintTaskVel(
+  const std::map<std::string, cyclo_motion_controller::common::Vector6d> & link_xdot_hard_constraint)
+{
+  link_xdot_hard_constraint_ = link_xdot_hard_constraint;
 }
 
 bool VRController::getOptJointVel(Eigen::VectorXd & opt_qdot)
@@ -109,6 +115,9 @@ void VRController::setCost()
   q_ds_.setZero(nx_);
 
   for (const auto & [link_name, xdot_desired] : link_xdot_desired_) {
+    if (link_xdot_hard_constraint_.find(link_name) != link_xdot_hard_constraint_.end()) {
+      continue;
+    }
     Eigen::MatrixXd J_i = robot_data_->getJacobian(link_name);
     cyclo_motion_controller::common::Vector6d w_tracking =
       cyclo_motion_controller::common::Vector6d::Ones();
@@ -213,6 +222,18 @@ void VRController::setEqConstraint()
 {
   A_eq_ds_.setZero(neqc_, nx_);
   b_eq_ds_.setZero(neqc_);
+
+  int row_offset = 0;
+  for (const auto & [link_name, xdot_desired] : link_xdot_hard_constraint_) {
+    if (row_offset + kTaskSpaceDim > neqc_) {
+      break;
+    }
+
+    const Eigen::MatrixXd J_i = robot_data_->getJacobian(link_name);
+    A_eq_ds_.block(row_offset, si_index_.qdot_start, kTaskSpaceDim, si_index_.qdot_size) = J_i;
+    b_eq_ds_.segment(row_offset, kTaskSpaceDim) = xdot_desired;
+    row_offset += kTaskSpaceDim;
+  }
 }
 
 }  // namespace controllers

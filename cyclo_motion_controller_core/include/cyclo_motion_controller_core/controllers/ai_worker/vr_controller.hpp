@@ -42,6 +42,8 @@ public:
     const Eigen::VectorXd w_damping);
   void setDesiredTaskVel(
     const std::map<std::string, cyclo_motion_controller::common::Vector6d> & link_xdot_desired);
+  void setHardConstraintTaskVel(
+    const std::map<std::string, cyclo_motion_controller::common::Vector6d> & link_xdot_hard_constraint);
   void setControllerParams(
     const double slack_penalty, const double cbf_alpha,
     const double buffer_distance, const double safe_distance);
@@ -76,8 +78,11 @@ private:
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> robot_data_;
   double dt_;
   int joint_dof_;
+  static constexpr int kTaskSpaceDim = 6;
+  static constexpr int kMaxHardConstraintLinks = 2;
 
   std::map<std::string, cyclo_motion_controller::common::Vector6d> link_xdot_desired_;
+  std::map<std::string, cyclo_motion_controller::common::Vector6d> link_xdot_hard_constraint_;
   std::map<std::string, cyclo_motion_controller::common::Vector6d> link_w_tracking_;
   Eigen::VectorXd w_damping_;
   double slack_penalty_;
