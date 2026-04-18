@@ -2,6 +2,11 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.4 (2026-04-20)
+------------------
+* Update acknowledgements to include dyros_robot_controller
+* Contributors: Yeonguk Kim
+
 0.1.3 (2026-04-09)
 ------------------
 * Updated the `ai_worker_controller` launch file to run the hand retargeting node alongside the motion controller
