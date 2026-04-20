@@ -2,6 +2,11 @@
 Changelog for package cyclo_motion_controller_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.4 (2026-04-20)
+------------------
+* Update copyright notice for dyros_robot_controller
+* Contributors: Yeonguk Kim
+
 0.1.3 (2026-04-09)
 ------------------
 * None
