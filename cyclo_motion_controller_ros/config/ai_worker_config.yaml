@@ -85,8 +85,8 @@ vr_controller:
 
     r_goal_pose_topic: "/r_goal_pose"
     l_goal_pose_topic: "/l_goal_pose"
-    r_elbow_pose_topic: "/r_elbow_pose"
-    l_elbow_pose_topic: "/l_elbow_pose"
+    r_elbow_pose_topic: "/r_subgoal_pose"
+    l_elbow_pose_topic: "/l_subgoal_pose"
     r_gripper_pose_topic: "/r_gripper_pose"
     l_gripper_pose_topic: "/l_gripper_pose"
     r_gripper_name: "arm_r_link7"

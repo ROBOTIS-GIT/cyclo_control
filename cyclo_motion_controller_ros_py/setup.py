@@ -30,6 +30,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'arm_retargeting_teleop = scripts.arm_retargeting:main',
             'retargeting_teleop = scripts.teleop_retargeting:main',
         ],
     },
