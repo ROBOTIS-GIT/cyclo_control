@@ -29,7 +29,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from retargeting.robot_wrapper import RobotWrapper
-from sensor_msgs.msg import JointState
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 
 QOS_BEST_EFFORT = QoSProfile(
@@ -40,9 +42,8 @@ QOS_BEST_EFFORT = QoSProfile(
 
 @dataclass(frozen=True)
 class RobotArmGeometry:
-    """Robot shoulder anchor and limb lengths for one arm."""
+    """Robot limb lengths for one arm."""
 
-    shoulder_pos: np.ndarray
     upper_arm_length: float
     forearm_length: float
 
@@ -80,7 +81,7 @@ class ArmRetargetingTeleop(Node):
 
         self.right_shoulder_link = self.declare_parameter(
             'right_shoulder_link',
-            'arm_r_link1',
+            'arm_r_link2',
         ).value
         self.right_elbow_link = self.declare_parameter(
             'right_elbow_link',
@@ -92,7 +93,7 @@ class ArmRetargetingTeleop(Node):
         ).value
         self.left_shoulder_link = self.declare_parameter(
             'left_shoulder_link',
-            'arm_l_link1',
+            'arm_l_link2',
         ).value
         self.left_elbow_link = self.declare_parameter(
             'left_elbow_link',
@@ -105,10 +106,12 @@ class ArmRetargetingTeleop(Node):
 
         self.right_pose_state = ArmPoseState()
         self.left_pose_state = ArmPoseState()
-        self.target_z_offset_m = -0.3
-        self.lift_joint_name = 'lift_joint'
-        self.lift_joint_current_position = 0.0
-        self.lift_reference_position_for_pose = None
+        self.base_frame = self.declare_parameter(
+            'base_frame',
+            'base_link',
+        ).value
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         robot = RobotWrapper(urdf_path)
         self.right_geometry = self._compute_robot_geometry(
@@ -222,12 +225,6 @@ class ArmRetargetingTeleop(Node):
             self._left_wrist_callback,
             QOS_BEST_EFFORT,
         )
-        self.joint_states_subscriber_ = self.create_subscription(
-            JointState,
-            '/joint_states',
-            self._joint_states_callback,
-            QOS_BEST_EFFORT,
-        )
 
         self.get_logger().info('Arm Retargeting Teleop Node Started')
 
@@ -255,24 +252,12 @@ class ArmRetargetingTeleop(Node):
         self._update_pose_state(self.left_pose_state, wrist_msg=msg)
         self.run_teleop_left()
 
-    def _joint_states_callback(self, msg: JointState) -> None:
-        """Track lift joint motion for arm-goal Z compensation."""
-        if self.lift_joint_name not in msg.name:
-            return
-
-        lift_joint_index = msg.name.index(self.lift_joint_name)
-        if lift_joint_index >= len(msg.position):
-            return
-
-        self.lift_joint_current_position = float(msg.position[lift_joint_index])
-        if self.lift_reference_position_for_pose is None:
-            self.lift_reference_position_for_pose = self.lift_joint_current_position
-
     def run_teleop_right(self) -> None:
         """Retarget the right arm poses and publish elbow/wrist goals."""
         retargeted_targets = self._retarget_pose_state(
             pose_state=self.right_pose_state,
             geometry=self.right_geometry,
+            shoulder_link=self.right_shoulder_link,
         )
         if retargeted_targets is None:
             return
@@ -285,6 +270,7 @@ class ArmRetargetingTeleop(Node):
         retargeted_targets = self._retarget_pose_state(
             pose_state=self.left_pose_state,
             geometry=self.left_geometry,
+            shoulder_link=self.left_shoulder_link,
         )
         if retargeted_targets is None:
             return
@@ -311,6 +297,7 @@ class ArmRetargetingTeleop(Node):
         self,
         pose_state: ArmPoseState,
         geometry: RobotArmGeometry,
+        shoulder_link: str,
     ) -> Optional[tuple[PoseStamped, PoseStamped]]:
         """Retarget one arm pose state into elbow and wrist goals."""
         shoulder_msg = pose_state.shoulder
@@ -337,19 +324,13 @@ class ArmRetargetingTeleop(Node):
         )
         if upper_arm_direction is None or forearm_direction is None:
             return
+        shoulder_anchor = self._lookup_link_position(shoulder_link)
+        if shoulder_anchor is None:
+            return
 
-        offset = np.array(
-            [
-                0.0,
-                0.0,
-                self.target_z_offset_m + self.get_lift_z_delta_for_arm_pose(),
-            ],
-            dtype=np.float64,
-        )
         elbow_target = (
-            geometry.shoulder_pos
+            shoulder_anchor
             + geometry.upper_arm_length * upper_arm_direction
-            + offset
         )
         wrist_target = (
             elbow_target
@@ -397,14 +378,6 @@ class ArmRetargetingTeleop(Node):
         subgoal_publisher.publish(elbow_goal)
         goal_publisher.publish(wrist_goal)
 
-    def get_lift_z_delta_for_arm_pose(self) -> float:
-        """Return Z offset applied to arm goals from lift motion."""
-        if self.lift_reference_position_for_pose is None:
-            return 0.0
-        return (
-            self.lift_joint_current_position - self.lift_reference_position_for_pose
-        )
-
     def _compute_robot_geometry(
         self,
         robot: RobotWrapper,
@@ -412,7 +385,7 @@ class ArmRetargetingTeleop(Node):
         elbow_link: str,
         wrist_link: str,
     ) -> RobotArmGeometry:
-        """Compute robot arm anchor and limb lengths."""
+        """Compute robot arm limb lengths."""
         shoulder_idx = robot.get_link_index(shoulder_link)
         elbow_idx = robot.get_link_index(elbow_link)
         wrist_idx = robot.get_link_index(wrist_link)
@@ -424,9 +397,31 @@ class ArmRetargetingTeleop(Node):
         wrist_pos = robot.get_link_pose(wrist_idx)[:3, 3].astype(np.float64)
 
         return RobotArmGeometry(
-            shoulder_pos=shoulder_pos,
             upper_arm_length=float(np.linalg.norm(elbow_pos - shoulder_pos)),
             forearm_length=float(np.linalg.norm(wrist_pos - elbow_pos)),
+        )
+
+    def _lookup_link_position(self, link_name: str) -> Optional[np.ndarray]:
+        """Return the current link position in the base frame using TF."""
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.base_frame,
+                link_name,
+                rclpy.time.Time(),
+            )
+        except TransformException as exc:
+            self.get_logger().warn(
+                f'Failed to lookup transform from {self.base_frame} to {link_name}: {exc}'
+            )
+            return None
+
+        return np.array(
+            [
+                transform.transform.translation.x,
+                transform.transform.translation.y,
+                transform.transform.translation.z,
+            ],
+            dtype=np.float64,
         )
 
     @staticmethod
