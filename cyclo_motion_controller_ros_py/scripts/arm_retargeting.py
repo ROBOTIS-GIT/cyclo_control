@@ -29,6 +29,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from retargeting.robot_wrapper import RobotWrapper
+from sensor_msgs.msg import JointState
 
 
 QOS_BEST_EFFORT = QoSProfile(
@@ -105,6 +106,9 @@ class ArmRetargetingTeleop(Node):
         self.right_pose_state = ArmPoseState()
         self.left_pose_state = ArmPoseState()
         self.target_z_offset_m = -0.3
+        self.lift_joint_name = 'lift_joint'
+        self.lift_joint_current_position = 0.0
+        self.lift_reference_position_for_pose = None
 
         robot = RobotWrapper(urdf_path)
         self.right_geometry = self._compute_robot_geometry(
@@ -144,7 +148,6 @@ class ArmRetargetingTeleop(Node):
             'l_wrist_pose_topic',
             '/l_wrist_pose',
         ).value
-
         r_goal_pose_topic = self.declare_parameter(
             'r_goal_pose_topic',
             '/r_goal_pose',
@@ -219,6 +222,12 @@ class ArmRetargetingTeleop(Node):
             self._left_wrist_callback,
             QOS_BEST_EFFORT,
         )
+        self.joint_states_subscriber_ = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self._joint_states_callback,
+            QOS_BEST_EFFORT,
+        )
 
         self.get_logger().info('Arm Retargeting Teleop Node Started')
 
@@ -245,6 +254,19 @@ class ArmRetargetingTeleop(Node):
     def _left_wrist_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.left_pose_state, wrist_msg=msg)
         self.run_teleop_left()
+
+    def _joint_states_callback(self, msg: JointState) -> None:
+        """Track lift joint motion for arm-goal Z compensation."""
+        if self.lift_joint_name not in msg.name:
+            return
+
+        lift_joint_index = msg.name.index(self.lift_joint_name)
+        if lift_joint_index >= len(msg.position):
+            return
+
+        self.lift_joint_current_position = float(msg.position[lift_joint_index])
+        if self.lift_reference_position_for_pose is None:
+            self.lift_reference_position_for_pose = self.lift_joint_current_position
 
     def run_teleop_right(self) -> None:
         """Retarget the right arm poses and publish elbow/wrist goals."""
@@ -316,7 +338,14 @@ class ArmRetargetingTeleop(Node):
         if upper_arm_direction is None or forearm_direction is None:
             return
 
-        offset = np.array([0.0, 0.0, self.target_z_offset_m], dtype=np.float64)
+        offset = np.array(
+            [
+                0.0,
+                0.0,
+                self.target_z_offset_m + self.get_lift_z_delta_for_arm_pose(),
+            ],
+            dtype=np.float64,
+        )
         elbow_target = (
             geometry.shoulder_pos
             + geometry.upper_arm_length * upper_arm_direction
@@ -367,6 +396,14 @@ class ArmRetargetingTeleop(Node):
         """Publish elbow and wrist goals."""
         subgoal_publisher.publish(elbow_goal)
         goal_publisher.publish(wrist_goal)
+
+    def get_lift_z_delta_for_arm_pose(self) -> float:
+        """Return Z offset applied to arm goals from lift motion."""
+        if self.lift_reference_position_for_pose is None:
+            return 0.0
+        return (
+            self.lift_joint_current_position - self.lift_reference_position_for_pose
+        )
 
     def _compute_robot_geometry(
         self,
