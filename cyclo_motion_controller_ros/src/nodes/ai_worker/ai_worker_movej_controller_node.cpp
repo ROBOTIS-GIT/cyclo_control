@@ -32,6 +32,7 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   left_gripper_position_(0.0),
   right_motion_start_time_(this->now()),
   left_motion_start_time_(this->now()),
+  last_joint_state_time_(this->now()),
   right_active_motion_duration_(0.0),
   left_active_motion_duration_(0.0)
 {
@@ -50,6 +51,7 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
@@ -192,20 +194,31 @@ void AIWorkerMoveJController::jointStateCallback(const sensor_msgs::msg::JointSt
   }
 
   extractJointStates(msg);
+  last_joint_state_time_ = this->now();
   joint_state_received_ = true;
 
-  if (!commanded_state_initialized_) {
-    q_commanded_ = q_;
-    right_movej_start_ = q_;
-    right_movej_goal_ = q_;
-    left_movej_start_ = q_;
-    left_movej_goal_ = q_;
+  const bool was_uninitialized = !commanded_state_initialized_;
+  const bool recovering_from_timeout = joint_state_timeout_active_;
+  joint_state_timeout_active_ = false;
+
+  if (was_uninitialized || recovering_from_timeout) {
+    syncCommandStateToFeedback();
     commanded_state_initialized_ = true;
     right_movej_target_initialized_ = true;
     left_movej_target_initialized_ = true;
-    RCLCPP_INFO(
-      this->get_logger(),
-      "AI Worker MoveJ Controller activated. Waiting for moveJ commands...");
+    if (was_uninitialized || recovering_from_timeout) {
+      RCLCPP_INFO(
+        this->get_logger(),
+        "AI Worker MoveJ Controller activated. Waiting for moveJ commands...");
+    }
+    return;
+  }
+
+  if (!right_movej_trajectory_active_) {
+    syncRightArmToFeedback();
+  }
+  if (!left_movej_trajectory_active_) {
+    syncLeftArmToFeedback();
   }
 }
 
@@ -281,7 +294,10 @@ bool AIWorkerMoveJController::updateArmTargetFromTrajectory(
 void AIWorkerMoveJController::rightTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !commanded_state_initialized_ || msg->points.empty()) {
+  if (
+    !msg || !joint_state_received_ || jointStateTimedOut() || !commanded_state_initialized_ ||
+    msg->points.empty())
+  {
     return;
   }
 
@@ -291,6 +307,7 @@ void AIWorkerMoveJController::rightTrajectoryCallback(
     return;
   }
 
+  syncRightArmToFeedback();
   Eigen::VectorXd target_q = q_commanded_;
   if (!updateArmTargetFromTrajectory(*msg, right_arm_joints_, "Right", target_q)) {
     return;
@@ -308,7 +325,10 @@ void AIWorkerMoveJController::rightTrajectoryCallback(
 void AIWorkerMoveJController::leftTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !commanded_state_initialized_ || msg->points.empty()) {
+  if (
+    !msg || !joint_state_received_ || jointStateTimedOut() || !commanded_state_initialized_ ||
+    msg->points.empty())
+  {
     return;
   }
 
@@ -318,6 +338,7 @@ void AIWorkerMoveJController::leftTrajectoryCallback(
     return;
   }
 
+  syncLeftArmToFeedback();
   Eigen::VectorXd target_q = q_commanded_;
   if (!updateArmTargetFromTrajectory(*msg, left_arm_joints_, "Left", target_q)) {
     return;
@@ -351,6 +372,18 @@ void AIWorkerMoveJController::controlLoopCallback()
   if (!joint_state_received_ || !commanded_state_initialized_) {
     RCLCPP_WARN_THROTTLE(
       this->get_logger(), *this->get_clock(), 2000, "Control loop waiting for joint states...");
+    return;
+  }
+
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      right_movej_trajectory_active_ = false;
+      left_movej_trajectory_active_ = false;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding commands until fresh feedback is received.");
+    }
     return;
   }
 
@@ -425,6 +458,37 @@ void AIWorkerMoveJController::controlLoopCallback()
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
   }
+}
+
+bool AIWorkerMoveJController::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void AIWorkerMoveJController::syncCommandStateToFeedback()
+{
+  q_commanded_ = q_;
+  right_movej_start_ = q_;
+  right_movej_goal_ = q_;
+  left_movej_start_ = q_;
+  left_movej_goal_ = q_;
+  right_movej_trajectory_active_ = false;
+  left_movej_trajectory_active_ = false;
+}
+
+void AIWorkerMoveJController::syncRightArmToFeedback()
+{
+  assignArmSegment(q_, right_arm_joints_, q_commanded_);
+  assignArmSegment(q_, right_arm_joints_, right_movej_start_);
+  assignArmSegment(q_, right_arm_joints_, right_movej_goal_);
+}
+
+void AIWorkerMoveJController::syncLeftArmToFeedback()
+{
+  assignArmSegment(q_, left_arm_joints_, q_commanded_);
+  assignArmSegment(q_, left_arm_joints_, left_movej_start_);
+  assignArmSegment(q_, left_arm_joints_, left_movej_goal_);
 }
 
 void AIWorkerMoveJController::publishTrajectory(const Eigen::VectorXd & q_command) const

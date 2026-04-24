@@ -67,6 +67,7 @@ private:
   double cbf_alpha_;
   double collision_buffer_;
   double collision_safe_distance_;
+  double joint_state_timeout_;
   std::string reactivate_topic_;
   std::string r_goal_pose_topic_;
   std::string l_goal_pose_topic_;
@@ -147,6 +148,7 @@ private:
   bool control_enabled_ = false;        // start only after reactivate service
   bool start_requested_ = false;        // reactivate has been requested
   bool joint_state_received_;
+  bool joint_state_timeout_active_ = false;
   bool reactivate_state_ = false;
 
         // Startup reference vs current pose check
@@ -158,6 +160,7 @@ private:
   bool left_raw_gripper_received_ = false;
   double right_raw_gripper_position_ = 0.0;
   double left_raw_gripper_position_ = 0.0;
+  rclcpp::Time last_joint_state_time_;
   rclcpp::Time last_right_raw_traj_time_;
   rclcpp::Time last_left_raw_traj_time_;
 
@@ -201,6 +204,8 @@ private:
     const Eigen::Affine3d & r_gripper_pose,
     const Eigen::Affine3d & l_gripper_pose);
   void extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg);
+  bool jointStateTimedOut() const;
+  void syncCommandStateToFeedback();
 
         // Control computation functions
   Eigen::Affine3d computePoseMat(const geometry_msgs::msg::PoseStamped & pose) const;

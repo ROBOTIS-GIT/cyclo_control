@@ -54,6 +54,8 @@ private:
   void publishCurrentPose(const Eigen::Affine3d & pose) const;
   void publishTrajectory(const Eigen::VectorXd & q_command) const;
   void publishControllerError(const std::string & error) const;
+  bool jointStateTimedOut() const;
+  void syncCommandStateToFeedback();
 
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
   void moveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg);
@@ -78,6 +80,7 @@ private:
   double cbf_alpha_;
   double collision_buffer_;
   double collision_safe_distance_;
+  double joint_state_timeout_;
 
   std::string urdf_path_;
   std::string srdf_path_;
@@ -114,8 +117,10 @@ private:
   bool commanded_state_initialized_;
   bool movel_target_initialized_;
   bool movel_trajectory_active_;
+  bool joint_state_timeout_active_ = false;
 
   rclcpp::Time motion_start_time_;
+  rclcpp::Time last_joint_state_time_;
   double active_motion_duration_;
   Eigen::Affine3d movel_start_pose_;
   Eigen::Affine3d movel_goal_pose_;
