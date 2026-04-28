@@ -102,8 +102,8 @@ public:
   {
     control_frequency_ = this->declare_parameter("control_frequency", 100.0);
     initial_move_duration_ = this->declare_parameter("initial_move_duration", 4.0);
-    redundancy_cycle1_duration_ = this->declare_parameter("redundancy_cycle1_duration", 2.5);
-    redundancy_cycle2_duration_ = this->declare_parameter("redundancy_cycle2_duration", 3.0);
+    redundancy_cycle1_duration_ = this->declare_parameter("redundancy_cycle1_duration", 3.5);
+    redundancy_cycle2_duration_ = this->declare_parameter("redundancy_cycle2_duration", 3.5);
     redundancy_phase1_cycles_ = this->declare_parameter("redundancy_phase1_cycles", 3);
     redundancy_phase2_cycles_ = this->declare_parameter("redundancy_phase2_cycles", 2);
     arm_base_cycle_duration_ = this->declare_parameter("arm_base_cycle_duration", 3.0);
@@ -156,38 +156,38 @@ public:
     cycle1_r_goal_pose_ = declarePoseParameter(
       "cycle1_right_target_pose",
       makePose(
-        Eigen::Vector3d(0.39392780661582947, -0.15, 0.9),
+        Eigen::Vector3d(0.39392780661582947, -0.15, 0.85),
         Eigen::Quaterniond(0.9297504425048828, 0.0, -0.3681904673576355, 0.0)));
     cycle1_l_goal_pose_ = declarePoseParameter(
       "cycle1_left_target_pose",
       makePose(
-        Eigen::Vector3d(0.39392780661582947, 0.15, 0.9),
+        Eigen::Vector3d(0.39392780661582947, 0.15, 0.85),
         Eigen::Quaterniond(0.9297504425048828, 0.0, -0.3681904673576355, 0.0)));
     orientation_start_r_goal_pose_ = declarePoseParameter(
       "orientation_start_right_target_pose",
       makePose(
-        Eigen::Vector3d(0.5, -0.22, 1.0),
+        Eigen::Vector3d(0.5, -0.22, 0.85),
         Eigen::Quaterniond(0.707, 0.0, -0.707, 0.0)));
     orientation_start_l_goal_pose_ = declarePoseParameter(
       "orientation_start_left_target_pose",
       makePose(
-        Eigen::Vector3d(0.5, 0.22, 1.0),
+        Eigen::Vector3d(0.5, 0.22, 0.85),
         Eigen::Quaterniond(0.707, 0.0, -0.707, 0.0)));
     cycle2_r_goal_pose_ = declarePoseParameter(
       "cycle2_right_target_pose",
-      makePose(Eigen::Vector3d(0.4, 0.0, 0.9), Eigen::Quaterniond(0.5, 0.5, -0.5, 0.5)));
+      makePose(Eigen::Vector3d(0.3, 0.0, 0.85), Eigen::Quaterniond(0.5, 0.5, -0.5, 0.5)));
     cycle2_l_goal_pose_ = declarePoseParameter(
       "cycle2_left_target_pose",
-      makePose(Eigen::Vector3d(0.4, 0.0, 1.0), Eigen::Quaterniond(0.5, -0.5, -0.5, -0.5)));
+      makePose(Eigen::Vector3d(0.3, 0.0, 0.95), Eigen::Quaterniond(0.5, -0.5, -0.5, -0.5)));
     cycle3_r_goal_pose_ = declarePoseParameter(
       "cycle3_right_target_pose",
       makePose(
-        Eigen::Vector3d(0.49392780661582947, -0.15, 0.7707512974739075),
+        Eigen::Vector3d(0.45392780661582947, -0.2, 0.7707512974739075),
         Eigen::Quaterniond(0.9297504425048828, 0.0, -0.3681904673576355, 0.0)));
     cycle3_l_goal_pose_ = declarePoseParameter(
       "cycle3_left_target_pose",
       makePose(
-        Eigen::Vector3d(0.49392780661582947, 0.15, 0.7707512974739075),
+        Eigen::Vector3d(0.45392780661582947, 0.2, 0.7707512974739075),
         Eigen::Quaterniond(0.9297504425048828, 0.0, -0.3681904673576355, 0.0)));
 
     r_goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(r_goal_pose_topic_, 10);
