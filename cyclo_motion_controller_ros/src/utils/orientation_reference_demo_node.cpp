@@ -68,10 +68,10 @@ public:
     circle_entry_duration_sec_ = this->declare_parameter<double>("circle_entry_duration_sec", 1.0);
     circle_duration_sec_ = this->declare_parameter<double>("circle_duration_sec", 6.0);
     circle_exit_duration_sec_ = this->declare_parameter<double>("circle_exit_duration_sec", 1.0);
-    max_roll_deg_ = this->declare_parameter<double>("max_roll_deg", 40.0);
+    max_roll_deg_ = this->declare_parameter<double>("max_roll_deg", 30.0);
     max_pitch_deg_ = this->declare_parameter<double>("max_pitch_deg", 30.0);
-    max_yaw_deg_ = this->declare_parameter<double>("max_yaw_deg", 40.0);
-    circle_radius_deg_ = this->declare_parameter<double>("circle_radius_deg", 30.0);
+    max_yaw_deg_ = this->declare_parameter<double>("max_yaw_deg", 30.0);
+    circle_radius_deg_ = this->declare_parameter<double>("circle_radius_deg", 20.0);
 
     right_goal_pub_ = this->create_publisher<robotis_interfaces::msg::MoveL>(right_goal_topic_, 10);
     left_goal_pub_ = this->create_publisher<robotis_interfaces::msg::MoveL>(left_goal_topic_, 10);

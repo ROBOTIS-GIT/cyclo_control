@@ -420,7 +420,7 @@ private:
         hard_pose_constraint_active ? fixed_base_kinematics_solver_ : kinematics_solver_;
       const auto & active_controller =
         hard_pose_constraint_active ? fixed_base_qp_controller_ : qp_controller_;
-      const Eigen::VectorXd & solver_state = hard_pose_constraint_active ? q_ : q_feedback;
+      const Eigen::VectorXd & solver_state = q_feedback;
       active_solver->updateState(solver_state, qdot_);
 
       const Eigen::Affine3d right_gripper_pose = active_solver->getPose(r_gripper_name_);

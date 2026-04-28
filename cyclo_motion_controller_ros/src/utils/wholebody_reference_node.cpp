@@ -80,8 +80,6 @@ enum class Phase
   InitialMove,
   WaitCycle1Pose,
   RedundancyFixedBase,
-  WaitCycle2Pose,
-  ArmBaseMotion,
   WaitCycle3Pose,
   RedundancyNaturalBase,
   ReturnToInitialPose,
@@ -97,7 +95,6 @@ public:
     initialized_(false),
     fixed_base_pose_captured_(false),
     redundancy_capture_ready_(false),
-    arm_base_phase_captured_(false),
     phase_(Phase::InitialMove)
   {
     control_frequency_ = this->declare_parameter("control_frequency", 100.0);
@@ -105,13 +102,10 @@ public:
     redundancy_cycle1_duration_ = this->declare_parameter("redundancy_cycle1_duration", 3.5);
     redundancy_cycle2_duration_ = this->declare_parameter("redundancy_cycle2_duration", 3.5);
     redundancy_phase1_cycles_ = this->declare_parameter("redundancy_phase1_cycles", 3);
-    redundancy_phase2_cycles_ = this->declare_parameter("redundancy_phase2_cycles", 2);
-    arm_base_cycle_duration_ = this->declare_parameter("arm_base_cycle_duration", 3.0);
-    arm_base_phase_cycles_ = this->declare_parameter("arm_base_phase_cycles", 2);
-    arm_base_entry_duration_ = this->declare_parameter("arm_base_entry_duration", 1.0);
-    elbow_arc_angle_deg_ = this->declare_parameter("elbow_arc_angle_deg", 30.0);
+    redundancy_phase2_cycles_ = this->declare_parameter("redundancy_phase2_cycles", 3);
+    elbow_arc_angle_deg_ = this->declare_parameter("elbow_arc_angle_deg", 20.0);
     phase1_return_past_start_ratio_ =
-      this->declare_parameter("phase1_return_past_start_ratio", 0.35);
+      this->declare_parameter("phase1_return_past_start_ratio", 0.55);
     minimum_elbow_radius_ = this->declare_parameter("minimum_elbow_radius", 0.0);
     transition_move_duration_ = this->declare_parameter("transition_move_duration", 2.0);
     arm_base_transition_duration_ = this->declare_parameter("arm_base_transition_duration", 2.0);
@@ -120,8 +114,6 @@ public:
     gripper_position_tolerance_ = this->declare_parameter("gripper_position_tolerance", 0.02);
     gripper_orientation_tolerance_deg_ =
       this->declare_parameter("gripper_orientation_tolerance_deg", 30.0);
-    arm_base_upper_z_offset_ = this->declare_parameter("arm_base_upper_z_offset", 0.0);
-    arm_base_lower_z_offset_ = this->declare_parameter("arm_base_lower_z_offset", -0.15);
     base_frame_id_ = this->declare_parameter("base_frame_id", std::string("base_link"));
     orientation_start_topic_ = this->declare_parameter(
       "orientation_start_topic", std::string("/motion_demo/start_orientation"));
@@ -274,13 +266,12 @@ private:
   {
     const bool all_available =
       lookupPose(right_gripper_frame_, initial_r_goal_pose_) &&
-      lookupPose(left_gripper_frame_, initial_l_goal_pose_) &&
-      lookupPose(arm_base_frame_, initial_arm_base_pose_);
+      lookupPose(left_gripper_frame_, initial_l_goal_pose_);
 
     if (!all_available) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 2000,
-        "Waiting for TF transforms from '%s' to initial gripper/arm-base frames.",
+        "Waiting for TF transforms from '%s' to initial gripper frames.",
         base_frame_id_.c_str());
       return false;
     }
@@ -291,7 +282,7 @@ private:
     active_r_goal_pose_ = cycle1_r_goal_pose_;
     active_l_goal_pose_ = cycle1_l_goal_pose_;
     phase_ = Phase::InitialMove;
-    RCLCPP_INFO(this->get_logger(), "Captured initial gripper and startup arm-base poses.");
+    RCLCPP_INFO(this->get_logger(), "Captured initial gripper poses.");
     return true;
   }
 
@@ -368,18 +359,6 @@ private:
     return true;
   }
 
-  bool captureArmBasePhaseStartFromTf()
-  {
-    arm_base_phase_captured_ = lookupPose(arm_base_frame_, arm_base_phase_start_pose_);
-    if (!arm_base_phase_captured_) {
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(), 2000,
-        "Waiting for TF transform from '%s' to arm-base frame.",
-        base_frame_id_.c_str());
-    }
-    return arm_base_phase_captured_;
-  }
-
   bool captureRestartStartFromTf()
   {
     Eigen::Affine3d right_elbow_pose = Eigen::Affine3d::Identity();
@@ -388,14 +367,13 @@ private:
     const bool all_available =
       lookupPose(right_gripper_frame_, initial_r_goal_pose_) &&
       lookupPose(left_gripper_frame_, initial_l_goal_pose_) &&
-      lookupPose(arm_base_frame_, initial_arm_base_pose_) &&
       lookupPose(right_elbow_frame_, right_elbow_pose) &&
       lookupPose(left_elbow_frame_, left_elbow_pose);
 
     if (!all_available) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 2000,
-        "Waiting for TF transforms from '%s' to gripper/arm-base/elbow frames to restart loop.",
+        "Waiting for TF transforms from '%s' to gripper/elbow frames to restart loop.",
         base_frame_id_.c_str());
       return false;
     }
@@ -418,11 +396,9 @@ private:
     phase_ = phase;
     phase_start_time_ = this->now();
     arm_base_transition_capture_ready_ = false;
+    cycle3_transition_capture_ready_ = false;
     if (phase == Phase::WaitCycle1Pose || phase == Phase::RedundancyFixedBase) {
       fixed_base_pose_captured_ = false;
-    }
-    if (phase == Phase::ArmBaseMotion || phase == Phase::RedundancyNaturalBase) {
-      arm_base_phase_captured_ = false;
     }
   }
 
@@ -465,18 +441,53 @@ private:
     publishPose(l_goal_pose_pub_, interpolatePose(left_waypoint, cycle2_l_goal_pose_, alpha));
   }
 
-  void publishCycle3TransitionGrippers(const double elapsed) const
+  bool captureCycle3TransitionStartFromTf()
   {
+    if (cycle3_transition_capture_ready_) {
+      return true;
+    }
+
+    Eigen::Affine3d right_pose = Eigen::Affine3d::Identity();
+    Eigen::Affine3d left_pose = Eigen::Affine3d::Identity();
+    cycle3_transition_capture_ready_ =
+      lookupPose(right_gripper_frame_, right_pose) &&
+      lookupPose(left_gripper_frame_, left_pose);
+    if (!cycle3_transition_capture_ready_) {
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 2000,
+        "Waiting for TF transform from '%s' to gripper frames for cycle3 transition smoothing.",
+        base_frame_id_.c_str());
+      return false;
+    }
+
+    cycle3_transition_start_r_goal_pose_ = right_pose;
+    cycle3_transition_start_l_goal_pose_ = left_pose;
+    return true;
+  }
+
+  void publishCycle3TransitionGrippers(const double elapsed)
+  {
+    if (!captureCycle3TransitionStartFromTf()) {
+      // Keep the previous held command until TF capture is available.
+      publishFixedGrippers();
+      return;
+    }
+    const Eigen::Affine3d & cycle3_transition_start_right = cycle3_transition_start_r_goal_pose_;
+    const Eigen::Affine3d & cycle3_transition_start_left = cycle3_transition_start_l_goal_pose_;
     const Eigen::Affine3d right_waypoint =
-      applyYOffset(cycle2_r_goal_pose_, -cycle2_transition_outward_y_offset_);
+      applyYOffset(cycle3_transition_start_right, -cycle2_transition_outward_y_offset_);
     const Eigen::Affine3d left_waypoint =
-      applyYOffset(cycle2_l_goal_pose_, cycle2_transition_outward_y_offset_);
+      applyYOffset(cycle3_transition_start_left, cycle2_transition_outward_y_offset_);
     const double half_duration = std::max(0.5 * transition_move_duration_, 1e-6);
 
     if (elapsed < half_duration) {
       const double alpha = clamp01(elapsed / half_duration);
-      publishPose(r_goal_pose_pub_, interpolatePose(cycle2_r_goal_pose_, right_waypoint, alpha));
-      publishPose(l_goal_pose_pub_, interpolatePose(cycle2_l_goal_pose_, left_waypoint, alpha));
+      publishPose(
+        r_goal_pose_pub_,
+        interpolatePose(cycle3_transition_start_right, right_waypoint, alpha));
+      publishPose(
+        l_goal_pose_pub_,
+        interpolatePose(cycle3_transition_start_left, left_waypoint, alpha));
       return;
     }
 
@@ -548,24 +559,23 @@ private:
   double computePhase1SweepAngle(const double elapsed) const
   {
     const double cycle_duration = std::max(redundancy_cycle1_duration_, 1e-6);
-    const double normalized_cycle =
-      std::fmod(std::max(elapsed, 0.0), cycle_duration) / cycle_duration;
     const double inward_angle = elbow_arc_angle_deg_ * kPi / 180.0;
     const double past_start_angle =
       std::max(0.0, phase1_return_past_start_ratio_) * inward_angle;
-
-    if (normalized_cycle < (1.0 / 3.0)) {
-      const double alpha = clamp01(normalized_cycle * 3.0);
-      return 0.5 * inward_angle * (1.0 - std::cos(kPi * alpha));
+    const double max_angle = inward_angle;
+    const double min_angle = -past_start_angle;
+    const double mid_angle = 0.5 * (max_angle + min_angle);
+    const double amplitude = 0.5 * (max_angle - min_angle);
+    if (amplitude < 1e-9) {
+      return 0.0;
     }
 
-    if (normalized_cycle < (2.0 / 3.0)) {
-      const double alpha = clamp01((normalized_cycle - (1.0 / 3.0)) * 3.0);
-      return inward_angle + 0.5 * (-past_start_angle - inward_angle) * (1.0 - std::cos(kPi * alpha));
-    }
-
-    const double alpha = clamp01((normalized_cycle - (2.0 / 3.0)) * 3.0);
-    return -past_start_angle + 0.5 * past_start_angle * (1.0 - std::cos(kPi * alpha));
+    // Continuous periodic sweep that starts at 0 rad and keeps non-zero velocity
+    // through the initial elbow position (avoids stop-and-go at cycle boundaries).
+    const double start_sin = std::clamp(-mid_angle / amplitude, -1.0, 1.0);
+    const double phase = std::asin(start_sin);
+    const double theta = 2.0 * kPi * std::max(elapsed, 0.0) / cycle_duration;
+    return mid_angle + amplitude * std::sin(theta + phase);
   }
 
   bool initializeElbowArc(
@@ -632,23 +642,6 @@ private:
     return true;
   }
 
-  Eigen::Affine3d computeArmBaseGoalPose(const double elapsed) const
-  {
-    const double midpoint = 0.5 * (arm_base_upper_z_offset_ + arm_base_lower_z_offset_);
-    const double amplitude = 0.5 * (arm_base_upper_z_offset_ - arm_base_lower_z_offset_);
-    const double wave =
-      midpoint + amplitude *
-      std::cos(2.0 * kPi * elapsed / std::max(arm_base_cycle_duration_, 1e-6));
-    const double ramp =
-      (elapsed < arm_base_entry_duration_) ?
-      0.5 * (1.0 - std::cos(kPi * elapsed / std::max(arm_base_entry_duration_, 1e-6))) :
-      1.0;
-
-    Eigen::Affine3d goal_pose = arm_base_phase_start_pose_;
-    goal_pose.translation().z() += ramp * wave;
-    return goal_pose;
-  }
-
   void publishPose(
     const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr & publisher,
     const Eigen::Affine3d & pose) const
@@ -703,14 +696,6 @@ private:
     publishPose(l_elbow_pose_pub_, interpolatePose(restart_l_elbow_pose_, left_goal_pose, alpha));
   }
 
-  void publishHeldArmBaseAtElapsed(const double elapsed) const
-  {
-    if (!arm_base_phase_captured_) {
-      return;
-    }
-    publishPose(arm_base_goal_pose_pub_, computeArmBaseGoalPose(elapsed));
-  }
-
   bool captureArmBaseTransitionStartFromTf()
   {
     if (arm_base_transition_capture_ready_) {
@@ -739,14 +724,6 @@ private:
       interpolatePose(arm_base_transition_start_pose_, goal_pose, alpha));
   }
 
-  void publishSmoothHeldArmBaseAtElapsed(const double target_elapsed, const double phase_elapsed)
-  {
-    if (!arm_base_phase_captured_) {
-      return;
-    }
-    publishSmoothArmBaseGoal(computeArmBaseGoalPose(target_elapsed), phase_elapsed);
-  }
-
   void timerCallback()
   {
     if (!initialized_ && !initializeFromTf()) {
@@ -758,10 +735,13 @@ private:
     switch (phase_) {
       case Phase::InitialMove:
       {
+        if (!fixed_base_pose_captured_ && !captureFixedBasePoseFromTf()) {
+          return;
+        }
         const double alpha = clamp01(elapsed / std::max(initial_move_duration_, 1e-6));
         publishPose(r_goal_pose_pub_, interpolatePose(initial_r_goal_pose_, cycle1_r_goal_pose_, alpha));
         publishPose(l_goal_pose_pub_, interpolatePose(initial_l_goal_pose_, cycle1_l_goal_pose_, alpha));
-        publishSmoothArmBaseGoal(initial_arm_base_pose_, elapsed);
+        publishSmoothArmBaseGoal(fixed_arm_base_pose_, elapsed);
         publishRestartElbows(elapsed);
         if (elapsed >= initial_move_duration_) {
           active_r_goal_pose_ = cycle1_r_goal_pose_;
@@ -774,12 +754,14 @@ private:
 
       case Phase::WaitCycle1Pose:
       {
+        if (!fixed_base_pose_captured_ && !captureFixedBasePoseFromTf()) {
+          return;
+        }
         publishTransitionGrippers(
           cycle3_r_goal_pose_, cycle3_l_goal_pose_,
           cycle1_r_goal_pose_, cycle1_l_goal_pose_, elapsed);
         publishHeldElbows();
-        publishSmoothHeldArmBaseAtElapsed(
-          redundancy_phase2_cycles_ * redundancy_cycle2_duration_, elapsed);
+        publishSmoothArmBaseGoal(fixed_arm_base_pose_, elapsed);
         if (elapsed >= transition_move_duration_ &&
           grippersReachedGoal(cycle1_r_goal_pose_, cycle1_l_goal_pose_))
         {
@@ -804,35 +786,6 @@ private:
         publishPose(l_elbow_pose_pub_, evaluateElbowArc(l_arc_, left_phase1_sweep_sign_ * sweep));
 
         if (elapsed >= redundancy_phase1_cycles_ * redundancy_cycle1_duration_) {
-          active_r_goal_pose_ = cycle2_r_goal_pose_;
-          active_l_goal_pose_ = cycle2_l_goal_pose_;
-          enterPhase(Phase::WaitCycle2Pose);
-        }
-        break;
-      }
-
-      case Phase::WaitCycle2Pose:
-      {
-        publishCycle2TransitionGrippers(elapsed);
-        publishSmoothArmBaseGoal(fixed_arm_base_pose_, elapsed);
-        publishHeldElbows();
-        if (elapsed >= transition_move_duration_ &&
-          grippersReachedGoal(cycle2_r_goal_pose_, cycle2_l_goal_pose_))
-        {
-          enterPhase(Phase::ArmBaseMotion);
-        }
-        break;
-      }
-
-      case Phase::ArmBaseMotion:
-      {
-        publishFixedGrippers();
-        if (!arm_base_phase_captured_ && !captureArmBasePhaseStartFromTf()) {
-          return;
-        }
-        publishSmoothArmBaseGoal(computeArmBaseGoalPose(elapsed), elapsed);
-
-        if (elapsed >= arm_base_phase_cycles_ * arm_base_cycle_duration_) {
           active_r_goal_pose_ = cycle3_r_goal_pose_;
           active_l_goal_pose_ = cycle3_l_goal_pose_;
           enterPhase(Phase::WaitCycle3Pose);
@@ -844,8 +797,7 @@ private:
       {
         publishCycle3TransitionGrippers(elapsed);
         publishHeldElbows();
-        publishSmoothHeldArmBaseAtElapsed(
-          arm_base_phase_cycles_ * arm_base_cycle_duration_, elapsed);
+        publishSmoothArmBaseGoal(fixed_arm_base_pose_, elapsed);
         if (elapsed >= transition_move_duration_ &&
           grippersReachedGoal(cycle3_r_goal_pose_, cycle3_l_goal_pose_))
         {
@@ -881,8 +833,7 @@ private:
           cycle3_r_goal_pose_, cycle3_l_goal_pose_,
           orientation_start_r_goal_pose_, orientation_start_l_goal_pose_, elapsed);
         publishHeldElbows();
-        publishSmoothHeldArmBaseAtElapsed(
-          redundancy_phase2_cycles_ * redundancy_cycle2_duration_, elapsed);
+        publishSmoothArmBaseGoal(fixed_arm_base_pose_, elapsed);
         if (elapsed >= transition_move_duration_ &&
           grippersReachedGoal(orientation_start_r_goal_pose_, orientation_start_l_goal_pose_))
         {
@@ -916,8 +867,6 @@ private:
   double initial_move_duration_;
   double redundancy_cycle1_duration_;
   double redundancy_cycle2_duration_;
-  double arm_base_cycle_duration_;
-  double arm_base_entry_duration_;
   double elbow_arc_angle_deg_;
   double phase1_return_past_start_ratio_;
   double minimum_elbow_radius_;
@@ -926,10 +875,7 @@ private:
   double cycle2_transition_outward_y_offset_;
   double gripper_position_tolerance_;
   double gripper_orientation_tolerance_deg_;
-  double arm_base_upper_z_offset_;
-  double arm_base_lower_z_offset_;
   int redundancy_phase1_cycles_;
-  int arm_base_phase_cycles_;
   int redundancy_phase2_cycles_;
 
   std::string base_frame_id_;
@@ -964,16 +910,15 @@ private:
   bool initialized_;
   bool fixed_base_pose_captured_;
   bool redundancy_capture_ready_;
-  bool arm_base_phase_captured_;
   bool orientation_done_received_ = false;
   bool restart_elbow_pose_captured_ = false;
   bool arm_base_transition_capture_ready_ = false;
+  bool cycle3_transition_capture_ready_ = false;
   Phase phase_;
   rclcpp::Time phase_start_time_;
 
   Eigen::Affine3d initial_r_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d initial_l_goal_pose_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d initial_arm_base_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d cycle1_r_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d cycle1_l_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d orientation_start_r_goal_pose_ = Eigen::Affine3d::Identity();
@@ -985,8 +930,9 @@ private:
   Eigen::Affine3d active_r_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d active_l_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d fixed_arm_base_pose_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d arm_base_phase_start_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d arm_base_transition_start_pose_ = Eigen::Affine3d::Identity();
+  Eigen::Affine3d cycle3_transition_start_r_goal_pose_ = Eigen::Affine3d::Identity();
+  Eigen::Affine3d cycle3_transition_start_l_goal_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d restart_r_elbow_pose_ = Eigen::Affine3d::Identity();
   Eigen::Affine3d restart_l_elbow_pose_ = Eigen::Affine3d::Identity();
   Eigen::Vector3d right_shoulder_position_ = Eigen::Vector3d::Zero();
