@@ -110,6 +110,20 @@ class ArmRetargetingTeleop(Node):
             'base_frame',
             'base_link',
         ).value
+        self.wrist_distance_priority = 1.0
+        self.wrist_priority_reference_distance = 0.3
+        self.wrist_priority_min_scale = 0.25
+        self.wrist_priority_decay_rate = 4.0
+        self.max_wrist_distance_correction = 0.3
+        self.wrist_distance_smoothing_alpha = 0.2
+        self.human_wrist_to_fingertip = 0.22
+        self.robot_wrist_to_fingertip = 0.25
+        self.wrist_distance_scale = self._compute_wrist_distance_scale(
+            human_wrist_to_fingertip=self.human_wrist_to_fingertip,
+            robot_wrist_to_fingertip=self.robot_wrist_to_fingertip,
+        )
+        self._filtered_right_wrist_target: Optional[np.ndarray] = None
+        self._filtered_left_wrist_target: Optional[np.ndarray] = None
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -230,53 +244,113 @@ class ArmRetargetingTeleop(Node):
 
     def _right_shoulder_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.right_pose_state, shoulder_msg=msg)
-        self.run_teleop_right()
+        self.run_teleop()
 
     def _left_shoulder_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.left_pose_state, shoulder_msg=msg)
-        self.run_teleop_left()
+        self.run_teleop()
 
     def _right_elbow_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.right_pose_state, elbow_msg=msg)
-        self.run_teleop_right()
+        self.run_teleop()
 
     def _left_elbow_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.left_pose_state, elbow_msg=msg)
-        self.run_teleop_left()
+        self.run_teleop()
 
     def _right_wrist_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.right_pose_state, wrist_msg=msg)
-        self.run_teleop_right()
+        self.run_teleop()
 
     def _left_wrist_callback(self, msg: PoseStamped) -> None:
         self._update_pose_state(self.left_pose_state, wrist_msg=msg)
-        self.run_teleop_left()
+        self.run_teleop()
 
-    def run_teleop_right(self) -> None:
-        """Retarget the right arm poses and publish elbow/wrist goals."""
-        retargeted_targets = self._retarget_pose_state(
+    def run_teleop(self) -> None:
+        """Retarget both arms and publish elbow/wrist goals."""
+        retargeted_targets = self._retarget_bimanual_pose_states()
+        if retargeted_targets is None:
+            return
+
+        right_elbow_goal, right_wrist_goal, left_elbow_goal, left_wrist_goal = (
+            retargeted_targets
+        )
+        self.publish_targets_right(right_elbow_goal, right_wrist_goal)
+        self.publish_targets_left(left_elbow_goal, left_wrist_goal)
+
+    def _retarget_bimanual_pose_states(
+        self,
+    ) -> Optional[tuple[PoseStamped, PoseStamped, PoseStamped, PoseStamped]]:
+        """Retarget both arms and prioritize wrist-to-wrist distance."""
+        right_targets = self._retarget_pose_state(
             pose_state=self.right_pose_state,
             geometry=self.right_geometry,
             shoulder_link=self.right_shoulder_link,
         )
-        if retargeted_targets is None:
-            return
+        if right_targets is None:
+            return None
 
-        elbow_goal, wrist_goal = retargeted_targets
-        self.publish_targets_right(elbow_goal, wrist_goal)
-
-    def run_teleop_left(self) -> None:
-        """Retarget the left arm poses and publish elbow/wrist goals."""
-        retargeted_targets = self._retarget_pose_state(
+        left_targets = self._retarget_pose_state(
             pose_state=self.left_pose_state,
             geometry=self.left_geometry,
             shoulder_link=self.left_shoulder_link,
         )
-        if retargeted_targets is None:
-            return
+        if left_targets is None:
+            return None
 
-        elbow_goal, wrist_goal = retargeted_targets
-        self.publish_targets_left(elbow_goal, wrist_goal)
+        right_wrist_msg = self.right_pose_state.wrist
+        left_wrist_msg = self.left_pose_state.wrist
+        if right_wrist_msg is None or left_wrist_msg is None:
+            return None
+
+        right_elbow_goal, right_wrist_goal = right_targets
+        left_elbow_goal, left_wrist_goal = left_targets
+        right_wrist_target = self._pose_to_numpy(right_wrist_goal)
+        left_wrist_target = self._pose_to_numpy(left_wrist_goal)
+
+        right_elbow_target = self._pose_to_numpy(right_elbow_goal)
+        left_elbow_target = self._pose_to_numpy(left_elbow_goal)
+        human_wrist_distance = float(
+            np.linalg.norm(
+                self._pose_to_numpy(right_wrist_msg) - self._pose_to_numpy(left_wrist_msg)
+            )
+        )
+        desired_wrist_distance = human_wrist_distance * self.wrist_distance_scale
+
+        adjusted_right_wrist_target, adjusted_left_wrist_target = (
+            self._apply_wrist_distance_priority(
+                right_wrist_target=right_wrist_target,
+                left_wrist_target=left_wrist_target,
+                desired_wrist_distance=desired_wrist_distance,
+            )
+        )
+        adjusted_right_wrist_target = self._project_wrist_to_forearm_length(
+            elbow_target=right_elbow_target,
+            wrist_target=adjusted_right_wrist_target,
+            forearm_length=self.right_geometry.forearm_length,
+            fallback_wrist_target=right_wrist_target,
+        )
+        adjusted_left_wrist_target = self._project_wrist_to_forearm_length(
+            elbow_target=left_elbow_target,
+            wrist_target=adjusted_left_wrist_target,
+            forearm_length=self.left_geometry.forearm_length,
+            fallback_wrist_target=left_wrist_target,
+        )
+        adjusted_right_wrist_target, adjusted_left_wrist_target = (
+            self._smooth_wrist_targets(
+                right_target=adjusted_right_wrist_target,
+                left_target=adjusted_left_wrist_target,
+            )
+        )
+        right_wrist_goal = self._copy_pose_with_new_position(
+            right_wrist_goal,
+            adjusted_right_wrist_target,
+        )
+        left_wrist_goal = self._copy_pose_with_new_position(
+            left_wrist_goal,
+            adjusted_left_wrist_target,
+        )
+        return right_elbow_goal, right_wrist_goal, left_elbow_goal, left_wrist_goal
 
     @staticmethod
     def _update_pose_state(
@@ -444,7 +518,13 @@ class ArmRetargetingTeleop(Node):
         """Copy pose orientation and header while replacing the position."""
         msg = PoseStamped()
         msg.header = source.header
-        msg.pose = source.pose
+        msg.pose.position.x = source.pose.position.x
+        msg.pose.position.y = source.pose.position.y
+        msg.pose.position.z = source.pose.position.z
+        msg.pose.orientation.x = source.pose.orientation.x
+        msg.pose.orientation.y = source.pose.orientation.y
+        msg.pose.orientation.z = source.pose.orientation.z
+        msg.pose.orientation.w = source.pose.orientation.w
         msg.pose.position.x = float(position[0])
         msg.pose.position.y = float(position[1])
         msg.pose.position.z = float(position[2])
@@ -457,6 +537,102 @@ class ArmRetargetingTeleop(Node):
         if norm < 1e-6:
             return None
         return vector / norm
+
+    def _apply_wrist_distance_priority(
+        self,
+        right_wrist_target: np.ndarray,
+        left_wrist_target: np.ndarray,
+        desired_wrist_distance: float,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Shift both wrists to prioritize matching inter-wrist distance."""
+        distance_vector = right_wrist_target - left_wrist_target
+        current_distance = float(np.linalg.norm(distance_vector))
+        if current_distance < 1e-6:
+            return right_wrist_target, left_wrist_target
+
+        direction = distance_vector / current_distance
+        full_distance_error = desired_wrist_distance - current_distance
+        dynamic_priority = self._compute_dynamic_wrist_priority(current_distance)
+        weighted_distance_error = dynamic_priority * full_distance_error
+        correction_per_wrist = 0.5 * weighted_distance_error
+        correction_per_wrist = float(
+            np.clip(
+                correction_per_wrist,
+                -self.max_wrist_distance_correction,
+                self.max_wrist_distance_correction,
+            )
+        )
+        correction = correction_per_wrist * direction
+        return right_wrist_target + correction, left_wrist_target - correction
+
+    def _compute_dynamic_wrist_priority(self, current_wrist_distance: float) -> float:
+        """Return wrist-distance priority that decays past reference distance."""
+        reference_distance = max(0.0, self.wrist_priority_reference_distance)
+        if current_wrist_distance <= reference_distance:
+            return self.wrist_distance_priority
+
+        min_scale = float(np.clip(self.wrist_priority_min_scale, 0.0, 1.0))
+        decay_rate = max(0.0, self.wrist_priority_decay_rate)
+        distance_over_reference = current_wrist_distance - reference_distance
+        decay_scale = float(np.exp(-decay_rate * distance_over_reference))
+        scaled_priority = self.wrist_distance_priority * max(min_scale, decay_scale)
+        return scaled_priority
+
+    def _compute_wrist_distance_scale(
+        self,
+        human_wrist_to_fingertip: float,
+        robot_wrist_to_fingertip: float,
+    ) -> float:
+        """Compute a stable wrist-distance scaling factor from hand lengths."""
+        if human_wrist_to_fingertip <= 1e-6 or robot_wrist_to_fingertip <= 1e-6:
+            self.get_logger().warn(
+                'Invalid wrist-to-fingertip lengths; using wrist distance scale = 1.0'
+            )
+            return 1.0
+        return float(robot_wrist_to_fingertip / human_wrist_to_fingertip)
+
+    def _project_wrist_to_forearm_length(
+        self,
+        elbow_target: np.ndarray,
+        wrist_target: np.ndarray,
+        forearm_length: float,
+        fallback_wrist_target: np.ndarray,
+    ) -> np.ndarray:
+        """Keep wrist target represented from elbow frame with forearm length."""
+        elbow_to_wrist = wrist_target - elbow_target
+        direction = self._compute_unit_vector(elbow_to_wrist)
+        if direction is None:
+            fallback_direction = self._compute_unit_vector(
+                fallback_wrist_target - elbow_target
+            )
+            if fallback_direction is None:
+                return wrist_target
+            direction = fallback_direction
+        return elbow_target + forearm_length * direction
+
+    def _smooth_wrist_targets(
+        self,
+        right_target: np.ndarray,
+        left_target: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Low-pass filter wrist targets to prevent frame-to-frame jumps."""
+        alpha = float(np.clip(self.wrist_distance_smoothing_alpha, 0.0, 1.0))
+        if self._filtered_right_wrist_target is None:
+            self._filtered_right_wrist_target = right_target.copy()
+        else:
+            self._filtered_right_wrist_target = (
+                (1.0 - alpha) * self._filtered_right_wrist_target + alpha * right_target
+            )
+        if self._filtered_left_wrist_target is None:
+            self._filtered_left_wrist_target = left_target.copy()
+        else:
+            self._filtered_left_wrist_target = (
+                (1.0 - alpha) * self._filtered_left_wrist_target + alpha * left_target
+            )
+        return (
+            self._filtered_right_wrist_target.copy(),
+            self._filtered_left_wrist_target.copy(),
+        )
 
     def _poses_have_matching_stamps(self, *msgs: PoseStamped) -> bool:
         """Return whether all poses share the exact same ROS header stamp."""
@@ -473,7 +649,6 @@ class ArmRetargetingTeleop(Node):
     def _pose_stamp_tuple(msg: PoseStamped) -> tuple[int, int]:
         """Convert a ROS pose header stamp into an equality-friendly tuple."""
         return int(msg.header.stamp.sec), int(msg.header.stamp.nanosec)
-
 
 def main(args=None) -> None:
     """Run the arm retargeting teleoperation node."""
