@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (2026-05-04)
+------------------
+* Added arm retargeting feature for AI Worker vr controller
+* Modified AI Worker, OMY, OMX movej controller to work with leader device
+* Contributors: Yeonguk Kim
+
 0.1.4 (2026-04-20)
 ------------------
 * Update acknowledgements to include dyros_robot_controller

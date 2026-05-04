@@ -54,13 +54,16 @@ VRController::VRController()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reactivate"));
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
-  r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_elbow_pose"));
-  l_elbow_pose_topic_ = this->declare_parameter("l_elbow_pose_topic", std::string("/l_elbow_pose"));
+  r_elbow_pose_topic_ = this->declare_parameter(
+      "r_elbow_pose_topic", std::string("/r_subgoal_pose"));
+  l_elbow_pose_topic_ = this->declare_parameter(
+      "l_elbow_pose_topic", std::string("/l_subgoal_pose"));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
   right_traj_topic_ = this->declare_parameter("right_traj_topic",
       std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
@@ -92,6 +95,7 @@ VRController::VRController()
   startup_ref_ori_threshold_deg_ = this->declare_parameter("startup_ref_ori_threshold_deg", 45.0);
 
   dt_ = time_step_;
+  last_joint_state_time_ = this->now();
   last_right_raw_traj_time_ = this->now();
   last_left_raw_traj_time_ = this->now();
 
@@ -381,13 +385,12 @@ void VRController::jointStateCallback(const sensor_msgs::msg::JointState::Shared
     }
 
     extractJointStates(msg);
+    last_joint_state_time_ = this->now();
     joint_state_received_ = true;
+    joint_state_timeout_active_ = false;
 
-            // Initialize q_desired_ from current joint positions on first callback
-    static bool positions_initialized = false;
-    if (!positions_initialized) {
-      q_desired_ = q_;
-      positions_initialized = true;
+    if (!start_requested_ || !control_enabled_ || activate_pending_ || reference_diverged_) {
+      syncCommandStateToFeedback();
     }
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Error in jointStateCallback: %s", e.what());
@@ -428,6 +431,7 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
     control_enabled_ = false;
     activate_pending_ = false;
     reference_diverged_ = true;
+    syncCommandStateToFeedback();
   } else {
     RCLCPP_WARN(this->get_logger(),
       "Reactivate topic '%s' set to false. Disabling controller.",
@@ -436,6 +440,7 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
     control_enabled_ = false;
     activate_pending_ = false;
     reference_diverged_ = true;
+    syncCommandStateToFeedback();
   }
 }
 
@@ -478,6 +483,20 @@ void VRController::controlLoopCallback()
     return;
   }
 
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      control_enabled_ = false;
+      activate_pending_ = false;
+      reference_diverged_ = true;
+      syncCommandStateToFeedback();
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding controller until fresh feedback is received.");
+    }
+    return;
+  }
+
         // Always compute & publish current gripper poses from measured state.
         // This allows external nodes to validate reference-vs-current before control starts.
   Eigen::Affine3d r_gripper_pose_meas = Eigen::Affine3d::Identity();
@@ -495,6 +514,7 @@ void VRController::controlLoopCallback()
 
         // Startup arming: wait for reactivate AND small goal-current pose error for both arms.
   if (!start_requested_) {
+    syncCommandStateToFeedback();
     if (debug_count++ % 100 == 0) {
       RCLCPP_WARN_THROTTLE(
                     this->get_logger(), *this->get_clock(), 2000,
@@ -506,6 +526,7 @@ void VRController::controlLoopCallback()
 
         // Only perform the goal-vs-current mismatch check during startup (before enabling control).
   if (!control_enabled_) {
+    syncCommandStateToFeedback();
     if (!r_goal_pose_received_ || !l_goal_pose_received_) {
       if (debug_count++ % 100 == 0) {
         RCLCPP_WARN_THROTTLE(
@@ -575,21 +596,25 @@ void VRController::controlLoopCallback()
     activate_start_ = this->get_clock()->now();
     activate_pending_ = true;
     reference_diverged_ = true;          // will be cleared after activation delay
+    syncCommandStateToFeedback();
     RCLCPP_WARN(
                 this->get_logger(),
                 "Startup check passed. Activating controller.");
   }
 
   if (activate_pending_) {
+    syncCommandStateToFeedback();
     const auto elapsed = this->get_clock()->now() - activate_start_;
     if (elapsed.seconds() >= 3.0) {
       reference_diverged_ = false;
       activate_pending_ = false;
+      syncCommandStateToFeedback();
       RCLCPP_WARN(this->get_logger(), "Controller activated.");
     }
   }
 
   if (reference_diverged_) {
+    syncCommandStateToFeedback();
     return;
   }
 
@@ -603,7 +628,9 @@ void VRController::controlLoopCallback()
 
     // If lift is commanded by another node, use measured lift state for
     // internal model consistency.
-    q_feedback[lift_joint_index_] = q_[lift_joint_index_];
+    if (lift_joint_index_ >= 0 && lift_joint_index_ < q_feedback.size()) {
+      q_feedback[lift_joint_index_] = q_[lift_joint_index_];
+    }
 
             // Control loop is executing - update kinematics solver with feedback state
     kinematics_solver_->updateState(q_feedback, qdot_);
@@ -706,6 +733,20 @@ void VRController::controlLoopCallback()
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
   }
+}
+
+bool VRController::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void VRController::syncCommandStateToFeedback()
+{
+  if (q_.size() != q_desired_.size()) {
+    return;
+  }
+  q_desired_ = q_;
 }
 
 Eigen::Affine3d VRController::computePoseMat(

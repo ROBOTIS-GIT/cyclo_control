@@ -2,6 +2,11 @@
 Changelog for package cyclo_motion_controller_ros_py
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (2026-05-04)
+------------------
+* Added arm retargeting feature for AI Worker vr controller
+* Contributors: Yeonguk Kim
+
 0.1.4 (2026-04-20)
 ------------------
 * None

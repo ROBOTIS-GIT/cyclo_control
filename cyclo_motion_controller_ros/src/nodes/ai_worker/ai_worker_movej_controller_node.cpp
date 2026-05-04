@@ -26,14 +26,9 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   commanded_state_initialized_(false),
   right_movej_target_initialized_(false),
   left_movej_target_initialized_(false),
-  right_movej_trajectory_active_(false),
-  left_movej_trajectory_active_(false),
   right_gripper_position_(0.0),
   left_gripper_position_(0.0),
-  right_motion_start_time_(this->now()),
-  left_motion_start_time_(this->now()),
-  right_active_motion_duration_(0.0),
-  left_active_motion_duration_(0.0)
+  last_joint_state_time_(this->now())
 {
   RCLCPP_INFO(this->get_logger(), "========================================");
   RCLCPP_INFO(this->get_logger(), "AI Worker MoveJ Controller - Starting up...");
@@ -50,6 +45,7 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
@@ -192,20 +188,22 @@ void AIWorkerMoveJController::jointStateCallback(const sensor_msgs::msg::JointSt
   }
 
   extractJointStates(msg);
+  last_joint_state_time_ = this->now();
   joint_state_received_ = true;
 
-  if (!commanded_state_initialized_) {
-    q_commanded_ = q_;
-    right_movej_start_ = q_;
-    right_movej_goal_ = q_;
-    left_movej_start_ = q_;
-    left_movej_goal_ = q_;
+  const bool was_uninitialized = !commanded_state_initialized_;
+  const bool recovering_from_timeout = joint_state_timeout_active_;
+  joint_state_timeout_active_ = false;
+
+  if (was_uninitialized || recovering_from_timeout) {
+    syncCommandStateToFeedback();
     commanded_state_initialized_ = true;
     right_movej_target_initialized_ = true;
     left_movej_target_initialized_ = true;
     RCLCPP_INFO(
       this->get_logger(),
       "AI Worker MoveJ Controller activated. Waiting for moveJ commands...");
+    return;
   }
 }
 
@@ -281,14 +279,21 @@ bool AIWorkerMoveJController::updateArmTargetFromTrajectory(
 void AIWorkerMoveJController::rightTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !commanded_state_initialized_ || msg->points.empty()) {
+  if (
+    !msg || !joint_state_received_ || jointStateTimedOut() || !commanded_state_initialized_ ||
+    msg->points.empty())
+  {
     return;
   }
 
   const auto duration = rclcpp::Duration(msg->points.front().time_from_start).seconds();
-  if (duration <= 1e-6) {
-    RCLCPP_WARN(this->get_logger(), "Right moveJ ignored: time_from_start must be > 0.");
+  if (duration <= -1) {
+    RCLCPP_WARN(this->get_logger(), "Right moveJ ignored: time_from_start must be > -1.");
     return;
+  }
+
+  if (duration > 0.0) {
+    syncRightArmToFeedback();
   }
 
   Eigen::VectorXd target_q = q_commanded_;
@@ -299,23 +304,27 @@ void AIWorkerMoveJController::rightTrajectoryCallback(
   updateGripperPositionFromTrajectory(*msg, right_gripper_joint_name_, right_gripper_position_);
   right_movej_start_ = q_commanded_;
   right_movej_goal_ = target_q;
-  right_motion_start_time_ = this->now();
-  right_active_motion_duration_ = duration;
   right_movej_target_initialized_ = true;
-  right_movej_trajectory_active_ = true;
 }
 
 void AIWorkerMoveJController::leftTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !commanded_state_initialized_ || msg->points.empty()) {
+  if (
+    !msg || !joint_state_received_ || jointStateTimedOut() || !commanded_state_initialized_ ||
+    msg->points.empty())
+  {
     return;
   }
 
   const auto duration = rclcpp::Duration(msg->points.front().time_from_start).seconds();
-  if (duration <= 1e-6) {
-    RCLCPP_WARN(this->get_logger(), "Left moveJ ignored: time_from_start must be > 0.");
+  if (duration <= -1) {
+    RCLCPP_WARN(this->get_logger(), "Left moveJ ignored: time_from_start must be > -1.");
     return;
+  }
+
+  if (duration > 0.0) {
+    syncLeftArmToFeedback();
   }
 
   Eigen::VectorXd target_q = q_commanded_;
@@ -326,10 +335,7 @@ void AIWorkerMoveJController::leftTrajectoryCallback(
   updateGripperPositionFromTrajectory(*msg, left_gripper_joint_name_, left_gripper_position_);
   left_movej_start_ = q_commanded_;
   left_movej_goal_ = target_q;
-  left_motion_start_time_ = this->now();
-  left_active_motion_duration_ = duration;
   left_movej_target_initialized_ = true;
-  left_movej_trajectory_active_ = true;
 }
 
 void AIWorkerMoveJController::assignArmSegment(
@@ -354,6 +360,16 @@ void AIWorkerMoveJController::controlLoopCallback()
     return;
   }
 
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding commands until fresh feedback is received.");
+    }
+    return;
+  }
+
   try {
     const Eigen::VectorXd q_feedback = q_commanded_;
     kinematics_solver_->updateState(q_feedback, qdot_);
@@ -362,45 +378,11 @@ void AIWorkerMoveJController::controlLoopCallback()
     Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(q_feedback.size());
 
     if (right_movej_target_initialized_) {
-      const double elapsed = (this->now() - right_motion_start_time_).seconds();
-      Eigen::VectorXd right_ref = right_movej_goal_;
-      Eigen::VectorXd right_qdot = Eigen::VectorXd::Zero(q_feedback.size());
-
-      if (right_movej_trajectory_active_ && elapsed < right_active_motion_duration_) {
-        const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(q_feedback.size());
-        right_ref = cyclo_motion_controller::common::math_utils::cubicVector(
-          elapsed, 0.0, right_active_motion_duration_,
-          right_movej_start_, right_movej_goal_, zeros, zeros);
-        right_qdot = cyclo_motion_controller::common::math_utils::cubicDotVector(
-          elapsed, 0.0, right_active_motion_duration_,
-          right_movej_start_, right_movej_goal_, zeros, zeros);
-      } else if (right_movej_trajectory_active_) {
-        right_movej_trajectory_active_ = false;
-      }
-
-      assignArmSegment(right_ref, right_arm_joints_, q_ref);
-      assignArmSegment(right_qdot, right_arm_joints_, qdot_ref);
+      assignArmSegment(right_movej_goal_, right_arm_joints_, q_ref);
     }
 
     if (left_movej_target_initialized_) {
-      const double elapsed = (this->now() - left_motion_start_time_).seconds();
-      Eigen::VectorXd left_ref = left_movej_goal_;
-      Eigen::VectorXd left_qdot = Eigen::VectorXd::Zero(q_feedback.size());
-
-      if (left_movej_trajectory_active_ && elapsed < left_active_motion_duration_) {
-        const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(q_feedback.size());
-        left_ref = cyclo_motion_controller::common::math_utils::cubicVector(
-          elapsed, 0.0, left_active_motion_duration_,
-          left_movej_start_, left_movej_goal_, zeros, zeros);
-        left_qdot = cyclo_motion_controller::common::math_utils::cubicDotVector(
-          elapsed, 0.0, left_active_motion_duration_,
-          left_movej_start_, left_movej_goal_, zeros, zeros);
-      } else if (left_movej_trajectory_active_) {
-        left_movej_trajectory_active_ = false;
-      }
-
-      assignArmSegment(left_ref, left_arm_joints_, q_ref);
-      assignArmSegment(left_qdot, left_arm_joints_, qdot_ref);
+      assignArmSegment(left_movej_goal_, left_arm_joints_, q_ref);
     }
 
     const Eigen::VectorXd desired_joint_vel = qdot_ref + kp_joint_ * (q_ref - q_feedback);
@@ -425,6 +407,31 @@ void AIWorkerMoveJController::controlLoopCallback()
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
   }
+}
+
+bool AIWorkerMoveJController::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void AIWorkerMoveJController::syncCommandStateToFeedback()
+{
+  q_commanded_ = q_;
+  right_movej_start_ = q_;
+  right_movej_goal_ = q_;
+  left_movej_start_ = q_;
+  left_movej_goal_ = q_;
+}
+
+void AIWorkerMoveJController::syncRightArmToFeedback()
+{
+  assignArmSegment(q_, right_arm_joints_, q_commanded_);
+}
+
+void AIWorkerMoveJController::syncLeftArmToFeedback()
+{
+  assignArmSegment(q_, left_arm_joints_, q_commanded_);
 }
 
 void AIWorkerMoveJController::publishTrajectory(const Eigen::VectorXd & q_command) const

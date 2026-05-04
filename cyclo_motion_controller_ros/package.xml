@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>cyclo_motion_controller_ros</name>
-  <version>0.1.4</version>
+  <version>0.2.0</version>
   <description>ROS 2 wrapper for Cyclo motion controller using QP-based inverse kinematics</description>
   <maintainer email="pyo@robotis.com">Pyo</maintainer>
   <license>Apache 2.0</license>

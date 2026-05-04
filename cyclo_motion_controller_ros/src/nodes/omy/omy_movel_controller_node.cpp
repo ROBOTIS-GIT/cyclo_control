@@ -29,6 +29,7 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
   movel_target_initialized_(false),
   movel_trajectory_active_(false),
   motion_start_time_(this->now()),
+  last_joint_state_time_(this->now()),
   active_motion_duration_(0.0),
   movel_start_pose_(Eigen::Affine3d::Identity()),
   movel_goal_pose_(Eigen::Affine3d::Identity())
@@ -50,6 +51,7 @@ OmyMoveLControllerNode::OmyMoveLControllerNode()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
 
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
@@ -226,22 +228,23 @@ void OmyMoveLControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
   }
 
   extractJointStates(msg);
+  last_joint_state_time_ = this->now();
   joint_state_received_ = true;
 
-  if (!commanded_state_initialized_) {
-    q_commanded_ = q_;
-    commanded_state_initialized_ = true;
+  const bool was_uninitialized = !commanded_state_initialized_;
+  const bool recovering_from_timeout = joint_state_timeout_active_;
+  joint_state_timeout_active_ = false;
 
-    kinematics_solver_->updateState(q_commanded_, qdot_);
-    movel_start_pose_ = kinematics_solver_->getPose(controlled_link_);
-    movel_goal_pose_ = movel_start_pose_;
+  if (was_uninitialized || recovering_from_timeout || !movel_trajectory_active_) {
+    syncCommandStateToFeedback();
+    commanded_state_initialized_ = true;
     movel_target_initialized_ = true;
   }
 }
 
 void OmyMoveLControllerNode::moveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_) {
+  if (!msg || !joint_state_received_ || jointStateTimedOut()) {
     RCLCPP_WARN_THROTTLE(
                 this->get_logger(),
                 *this->get_clock(),
@@ -252,6 +255,7 @@ void OmyMoveLControllerNode::moveLCallback(const robotis_interfaces::msg::MoveL:
 
   const double requested_duration = commandDurationSeconds(msg->time_from_start);
 
+  syncCommandStateToFeedback();
   kinematics_solver_->updateState(q_commanded_, qdot_);
   movel_start_pose_ = kinematics_solver_->getPose(controlled_link_);
   movel_goal_pose_ = poseMsgToEigen(msg->pose);
@@ -306,6 +310,17 @@ void OmyMoveLControllerNode::controlLoopCallback()
                 *this->get_clock(),
                 2000,
                 "Control loop waiting for joint states...");
+    return;
+  }
+
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      movel_trajectory_active_ = false;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding commands until fresh feedback is received.");
+    }
     return;
   }
 
@@ -395,6 +410,21 @@ void OmyMoveLControllerNode::controlLoopCallback()
     publishControllerError("OMY MoveL Controller loop error: " + std::string(e.what()));
     RCLCPP_ERROR(this->get_logger(), "OMY MoveL Controller loop error: %s", e.what());
   }
+}
+
+bool OmyMoveLControllerNode::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void OmyMoveLControllerNode::syncCommandStateToFeedback()
+{
+  q_commanded_ = q_;
+  kinematics_solver_->updateState(q_commanded_, qdot_);
+  movel_start_pose_ = kinematics_solver_->getPose(controlled_link_);
+  movel_goal_pose_ = movel_start_pose_;
+  movel_trajectory_active_ = false;
 }
 }  // namespace cyclo_motion_controller_ros
 

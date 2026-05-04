@@ -30,6 +30,7 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   left_movel_trajectory_active_(false),
   right_motion_start_time_(this->now()),
   left_motion_start_time_(this->now()),
+  last_joint_state_time_(this->now()),
   right_active_motion_duration_(0.0),
   left_active_motion_duration_(0.0),
   right_gripper_position_(0.0),
@@ -52,6 +53,7 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
@@ -223,31 +225,37 @@ void AIWorkerMoveLController::jointStateCallback(const sensor_msgs::msg::JointSt
   }
 
   extractJointStates(msg);
+  last_joint_state_time_ = this->now();
   joint_state_received_ = true;
 
-  if (!q_desired_initialized_) {
-    q_desired_ = q_;
-    q_desired_initialized_ = true;
+  const bool was_uninitialized = !q_desired_initialized_;
+  const bool recovering_from_timeout = joint_state_timeout_active_;
+  joint_state_timeout_active_ = false;
 
-    kinematics_solver_->updateState(q_desired_, qdot_);
-    right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
-    left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
-    right_movel_start_pose_ = right_gripper_pose_;
-    left_movel_start_pose_ = left_gripper_pose_;
-    right_movel_goal_pose_ = right_gripper_pose_;
-    left_movel_goal_pose_ = left_gripper_pose_;
+  if (was_uninitialized || recovering_from_timeout) {
+    syncCommandStateToFeedback();
+    q_desired_initialized_ = true;
     right_movel_target_initialized_ = true;
     left_movel_target_initialized_ = true;
+    return;
+  }
+
+  if (!right_movel_trajectory_active_ && !left_movel_trajectory_active_) {
+    syncCommandStateToFeedback();
   }
 }
 
 void AIWorkerMoveLController::rightMoveLCallback(
   const robotis_interfaces::msg::MoveL::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !q_desired_initialized_) {
+  if (!msg || !joint_state_received_ || jointStateTimedOut() || !q_desired_initialized_) {
     return;
   }
 
+  syncArmStateToFeedback(right_arm_joints_, q_desired_);
+  if (lift_joint_index_ >= 0 && lift_joint_index_ < q_desired_.size()) {
+    q_desired_[lift_joint_index_] = q_[lift_joint_index_];
+  }
   kinematics_solver_->updateState(q_desired_, qdot_);
   right_movel_start_pose_ = kinematics_solver_->getPose(r_gripper_name_);
   right_movel_goal_pose_ = poseMsgToEigen(msg->pose);
@@ -259,10 +267,14 @@ void AIWorkerMoveLController::rightMoveLCallback(
 
 void AIWorkerMoveLController::leftMoveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg)
 {
-  if (!msg || !joint_state_received_ || !q_desired_initialized_) {
+  if (!msg || !joint_state_received_ || jointStateTimedOut() || !q_desired_initialized_) {
     return;
   }
 
+  syncArmStateToFeedback(left_arm_joints_, q_desired_);
+  if (lift_joint_index_ >= 0 && lift_joint_index_ < q_desired_.size()) {
+    q_desired_[lift_joint_index_] = q_[lift_joint_index_];
+  }
   kinematics_solver_->updateState(q_desired_, qdot_);
   left_movel_start_pose_ = kinematics_solver_->getPose(l_gripper_name_);
   left_movel_goal_pose_ = poseMsgToEigen(msg->pose);
@@ -311,6 +323,18 @@ cyclo_motion_controller::common::Vector6d AIWorkerMoveLController::computeDesire
 void AIWorkerMoveLController::controlLoopCallback()
 {
   if (!joint_state_received_ || !q_desired_initialized_) {
+    return;
+  }
+
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      right_movel_trajectory_active_ = false;
+      left_movel_trajectory_active_ = false;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding commands until fresh feedback is received.");
+    }
     return;
   }
 
@@ -439,6 +463,39 @@ void AIWorkerMoveLController::controlLoopCallback()
     err.data = std::string("AI Worker MoveL Controller loop error: ") + e.what();
     controller_error_pub_->publish(err);
     RCLCPP_ERROR(this->get_logger(), "%s", err.data.c_str());
+  }
+}
+
+bool AIWorkerMoveLController::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void AIWorkerMoveLController::syncCommandStateToFeedback()
+{
+  q_desired_ = q_;
+  kinematics_solver_->updateState(q_desired_, qdot_);
+  right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
+  left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
+  right_movel_start_pose_ = right_gripper_pose_;
+  left_movel_start_pose_ = left_gripper_pose_;
+  right_movel_goal_pose_ = right_gripper_pose_;
+  left_movel_goal_pose_ = left_gripper_pose_;
+  right_movel_trajectory_active_ = false;
+  left_movel_trajectory_active_ = false;
+}
+
+void AIWorkerMoveLController::syncArmStateToFeedback(
+  const std::vector<std::string> & arm_joint_names,
+  Eigen::VectorXd & destination) const
+{
+  for (const auto & joint_name : arm_joint_names) {
+    const auto it = model_joint_index_map_.find(joint_name);
+    if (it == model_joint_index_map_.end()) {
+      continue;
+    }
+    destination[it->second] = q_[it->second];
   }
 }
 
