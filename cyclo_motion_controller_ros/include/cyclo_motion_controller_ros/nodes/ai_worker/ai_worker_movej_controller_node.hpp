@@ -121,18 +121,11 @@ private:
   bool commanded_state_initialized_;
   bool right_movej_target_initialized_;
   bool left_movej_target_initialized_;
-  bool right_movej_trajectory_active_;
-  bool left_movej_trajectory_active_;
   bool joint_state_timeout_active_ = false;
 
   double right_gripper_position_;
   double left_gripper_position_;
-
-  rclcpp::Time right_motion_start_time_;
-  rclcpp::Time left_motion_start_time_;
   rclcpp::Time last_joint_state_time_;
-  double right_active_motion_duration_;
-  double left_active_motion_duration_;
 
   std::vector<std::string> left_arm_joints_;
   std::vector<std::string> right_arm_joints_;

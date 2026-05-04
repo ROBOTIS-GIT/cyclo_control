@@ -39,8 +39,8 @@ ai_worker_movej_controller:
     time_step: 0.01
     trajectory_time: 0.0
 
-    kp_joint: 6.0
-    weight_tracking: 1.0
+    kp_joint: 50.0
+    weight_tracking: 10.0
     weight_damping: 0.1
 
     collision_buffer: 0.05
