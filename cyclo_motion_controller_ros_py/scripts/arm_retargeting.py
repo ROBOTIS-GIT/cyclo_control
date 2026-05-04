@@ -115,15 +115,12 @@ class ArmRetargetingTeleop(Node):
         self.wrist_priority_min_scale = 0.25
         self.wrist_priority_decay_rate = 4.0
         self.max_wrist_distance_correction = 0.3
-        self.wrist_distance_smoothing_alpha = 0.2
         self.human_wrist_to_fingertip = 0.22
         self.robot_wrist_to_fingertip = 0.25
         self.wrist_distance_scale = self._compute_wrist_distance_scale(
             human_wrist_to_fingertip=self.human_wrist_to_fingertip,
             robot_wrist_to_fingertip=self.robot_wrist_to_fingertip,
         )
-        self._filtered_right_wrist_target: Optional[np.ndarray] = None
-        self._filtered_left_wrist_target: Optional[np.ndarray] = None
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -335,12 +332,6 @@ class ArmRetargetingTeleop(Node):
             wrist_target=adjusted_left_wrist_target,
             forearm_length=self.left_geometry.forearm_length,
             fallback_wrist_target=left_wrist_target,
-        )
-        adjusted_right_wrist_target, adjusted_left_wrist_target = (
-            self._smooth_wrist_targets(
-                right_target=adjusted_right_wrist_target,
-                left_target=adjusted_left_wrist_target,
-            )
         )
         right_wrist_goal = self._copy_pose_with_new_position(
             right_wrist_goal,
@@ -609,30 +600,6 @@ class ArmRetargetingTeleop(Node):
                 return wrist_target
             direction = fallback_direction
         return elbow_target + forearm_length * direction
-
-    def _smooth_wrist_targets(
-        self,
-        right_target: np.ndarray,
-        left_target: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Low-pass filter wrist targets to prevent frame-to-frame jumps."""
-        alpha = float(np.clip(self.wrist_distance_smoothing_alpha, 0.0, 1.0))
-        if self._filtered_right_wrist_target is None:
-            self._filtered_right_wrist_target = right_target.copy()
-        else:
-            self._filtered_right_wrist_target = (
-                (1.0 - alpha) * self._filtered_right_wrist_target + alpha * right_target
-            )
-        if self._filtered_left_wrist_target is None:
-            self._filtered_left_wrist_target = left_target.copy()
-        else:
-            self._filtered_left_wrist_target = (
-                (1.0 - alpha) * self._filtered_left_wrist_target + alpha * left_target
-            )
-        return (
-            self._filtered_right_wrist_target.copy(),
-            self._filtered_left_wrist_target.copy(),
-        )
 
     def _poses_have_matching_stamps(self, *msgs: PoseStamped) -> bool:
         """Return whether all poses share the exact same ROS header stamp."""
