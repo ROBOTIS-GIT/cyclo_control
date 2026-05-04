@@ -18,8 +18,8 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
+import os
 from typing import Optional
 
 from ament_index_python.packages import get_package_share_directory
@@ -39,6 +39,7 @@ QOS_BEST_EFFORT = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
     depth=1,
 )
+
 
 @dataclass(frozen=True)
 class RobotArmGeometry:
@@ -616,6 +617,7 @@ class ArmRetargetingTeleop(Node):
     def _pose_stamp_tuple(msg: PoseStamped) -> tuple[int, int]:
         """Convert a ROS pose header stamp into an equality-friendly tuple."""
         return int(msg.header.stamp.sec), int(msg.header.stamp.nanosec)
+
 
 def main(args=None) -> None:
     """Run the arm retargeting teleoperation node."""

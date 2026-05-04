@@ -60,8 +60,10 @@ VRController::VRController()
   reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reactivate"));
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
-  r_elbow_pose_topic_ = this->declare_parameter("r_elbow_pose_topic", std::string("/r_subgoal_pose"));
-  l_elbow_pose_topic_ = this->declare_parameter("l_elbow_pose_topic", std::string("/l_subgoal_pose"));
+  r_elbow_pose_topic_ = this->declare_parameter(
+      "r_elbow_pose_topic", std::string("/r_subgoal_pose"));
+  l_elbow_pose_topic_ = this->declare_parameter(
+      "l_elbow_pose_topic", std::string("/l_subgoal_pose"));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
   right_traj_topic_ = this->declare_parameter("right_traj_topic",
       std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
