@@ -200,11 +200,9 @@ void AIWorkerMoveJController::jointStateCallback(const sensor_msgs::msg::JointSt
     commanded_state_initialized_ = true;
     right_movej_target_initialized_ = true;
     left_movej_target_initialized_ = true;
-    if (was_uninitialized || recovering_from_timeout) {
-      RCLCPP_INFO(
-        this->get_logger(),
-        "AI Worker MoveJ Controller activated. Waiting for moveJ commands...");
-    }
+    RCLCPP_INFO(
+      this->get_logger(),
+      "AI Worker MoveJ Controller activated. Waiting for moveJ commands...");
     return;
   }
 }
@@ -429,15 +427,11 @@ void AIWorkerMoveJController::syncCommandStateToFeedback()
 void AIWorkerMoveJController::syncRightArmToFeedback()
 {
   assignArmSegment(q_, right_arm_joints_, q_commanded_);
-  assignArmSegment(q_, right_arm_joints_, right_movej_start_);
-  assignArmSegment(q_, right_arm_joints_, right_movej_goal_);
 }
 
 void AIWorkerMoveJController::syncLeftArmToFeedback()
 {
   assignArmSegment(q_, left_arm_joints_, q_commanded_);
-  assignArmSegment(q_, left_arm_joints_, left_movej_start_);
-  assignArmSegment(q_, left_arm_joints_, left_movej_goal_);
 }
 
 void AIWorkerMoveJController::publishTrajectory(const Eigen::VectorXd & q_command) const

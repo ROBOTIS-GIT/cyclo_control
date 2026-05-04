@@ -510,9 +510,6 @@ class ArmRetargetingTeleop(Node):
         """Copy pose orientation and header while replacing the position."""
         msg = PoseStamped()
         msg.header = source.header
-        msg.pose.position.x = source.pose.position.x
-        msg.pose.position.y = source.pose.position.y
-        msg.pose.position.z = source.pose.position.z
         msg.pose.orientation.x = source.pose.orientation.x
         msg.pose.orientation.y = source.pose.orientation.y
         msg.pose.orientation.z = source.pose.orientation.z

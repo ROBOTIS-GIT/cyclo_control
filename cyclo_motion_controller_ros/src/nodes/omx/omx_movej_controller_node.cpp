@@ -264,11 +264,9 @@ void OmxMoveJControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
     syncCommandStateToFeedback();
     commanded_state_initialized_ = true;
     movej_target_initialized_ = true;
-    if (was_uninitialized || recovering_from_timeout) {
-      RCLCPP_INFO(
-        this->get_logger(),
-        "OMX MoveJ Controller activated. Waiting for moveJ commands...");
-    }
+    RCLCPP_INFO(
+      this->get_logger(),
+      "OMX MoveJ Controller activated. Waiting for moveJ commands...");
   }
 }
 
