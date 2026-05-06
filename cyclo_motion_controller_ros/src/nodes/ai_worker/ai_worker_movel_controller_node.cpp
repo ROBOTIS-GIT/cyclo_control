@@ -240,9 +240,6 @@ void AIWorkerMoveLController::jointStateCallback(const sensor_msgs::msg::JointSt
     return;
   }
 
-  if (!right_movel_trajectory_active_ && !left_movel_trajectory_active_) {
-    syncCommandStateToFeedback();
-  }
 }
 
 void AIWorkerMoveLController::rightMoveLCallback(
@@ -262,7 +259,7 @@ void AIWorkerMoveLController::rightMoveLCallback(
   right_active_motion_duration_ = commandDurationSeconds(msg->time_from_start);
   right_motion_start_time_ = this->now();
   right_movel_target_initialized_ = true;
-  right_movel_trajectory_active_ = right_active_motion_duration_ > 1e-6;
+  right_movel_trajectory_active_ = right_active_motion_duration_ > -1.0;
 }
 
 void AIWorkerMoveLController::leftMoveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg)
@@ -281,7 +278,7 @@ void AIWorkerMoveLController::leftMoveLCallback(const robotis_interfaces::msg::M
   left_active_motion_duration_ = commandDurationSeconds(msg->time_from_start);
   left_motion_start_time_ = this->now();
   left_movel_target_initialized_ = true;
-  left_movel_trajectory_active_ = left_active_motion_duration_ > 1e-6;
+  left_movel_trajectory_active_ = left_active_motion_duration_ > -1.0;
 }
 
 Eigen::Affine3d AIWorkerMoveLController::poseMsgToEigen(

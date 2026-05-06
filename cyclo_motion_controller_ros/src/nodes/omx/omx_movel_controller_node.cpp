@@ -235,7 +235,7 @@ void OmxMoveLControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
   const bool recovering_from_timeout = joint_state_timeout_active_;
   joint_state_timeout_active_ = false;
 
-  if (was_uninitialized || recovering_from_timeout || !movel_trajectory_active_) {
+  if (was_uninitialized || recovering_from_timeout) {
     syncCommandStateToFeedback();
     commanded_state_initialized_ = true;
     movel_target_initialized_ = true;
@@ -262,7 +262,7 @@ void OmxMoveLControllerNode::moveLCallback(const robotis_interfaces::msg::MoveL:
   active_motion_duration_ = requested_duration;
   motion_start_time_ = this->now();
   movel_target_initialized_ = true;
-  movel_trajectory_active_ = true;
+  movel_trajectory_active_ = requested_duration > -1.0;
 }
 
 Eigen::Affine3d OmxMoveLControllerNode::poseMsgToEigen(
