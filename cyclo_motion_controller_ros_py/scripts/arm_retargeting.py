@@ -116,12 +116,15 @@ class ArmRetargetingTeleop(Node):
         self.wrist_priority_min_scale = 0.25
         self.wrist_priority_decay_rate = 4.0
         self.max_wrist_distance_correction = 0.3
+        self.wrist_distance_smoothing_alpha = 1.0
         self.human_wrist_to_fingertip = 0.22
         self.robot_wrist_to_fingertip = 0.25
         self.wrist_distance_scale = self._compute_wrist_distance_scale(
             human_wrist_to_fingertip=self.human_wrist_to_fingertip,
             robot_wrist_to_fingertip=self.robot_wrist_to_fingertip,
         )
+        self._filtered_right_wrist_target: Optional[np.ndarray] = None
+        self._filtered_left_wrist_target: Optional[np.ndarray] = None
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -300,6 +303,8 @@ class ArmRetargetingTeleop(Node):
         left_wrist_msg = self.left_pose_state.wrist
         if right_wrist_msg is None or left_wrist_msg is None:
             return None
+        if not self._poses_have_matching_stamps(right_wrist_msg, left_wrist_msg):
+            return None
 
         right_elbow_goal, right_wrist_goal = right_targets
         left_elbow_goal, left_wrist_goal = left_targets
@@ -334,6 +339,12 @@ class ArmRetargetingTeleop(Node):
             forearm_length=self.left_geometry.forearm_length,
             fallback_wrist_target=left_wrist_target,
         )
+        adjusted_right_wrist_target, adjusted_left_wrist_target = (
+            self._smooth_wrist_targets(
+                right_target=adjusted_right_wrist_target,
+                left_target=adjusted_left_wrist_target,
+            )
+        )
         right_wrist_goal = self._copy_pose_with_new_position(
             right_wrist_goal,
             adjusted_right_wrist_target,
@@ -341,6 +352,12 @@ class ArmRetargetingTeleop(Node):
         left_wrist_goal = self._copy_pose_with_new_position(
             left_wrist_goal,
             adjusted_left_wrist_target,
+        )
+        right_wrist_goal, left_wrist_goal = self._enforce_human_wrist_relative_orientation(
+            right_human_wrist=right_wrist_msg,
+            left_human_wrist=left_wrist_msg,
+            right_wrist_goal=right_wrist_goal,
+            left_wrist_goal=left_wrist_goal,
         )
         return right_elbow_goal, right_wrist_goal, left_elbow_goal, left_wrist_goal
 
@@ -510,6 +527,9 @@ class ArmRetargetingTeleop(Node):
         """Copy pose orientation and header while replacing the position."""
         msg = PoseStamped()
         msg.header = source.header
+        msg.pose.position.x = source.pose.position.x
+        msg.pose.position.y = source.pose.position.y
+        msg.pose.position.z = source.pose.position.z
         msg.pose.orientation.x = source.pose.orientation.x
         msg.pose.orientation.y = source.pose.orientation.y
         msg.pose.orientation.z = source.pose.orientation.z
@@ -599,6 +619,30 @@ class ArmRetargetingTeleop(Node):
             direction = fallback_direction
         return elbow_target + forearm_length * direction
 
+    def _smooth_wrist_targets(
+        self,
+        right_target: np.ndarray,
+        left_target: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Low-pass filter wrist targets to prevent frame-to-frame jumps."""
+        alpha = float(np.clip(self.wrist_distance_smoothing_alpha, 0.0, 1.0))
+        if self._filtered_right_wrist_target is None:
+            self._filtered_right_wrist_target = right_target.copy()
+        else:
+            self._filtered_right_wrist_target = (
+                (1.0 - alpha) * self._filtered_right_wrist_target + alpha * right_target
+            )
+        if self._filtered_left_wrist_target is None:
+            self._filtered_left_wrist_target = left_target.copy()
+        else:
+            self._filtered_left_wrist_target = (
+                (1.0 - alpha) * self._filtered_left_wrist_target + alpha * left_target
+            )
+        return (
+            self._filtered_right_wrist_target.copy(),
+            self._filtered_left_wrist_target.copy(),
+        )
+
     def _poses_have_matching_stamps(self, *msgs: PoseStamped) -> bool:
         """Return whether all poses share the exact same ROS header stamp."""
         if not msgs:
@@ -614,6 +658,104 @@ class ArmRetargetingTeleop(Node):
     def _pose_stamp_tuple(msg: PoseStamped) -> tuple[int, int]:
         """Convert a ROS pose header stamp into an equality-friendly tuple."""
         return int(msg.header.stamp.sec), int(msg.header.stamp.nanosec)
+
+    def _enforce_human_wrist_relative_orientation(
+        self,
+        right_human_wrist: PoseStamped,
+        left_human_wrist: PoseStamped,
+        right_wrist_goal: PoseStamped,
+        left_wrist_goal: PoseStamped,
+    ) -> tuple[PoseStamped, PoseStamped]:
+        """Apply human right/left wrist relative orientation to modified goals."""
+        right_human_quat = self._normalize_quaternion(
+            self._pose_orientation_to_quaternion(right_human_wrist)
+        )
+        left_human_quat = self._normalize_quaternion(
+            self._pose_orientation_to_quaternion(left_human_wrist)
+        )
+        if right_human_quat is None or left_human_quat is None:
+            return right_wrist_goal, left_wrist_goal
+
+        left_to_right_quat = self._quaternion_multiply(
+            right_human_quat,
+            self._quaternion_inverse(left_human_quat),
+        )
+        left_to_right_quat = self._normalize_quaternion(left_to_right_quat)
+        if left_to_right_quat is None:
+            return right_wrist_goal, left_wrist_goal
+
+        right_goal_quat = self._normalize_quaternion(
+            self._pose_orientation_to_quaternion(right_wrist_goal)
+        )
+        if right_goal_quat is None:
+            return right_wrist_goal, left_wrist_goal
+
+        enforced_left_goal_quat = self._quaternion_multiply(
+            self._quaternion_inverse(left_to_right_quat),
+            right_goal_quat,
+        )
+        enforced_left_goal_quat = self._normalize_quaternion(enforced_left_goal_quat)
+        if enforced_left_goal_quat is None:
+            return right_wrist_goal, left_wrist_goal
+
+        self._set_pose_orientation_from_quaternion(
+            left_wrist_goal,
+            enforced_left_goal_quat,
+        )
+        return right_wrist_goal, left_wrist_goal
+
+    @staticmethod
+    def _pose_orientation_to_quaternion(msg: PoseStamped) -> np.ndarray:
+        """Return pose orientation as [x, y, z, w]."""
+        return np.array(
+            [
+                msg.pose.orientation.x,
+                msg.pose.orientation.y,
+                msg.pose.orientation.z,
+                msg.pose.orientation.w,
+            ],
+            dtype=np.float64,
+        )
+
+    @staticmethod
+    def _set_pose_orientation_from_quaternion(msg: PoseStamped, quat: np.ndarray) -> None:
+        """Write [x, y, z, w] quaternion into pose orientation."""
+        msg.pose.orientation.x = float(quat[0])
+        msg.pose.orientation.y = float(quat[1])
+        msg.pose.orientation.z = float(quat[2])
+        msg.pose.orientation.w = float(quat[3])
+
+    @staticmethod
+    def _normalize_quaternion(quat: np.ndarray) -> Optional[np.ndarray]:
+        """Normalize quaternion and return `None` if degenerate."""
+        norm = float(np.linalg.norm(quat))
+        if norm < 1e-6:
+            return None
+        return quat / norm
+
+    @staticmethod
+    def _quaternion_inverse(quat: np.ndarray) -> np.ndarray:
+        """Return quaternion inverse for [x, y, z, w] input."""
+        norm_sq = float(np.dot(quat, quat))
+        if norm_sq < 1e-6:
+            return quat.copy()
+        x, y, z, w = quat
+        return np.array([-x, -y, -z, w], dtype=np.float64) / norm_sq
+
+    @staticmethod
+    def _quaternion_multiply(lhs: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+        """Multiply [x, y, z, w] quaternions: result = lhs * rhs."""
+        x1, y1, z1, w1 = lhs
+        x2, y2, z2, w2 = rhs
+        return np.array(
+            [
+                w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+                w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+                w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            ],
+            dtype=np.float64,
+        )
 
 
 def main(args=None) -> None:
