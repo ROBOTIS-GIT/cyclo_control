@@ -23,9 +23,10 @@
 
 #pragma once
 #include <Eigen/Dense>
-#include <string>
-#include <iostream>
+#include <algorithm>
 #include <fstream>
+#include <iostream>
+#include <string>
 
 #include "OsqpEigen/OsqpEigen.h"
 
@@ -81,7 +82,45 @@ public:
     A_ds_.setZero(nc_, nx_);
     l_ds_.setConstant(nc_, -OSQP_INFTY);
     u_ds_.setConstant(nc_, OSQP_INFTY);
+
+    solver_initialized_ = false;
+    has_prev_pattern_ = false;
   }
+            /**
+             * @brief Initialize the solver.
+             * @param P (const Eigen::SparseMatrix<double>&) Hessian matrix.
+             * @param A (const Eigen::SparseMatrix<double>&) Constraint matrix.
+             * @param q (const Eigen::VectorXd&) Gradient vector.
+             * @param l (const Eigen::VectorXd&) Lower bounds for constraints.
+             * @param u (const Eigen::VectorXd&) Upper bounds for constraints.
+             * @return (bool) True if the solver was initialized successfully.
+             */
+  bool initializeSolver(
+    const Eigen::SparseMatrix<double> & P,
+    const Eigen::SparseMatrix<double> & A,
+    Eigen::VectorXd & q,
+    Eigen::VectorXd & l,
+    Eigen::VectorXd & u)
+  {
+    // Recreate solver from scratch to avoid stale Data() state after failed setup.
+    solver_ = OsqpEigen::Solver();
+
+    solver_.settings()->setWarmStart(true);
+    solver_.settings()->getSettings()->verbose = false;
+
+    solver_.data()->setNumberOfVariables(nx_);
+    solver_.data()->setNumberOfConstraints(nc_);
+    if (!solver_.data()->setHessianMatrix(P)) {return false;}
+    if (!solver_.data()->setGradient(q)) {return false;}
+    if (!solver_.data()->setLinearConstraintsMatrix(A)) {return false;}
+    if (!solver_.data()->setLowerBound(l)) {return false;}
+    if (!solver_.data()->setUpperBound(u)) {return false;}
+
+    if (!solver_.initSolver()) {return false;}
+    solver_initialized_ = true;
+    return true;
+  }
+
             /**
              * @brief Solve the QP problem.
              *
@@ -106,31 +145,35 @@ public:
     Eigen::VectorXd l = l_ds_;
     Eigen::VectorXd u = u_ds_;
 
-    OsqpEigen::Solver solver;
+    const bool pattern_changed =
+      !has_prev_pattern_ ||
+      !hasSameSparsityPattern(P, prev_hessian_pattern_) ||
+      !hasSameSparsityPattern(A, prev_constraint_pattern_);
 
-                // Configure solver settings
-    solver.settings()->setWarmStart(true);
-    solver.settings()->getSettings()->verbose = false;
+    if (!solver_initialized_ || pattern_changed) {
+      if (!initializeSolver(P, A, q, l, u)) {return false;}
+    } else {
+      const bool updated =
+        solver_.updateHessianMatrix(P) &&
+        solver_.updateLinearConstraintsMatrix(A) &&
+        solver_.updateGradient(q) &&
+        solver_.updateBounds(l, u);
 
-                // Set QP problem data
-    solver.data()->setNumberOfVariables(nx_);
-    solver.data()->setNumberOfConstraints(nc_);
-    if (!solver.data()->setHessianMatrix(P)) {return false;}
-    if (!solver.data()->setGradient(q)) {return false;}
-    if (!solver.data()->setLinearConstraintsMatrix(A)) {return false;}
-    if (!solver.data()->setLowerBound(l)) {return false;}
-    if (!solver.data()->setUpperBound(u)) {return false;}
+      if (!updated) {
+        solver_initialized_ = false;
+        if (!initializeSolver(P, A, q, l, u)) {return false;}
+      }
+    }
 
-                // Initialize and solve
-    if (!solver.initSolver()) {return false;}
-    if (solver.solveProblem() != OsqpEigen::ErrorExitFlag::NoError) {return false;}
+    if (solver_.solveProblem() != OsqpEigen::ErrorExitFlag::NoError) {return false;}
 
-    qp_status_ = solver.getStatus();
-    if (solver.getStatus() != OsqpEigen::Status::Solved) {return false;}
+    qp_status_ = solver_.getStatus();
+    if (solver_.getStatus() != OsqpEigen::Status::Solved) {return false;}
 
-    sol = solver.getSolution();
-    solver.clearSolverVariables();
-    solver.clearSolver();
+    sol = solver_.getSolution();
+    prev_hessian_pattern_ = P;
+    prev_constraint_pattern_ = A;
+    has_prev_pattern_ = true;
 
     return true;
   }
@@ -157,6 +200,10 @@ private:
              */
   void setConstraint()
   {
+    A_ds_.setZero(nc_, nx_);
+    l_ds_.setConstant(nc_, -OSQP_INFTY);
+    u_ds_.setConstant(nc_, OSQP_INFTY);
+
                 // Bound Constraint
     if (nbc_ != 0) {
       A_ds_.block(0, 0, nbc_, nx_).setIdentity();
@@ -177,6 +224,26 @@ private:
       l_ds_.segment(nbc_ + nineqc_, neqc_) = b_eq_ds_;
       u_ds_.segment(nbc_ + nineqc_, neqc_) = b_eq_ds_;
     }
+  }
+
+  static bool hasSameSparsityPattern(
+    const Eigen::SparseMatrix<double> & lhs,
+    const Eigen::SparseMatrix<double> & rhs)
+  {
+    if (
+      lhs.rows() != rhs.rows() ||
+      lhs.cols() != rhs.cols() ||
+      lhs.outerSize() != rhs.outerSize() ||
+      lhs.nonZeros() != rhs.nonZeros())
+    {
+      return false;
+    }
+
+    const bool same_outer = std::equal(
+      lhs.outerIndexPtr(), lhs.outerIndexPtr() + lhs.outerSize() + 1, rhs.outerIndexPtr());
+    const bool same_inner = std::equal(
+      lhs.innerIndexPtr(), lhs.innerIndexPtr() + lhs.nonZeros(), rhs.innerIndexPtr());
+    return same_outer && same_inner;
   }
 
 protected:
@@ -205,11 +272,15 @@ protected:
 
 
   OsqpEigen::Status qp_status_;             // Status of the QP solver
+  OsqpEigen::Solver solver_;                // Persistent OSQP solver
+  bool solver_initialized_ {false};         // Solver init state
+  Eigen::SparseMatrix<double> prev_hessian_pattern_;     // Cached Hessian pattern
+  Eigen::SparseMatrix<double> prev_constraint_pattern_;  // Cached constraint pattern
+  bool has_prev_pattern_ {false};                        // Pattern cache state
 };
 }  // namespace optimization
 }  // namespace cyclo_motion_controller
 
-// Legacy alias (prefer cyclo_motion_controller::optimization::QPBase).
 namespace QP
 {
 using QPBase = cyclo_motion_controller::optimization::QPBase;
