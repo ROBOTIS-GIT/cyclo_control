@@ -239,7 +239,6 @@ void AIWorkerMoveLController::jointStateCallback(const sensor_msgs::msg::JointSt
     left_movel_target_initialized_ = true;
     return;
   }
-
 }
 
 void AIWorkerMoveLController::rightMoveLCallback(
