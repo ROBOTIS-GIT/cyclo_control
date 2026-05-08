@@ -27,6 +27,7 @@ OmxMoveJControllerNode::OmxMoveJControllerNode()
   movej_target_initialized_(false),
   movej_trajectory_active_(false),
   motion_start_time_(this->now()),
+  last_joint_state_time_(this->now()),
   active_motion_duration_(0.0)
 {
   RCLCPP_INFO(this->get_logger(), "========================================");
@@ -44,6 +45,7 @@ OmxMoveJControllerNode::OmxMoveJControllerNode()
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
   collision_buffer_ = this->declare_parameter("collision_buffer", 0.05);
   collision_safe_distance_ = this->declare_parameter("collision_safe_distance", 0.02);
+  joint_state_timeout_ = this->declare_parameter("joint_state_timeout", 0.5);
 
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
@@ -251,22 +253,27 @@ void OmxMoveJControllerNode::jointStateCallback(const sensor_msgs::msg::JointSta
   }
 
   extractJointStates(msg);
+  last_joint_state_time_ = this->now();
   joint_state_received_ = true;
 
-  if (!commanded_state_initialized_) {
-    q_commanded_ = q_;
-    movej_start_ = q_;
-    movej_goal_ = q_;
+  const bool was_uninitialized = !commanded_state_initialized_;
+  const bool recovering_from_timeout = joint_state_timeout_active_;
+  joint_state_timeout_active_ = false;
+
+  if (was_uninitialized || recovering_from_timeout) {
+    syncCommandStateToFeedback();
     commanded_state_initialized_ = true;
-    RCLCPP_INFO(this->get_logger(),
-        "OMX MoveJ Controller activated. Waiting for moveJ commands...");
+    movej_target_initialized_ = true;
+    RCLCPP_INFO(
+      this->get_logger(),
+      "OMX MoveJ Controller activated. Waiting for moveJ commands...");
   }
 }
 
 void OmxMoveJControllerNode::moveJCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
-  if (!msg || msg->points.empty() || !joint_state_received_) {
+  if (!msg || msg->points.empty() || !joint_state_received_ || jointStateTimedOut()) {
     RCLCPP_WARN_THROTTLE(
                 this->get_logger(),
                 *this->get_clock(),
@@ -275,8 +282,21 @@ void OmxMoveJControllerNode::moveJCallback(
     return;
   }
 
-  Eigen::VectorXd target_q = q_commanded_;
   const auto & point = msg->points.front();
+  const auto duration = rclcpp::Duration(point.time_from_start).seconds();
+  if (duration <= -1) {
+    const std::string error =
+      "moveJ command ignored: time_from_start must be > -1.";
+    publishControllerError(error);
+    RCLCPP_WARN(this->get_logger(), "%s", error.c_str());
+    return;
+  }
+
+  if (duration > 0.0) {
+    syncCommandStateToFeedback();
+  }
+
+  Eigen::VectorXd target_q = q_commanded_;
 
   if (!msg->joint_names.empty()) {
     for (size_t i = 0; i < msg->joint_names.size(); ++i) {
@@ -303,24 +323,9 @@ void OmxMoveJControllerNode::moveJCallback(
 
   movej_start_ = q_commanded_;
   movej_goal_ = target_q;
-  active_motion_duration_ = rclcpp::Duration(point.time_from_start).seconds();
-  if (active_motion_duration_ <= 1e-6) {
-    const std::string error =
-      "moveJ command ignored: time_from_start must be greater than zero.";
-    publishControllerError(error);
-    RCLCPP_WARN(this->get_logger(), "%s", error.c_str());
-    return;
-  }
-  motion_start_time_ = this->now();
   movej_target_initialized_ = true;
-  movej_trajectory_active_ = true;
   latest_movej_command_ = *msg;
   latest_movej_command_received_ = true;
-
-  RCLCPP_INFO(
-            this->get_logger(),
-            "Received moveJ command (duration: %.3f s)",
-            active_motion_duration_);
 }
 
 void OmxMoveJControllerNode::controlLoopCallback()
@@ -343,26 +348,24 @@ void OmxMoveJControllerNode::controlLoopCallback()
     return;
   }
 
+  if (jointStateTimedOut()) {
+    if (!joint_state_timeout_active_) {
+      joint_state_timeout_active_ = true;
+      movej_trajectory_active_ = false;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Joint states timed out. Holding commands until fresh feedback is received.");
+    }
+    return;
+  }
+
   try {
     const Eigen::VectorXd q_feedback = q_commanded_;
     kinematics_solver_->updateState(q_feedback, qdot_);
     publishCurrentPose(kinematics_solver_->getPose(controlled_link_));
 
-    const double elapsed = (this->now() - motion_start_time_).seconds();
-    const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(movej_start_.size());
-
-    Eigen::VectorXd q_ref = movej_goal_;
-    Eigen::VectorXd qdot_ref = zeros;
-
-    if (movej_trajectory_active_ && elapsed < active_motion_duration_) {
-      q_ref = cyclo_motion_controller::common::math_utils::cubicVector(
-                    elapsed, 0.0, active_motion_duration_, movej_start_, movej_goal_, zeros, zeros);
-      qdot_ref = cyclo_motion_controller::common::math_utils::cubicDotVector(
-                    elapsed, 0.0, active_motion_duration_, movej_start_, movej_goal_, zeros, zeros);
-    } else if (movej_trajectory_active_) {
-      movej_trajectory_active_ = false;
-      RCLCPP_INFO(this->get_logger(), "moveJ command completed.");
-    }
+    const Eigen::VectorXd q_ref = movej_goal_;
+    const Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(movej_start_.size());
 
     const Eigen::VectorXd desired_joint_vel =
       qdot_ref + kp_joint_ * (q_ref - q_feedback);
@@ -391,6 +394,20 @@ void OmxMoveJControllerNode::controlLoopCallback()
     publishControllerError("OMX MoveJ Controller loop error: " + std::string(e.what()));
     RCLCPP_ERROR(this->get_logger(), "OMX MoveJ Controller loop error: %s", e.what());
   }
+}
+
+bool OmxMoveJControllerNode::jointStateTimedOut() const
+{
+  return joint_state_received_ &&
+         (this->now() - last_joint_state_time_).seconds() > joint_state_timeout_;
+}
+
+void OmxMoveJControllerNode::syncCommandStateToFeedback()
+{
+  q_commanded_ = q_;
+  movej_start_ = q_;
+  movej_goal_ = q_;
+  movej_trajectory_active_ = false;
 }
 }  // namespace cyclo_motion_controller_ros
 

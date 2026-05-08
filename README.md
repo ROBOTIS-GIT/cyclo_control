@@ -153,6 +153,8 @@ You can switch AI Worker controllers via `controller_type`:
 - `controller_type:=vr` runs `vr_controller_node` and `reference_checker_node`; when `hand:=true`, it also runs `retargeting_teleop`
 - `controller_type:=leader` runs `leader_controller_node` together with `vr_controller_node`
 
+In `vr` mode, arm retargeting is enabled by default (`arm:=true`) and starts `arm_retargeting_teleop` to map tracked arm motion into follower arm commands.
+
 Example launch commands:
 
 ```bash
@@ -166,6 +168,9 @@ ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controlle
 ```
 ```bash
 ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=vr hand:=true
+```
+```bash
+ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=vr arm:=false
 ```
 ```bash
 ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py controller_type:=leader
@@ -182,6 +187,7 @@ When `controller_type:=movel` and `start_interactive_marker:=true`, `ai_worker_c
 To disable collision checking only between the two grippers, set `disable_gripper_collisions:=true`. This helps maintain smooth handover-style motions when the grippers come into contact.
 
 In `vr` mode, the `hand` launch argument enables hand teleoperation through the retargeting algorithm. It defaults to `false`.
+The `arm` launch argument controls arm retargeting in `vr` mode and defaults to `true`.
 
 Example `movel` commands:
 

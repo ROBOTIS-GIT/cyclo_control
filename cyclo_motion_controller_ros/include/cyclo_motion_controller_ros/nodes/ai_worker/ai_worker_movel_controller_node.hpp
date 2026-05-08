@@ -61,6 +61,7 @@ private:
   double cbf_alpha_;
   double collision_buffer_;
   double collision_safe_distance_;
+  double joint_state_timeout_;
   std::string joint_states_topic_;
   std::string right_movel_topic_;
   std::string left_movel_topic_;
@@ -111,9 +112,11 @@ private:
   bool left_movel_target_initialized_;
   bool right_movel_trajectory_active_;
   bool left_movel_trajectory_active_;
+  bool joint_state_timeout_active_ = false;
 
   rclcpp::Time right_motion_start_time_;
   rclcpp::Time left_motion_start_time_;
+  rclcpp::Time last_joint_state_time_;
   double right_active_motion_duration_;
   double left_active_motion_duration_;
 
@@ -146,6 +149,11 @@ private:
     const Eigen::Affine3d & r_gripper_pose,
     const Eigen::Affine3d & l_gripper_pose);
   void extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg);
+  bool jointStateTimedOut() const;
+  void syncCommandStateToFeedback();
+  void syncArmStateToFeedback(
+    const std::vector<std::string> & arm_joint_names,
+    Eigen::VectorXd & destination) const;
 
   Eigen::Affine3d poseMsgToEigen(const geometry_msgs::msg::PoseStamped & pose_msg) const;
   cyclo_motion_controller::common::Vector6d computeDesiredVelocity(

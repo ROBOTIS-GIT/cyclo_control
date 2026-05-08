@@ -2,6 +2,11 @@
 Changelog for package cyclo_motion_controller_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.0 (2026-05-04)
+------------------
+* Modified AI Worker, OMY, OMX movej controller to work with leader device
+* Contributors: Yeonguk Kim
+
 0.1.4 (2026-04-20)
 ------------------
 * None
