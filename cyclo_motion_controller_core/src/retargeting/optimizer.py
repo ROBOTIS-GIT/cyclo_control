@@ -78,6 +78,16 @@ class DexPilotOptimizer:
         self.origin_finger_indices = np.array(origin_link_index, dtype=int)
         self.task_finger_indices = np.array(task_link_index, dtype=int)
 
+        # DexPilot inter-finger pairs use link indices 0=wrist, 1=thumb, …
+        # Human reference for (k, 1) is (thumb − finger_k); the direction
+        # from the thumb tip toward the other four tips is −mean of those.
+        len_proj_pairs = self.num_fingers * (self.num_fingers - 1) // 2
+        self._thumb_to_other_pair_idx = np.flatnonzero(
+            (np.array(task_link_index, dtype=int) == 1)
+            & (np.array(origin_link_index, dtype=int) > 1)
+            & (np.arange(len(task_link_index)) < len_proj_pairs)
+        )
+
         self.target_link_human_indices = (
             np.stack([origin_link_index, task_link_index], axis=0) * 4
         ).astype(int)
@@ -320,6 +330,17 @@ class DexPilotOptimizer:
             if target_dir is not None
             else None
         )
+        if target_dir_array is not None and self._thumb_to_other_pair_idx.size > 0:
+            thumb_pinch = np.any(self.projected[self._thumb_to_other_pair_idx])
+            if thumb_pinch:
+                raw_face = -np.mean(
+                    target_vector[self._thumb_to_other_pair_idx].astype(np.float64),
+                    axis=0,
+                )
+                face_norm = np.linalg.norm(raw_face)
+                if face_norm > 1e-5:
+                    target_dir_array = target_dir_array.copy()
+                    target_dir_array[0, :] = (raw_face / face_norm).astype(np.float32)
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
