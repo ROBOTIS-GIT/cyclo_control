@@ -79,9 +79,10 @@ class DexPilotOptimizer:
         self.task_finger_indices = np.array(task_link_index, dtype=int)
 
         # DexPilot inter-finger pairs use link indices 0=wrist, 1=thumb, …
-        # Human reference for (k, 1) is (thumb − finger_k). The mean of those
-        # vectors points from the other tips toward the thumb; the pinch-facing
-        # direction (thumb pad / bone toward the pinch) is its negation.
+        # Human reference for (k, 1) is (thumb − finger_k); negating a row
+        # gives finger_k − thumb (from thumb toward that fingertip). Pinch
+        # facing weights rows that DexPilot marks projected (close) so ulnar
+        # pinches are not dominated by index/middle.
         len_proj_pairs = self.num_fingers * (self.num_fingers - 1) // 2
         self._thumb_to_other_pair_idx = np.flatnonzero(
             (np.array(task_link_index, dtype=int) == 1)
@@ -332,12 +333,19 @@ class DexPilotOptimizer:
             else None
         )
         if target_dir_array is not None and self._thumb_to_other_pair_idx.size > 0:
-            thumb_pinch = np.any(self.projected[self._thumb_to_other_pair_idx])
+            idxs = self._thumb_to_other_pair_idx
+            thumb_pinch = np.any(self.projected[idxs])
             if thumb_pinch:
-                raw_face = -np.mean(
-                    target_vector[self._thumb_to_other_pair_idx].astype(np.float64),
-                    axis=0,
-                )
+                raw = target_vector[idxs].astype(np.float64)
+                toward = -raw
+                dists = np.linalg.norm(raw, axis=1) + 1e-8
+                active = self.projected[idxs].astype(np.float64)
+                if active.sum() > 1e-6:
+                    w = active / (dists ** 2)
+                    w /= w.sum()
+                    raw_face = (toward * w[:, None]).sum(axis=0)
+                else:
+                    raw_face = toward[int(np.argmin(dists))]
                 face_norm = np.linalg.norm(raw_face)
                 if face_norm > 1e-5:
                     target_dir_array = target_dir_array.copy()
