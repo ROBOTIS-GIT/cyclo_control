@@ -181,12 +181,10 @@ class ROBOTISHandRetargeter:
         self.optimizer.vector_scaling = self.optimizer.build_vector_scaling()
 
         self.is_calibrated = True
-        print(f'[Retargeter] Calibrated finger scaling: {self.finger_scaling}')
-        print(f'[Retargeter] Human finger lengths: {human_lengths}')
-        print(
-            '[Retargeter] Robot finger lengths: '
-            f'{self.robot_finger_lengths}'
-        )
+        tag = f'[Retargeter {self.hand_side}]'
+        print(f'{tag} Calibrated finger scaling: {self.finger_scaling}')
+        print(f'{tag} Human finger lengths: {human_lengths}')
+        print(f'{tag} Robot finger lengths: {self.robot_finger_lengths}')
 
     def _retarget_optimization(
         self,
