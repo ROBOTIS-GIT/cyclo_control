@@ -93,6 +93,14 @@ VRController::VRController()
       std::string("gripper_l_joint1"));
   startup_ref_pos_threshold_ = this->declare_parameter("startup_ref_pos_threshold", 0.15);
   startup_ref_ori_threshold_deg_ = this->declare_parameter("startup_ref_ori_threshold_deg", 45.0);
+  slow_start_exit_pos_threshold_ =
+    this->declare_parameter("slow_start_exit_pos_threshold", 0.03);
+  slow_start_exit_ori_threshold_deg_ =
+    this->declare_parameter("slow_start_exit_ori_threshold_deg", 10.0);
+  startup_slow_start_linear_vel_ =
+    this->declare_parameter("slow_start_linear_velocity", 0.05);
+  startup_slow_start_angular_vel_ =
+    this->declare_parameter("slow_start_angular_velocity", 0.35);
 
   dt_ = time_step_;
   last_joint_state_time_ = this->now();
@@ -431,6 +439,8 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
     control_enabled_ = false;
     activate_pending_ = false;
     reference_diverged_ = true;
+    slow_start_active_ = false;
+    slow_start_release_active_ = false;
     syncCommandStateToFeedback();
   } else {
     RCLCPP_WARN(this->get_logger(),
@@ -440,6 +450,8 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
     control_enabled_ = false;
     activate_pending_ = false;
     reference_diverged_ = true;
+    slow_start_active_ = false;
+    slow_start_release_active_ = false;
     syncCommandStateToFeedback();
   }
 }
@@ -489,6 +501,8 @@ void VRController::controlLoopCallback()
       control_enabled_ = false;
       activate_pending_ = false;
       reference_diverged_ = true;
+      slow_start_active_ = false;
+      slow_start_release_active_ = false;
       syncCommandStateToFeedback();
       RCLCPP_WARN(
         this->get_logger(),
@@ -515,7 +529,7 @@ void VRController::controlLoopCallback()
     }
   }
 
-        // Startup arming: wait for reactivate AND small goal-current pose error for both arms.
+        // Startup arming: wait for reactivate and available goal poses.
   if (!start_requested_) {
     syncCommandStateToFeedback();
     if (debug_count++ % 100 == 0) {
@@ -527,7 +541,7 @@ void VRController::controlLoopCallback()
     return;
   }
 
-        // Only perform the goal-vs-current mismatch check during startup (before enabling control).
+        // Require startup alignment check to pass before arming.
   if (!control_enabled_) {
     syncCommandStateToFeedback();
     if (!r_goal_pose_received_ || !l_goal_pose_received_) {
@@ -594,15 +608,17 @@ void VRController::controlLoopCallback()
       return;
     }
 
-            // Arm controller once the mismatch is small enough
+            // Arm controller once startup check passes.
     control_enabled_ = true;
     activate_start_ = this->get_clock()->now();
     activate_pending_ = true;
     reference_diverged_ = true;          // will be cleared after activation delay
+    slow_start_active_ = true;
+    slow_start_release_active_ = false;
     syncCommandStateToFeedback();
     RCLCPP_WARN(
                 this->get_logger(),
-                "Startup check passed. Activating controller.");
+                "Goals available. Activating controller with startup slow-start.");
   }
 
   if (activate_pending_) {
@@ -626,8 +642,10 @@ void VRController::controlLoopCallback()
   try {
             // kinematics_solver_->updateState(q_, qdot_);
             // Use previously commanded joint goals as feedback state
-    Eigen::VectorXd q_feedback =
-      (q_desired_.size() == q_.size()) ? q_desired_ : q_;
+    Eigen::VectorXd q_feedback = q_;
+    if (!slow_start_active_ && !slow_start_release_active_) {
+      q_feedback = (q_desired_.size() == q_.size()) ? q_desired_ : q_;
+    }
 
     // If lift is commanded by another node, use measured lift state for
     // internal model consistency.
@@ -659,32 +677,111 @@ void VRController::controlLoopCallback()
             // Publish current end-effector pose
     publishGripperPose(right_gripper_pose_, left_gripper_pose_);
 
-            // Slow-start ramp after activation delay
-    const auto activate_elapsed = this->get_clock()->now() - activate_start_;
-    double slow_start_scale = 1.0;
-    double slow_start_duration = 8.0;
-    if (slow_start_duration > 0.0) {
-      const double ramp_time = activate_elapsed.seconds() - 3.0;
-      if (ramp_time < slow_start_duration) {
-        slow_start_scale = std::clamp(ramp_time / slow_start_duration, 0.0, 1.0);
-      }
+    auto pose_error = [](const Eigen::Affine3d & cur, const Eigen::Affine3d & goal, double & pos_m,
+      double & ori_deg) {
+        pos_m = (goal.translation() - cur.translation()).norm();
+        const Eigen::Quaterniond q_cur(cur.linear());
+        const Eigen::Quaterniond q_goal(goal.linear());
+        const double dot = std::abs(q_cur.dot(q_goal));
+        const double clamped = std::min(1.0, std::max(-1.0, dot));
+        const double angle_rad = 2.0 * std::acos(clamped);
+        ori_deg = angle_rad * 180.0 / M_PI;
+      };
+
+    double r_pos_err = 0.0, r_ori_err = 0.0;
+    double l_pos_err = 0.0, l_ori_err = 0.0;
+    pose_error(right_gripper_pose_, r_goal_pose_, r_pos_err, r_ori_err);
+    pose_error(left_gripper_pose_, l_goal_pose_, l_pos_err, l_ori_err);
+
+    const bool r_ok =
+      (r_pos_err <= slow_start_exit_pos_threshold_) &&
+      (r_ori_err <= slow_start_exit_ori_threshold_deg_);
+    const bool l_ok =
+      (l_pos_err <= slow_start_exit_pos_threshold_) &&
+      (l_ori_err <= slow_start_exit_ori_threshold_deg_);
+    if (slow_start_active_ && r_ok && l_ok) {
+      slow_start_active_ = false;
+      slow_start_release_active_ = true;
+      slow_start_release_start_ = this->get_clock()->now();
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Startup slow-start reached threshold. Blending into normal tracking.");
     }
 
-            // Compute desired velocity (scaled during slow-start)
+            // Compute desired velocity.
     cyclo_motion_controller::common::Vector6d right_desired_vel =
-      computeDesiredVelocity(right_gripper_pose_, r_goal_pose_) * slow_start_scale;
+      cyclo_motion_controller::common::Vector6d::Zero();
     cyclo_motion_controller::common::Vector6d left_desired_vel =
-      computeDesiredVelocity(left_gripper_pose_, l_goal_pose_) * slow_start_scale;
+      cyclo_motion_controller::common::Vector6d::Zero();
+
+    const auto compute_slow_start_velocity =
+      [](const Eigen::Affine3d & current_pose, const Eigen::Affine3d & goal_pose,
+        const double linear_speed, const double angular_speed) {
+        cyclo_motion_controller::common::Vector6d vel =
+          cyclo_motion_controller::common::Vector6d::Zero();
+        const Eigen::Vector3d pos_error = goal_pose.translation() - current_pose.translation();
+        const double pos_norm = pos_error.norm();
+        if (pos_norm > 1e-9) {
+          vel.head(3) = pos_error / pos_norm * linear_speed;
+        }
+
+        const Eigen::Matrix3d rotation_error = goal_pose.linear() * current_pose.linear().transpose();
+        const Eigen::AngleAxisd angle_axis_error(rotation_error);
+        const Eigen::Vector3d ori_error =
+          angle_axis_error.axis() * angle_axis_error.angle();
+        const double ori_norm = ori_error.norm();
+        if (ori_norm > 1e-9) {
+          vel.tail(3) = ori_error / ori_norm * angular_speed;
+        }
+        return vel;
+      };
+
+    const cyclo_motion_controller::common::Vector6d right_slow_vel =
+      compute_slow_start_velocity(
+      right_gripper_pose_, r_goal_pose_, startup_slow_start_linear_vel_, startup_slow_start_angular_vel_);
+    const cyclo_motion_controller::common::Vector6d left_slow_vel =
+      compute_slow_start_velocity(
+      left_gripper_pose_, l_goal_pose_, startup_slow_start_linear_vel_, startup_slow_start_angular_vel_);
+    const cyclo_motion_controller::common::Vector6d right_normal_vel =
+      computeDesiredVelocity(right_gripper_pose_, r_goal_pose_);
+    const cyclo_motion_controller::common::Vector6d left_normal_vel =
+      computeDesiredVelocity(left_gripper_pose_, l_goal_pose_);
+
+    if (slow_start_active_) {
+      right_desired_vel = right_slow_vel;
+      left_desired_vel = left_slow_vel;
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 2000,
+        "Startup slow-start active. "
+        "R(pos=%.3f m, ori=%.1f deg) L(pos=%.3f m, ori=%.1f deg) "
+        "(thr pos=%.3f m, ori=%.1f deg)",
+        r_pos_err, r_ori_err, l_pos_err, l_ori_err, slow_start_exit_pos_threshold_,
+        slow_start_exit_ori_threshold_deg_);
+    } else if (slow_start_release_active_) {
+      double alpha = 1.0;
+      if (0.5 > 1e-6) {
+        const double t =
+          (this->get_clock()->now() - slow_start_release_start_).seconds();
+        alpha = std::clamp(t / 0.5, 0.0, 1.0);
+      }
+      right_desired_vel = (1.0 - alpha) * right_slow_vel + alpha * right_normal_vel;
+      left_desired_vel = (1.0 - alpha) * left_slow_vel + alpha * left_normal_vel;
+      if (alpha >= 1.0) {
+        slow_start_release_active_ = false;
+        RCLCPP_WARN(this->get_logger(), "Startup slow-start blend complete.");
+      }
+    } else {
+      right_desired_vel = right_normal_vel;
+      left_desired_vel = left_normal_vel;
+    }
     cyclo_motion_controller::common::Vector6d right_elbow_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
     cyclo_motion_controller::common::Vector6d left_elbow_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
     right_elbow_desired_vel.head(3) =
-      kp_position_ * (r_elbow_pose_.translation() - right_elbow_pose.translation()) *
-      slow_start_scale;
+      kp_position_ * (r_elbow_pose_.translation() - right_elbow_pose.translation());
     left_elbow_desired_vel.head(3) =
-      kp_position_ * (l_elbow_pose_.translation() - left_elbow_pose.translation()) *
-      slow_start_scale;
+      kp_position_ * (l_elbow_pose_.translation() - left_elbow_pose.translation());
 
     std::map<std::string, cyclo_motion_controller::common::Vector6d> desired_task_velocities;
     desired_task_velocities[r_gripper_name_] = right_desired_vel;

@@ -154,6 +154,13 @@ private:
         // Startup reference vs current pose check
   double startup_ref_pos_threshold_ = 0.15;              // meters
   double startup_ref_ori_threshold_deg_ = 45.0;          // degrees
+  double slow_start_exit_pos_threshold_ = 0.03;          // meters
+  double slow_start_exit_ori_threshold_deg_ = 10.0;      // degrees
+  double startup_slow_start_linear_vel_ = 0.05;          // m/s
+  double startup_slow_start_angular_vel_ = 0.35;         // rad/s
+  bool slow_start_active_ = false;
+  bool slow_start_release_active_ = false;
+  rclcpp::Time slow_start_release_start_;
 
         // Latest gripper positions from raw joint trajectory (leader side)
   bool right_raw_gripper_received_ = false;
