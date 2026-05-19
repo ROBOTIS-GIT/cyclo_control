@@ -60,14 +60,14 @@ class RetargetingTeleop(Node):
             'hx5_d20_left.urdf',
         )
 
-        # self.right_retargeter = ROBOTISHandRetargeter(
-        #     path_to_urdf=right_urdf_path,
-        #     hand_side='right',
-        # )
-        self.left_retargeter = ROBOTISHandRetargeter(
-            path_to_urdf=left_urdf_path,
-            hand_side='left',
+        self.right_retargeter = ROBOTISHandRetargeter(
+            path_to_urdf=right_urdf_path,
+            hand_side='right',
         )
+        # self.left_retargeter = ROBOTISHandRetargeter(
+        #     path_to_urdf=left_urdf_path,
+        #     hand_side='left',
+        # )
 
         self.left_joint_names = [
             'finger_l_joint1',
@@ -129,33 +129,33 @@ class RetargetingTeleop(Node):
         #     QOS_BEST_EFFORT,
         # )
 
-        self.right_publisher_ = self.create_publisher(
-            JointTrajectory,
-            (
-                '/leader/'
-                'joint_trajectory_command_broadcaster_right_hand/'
-                'joint_trajectory'
-            ),
-            QOS_BEST_EFFORT,
-        )
         # self.right_publisher_ = self.create_publisher(
-        #     JointState,
-        #     '/joint_states',
+        #     JointTrajectory,
+        #     (
+        #         '/leader/'
+        #         'joint_trajectory_command_broadcaster_right_hand/'
+        #         'joint_trajectory'
+        #     ),
         #     QOS_BEST_EFFORT,
         # )
-
-        self.left_subscriber_ = self.create_subscription(
-            HandJoints,
-            '/left_hand/hand_joint_pos',
-            self.run_teleop_left,
+        self.right_publisher_ = self.create_publisher(
+            JointState,
+            '/joint_states',
             QOS_BEST_EFFORT,
         )
-        # self.right_subscriber_ = self.create_subscription(
+
+        # self.left_subscriber_ = self.create_subscription(
         #     HandJoints,
-        #     '/right_hand/hand_joint_pos',
-        #     self.run_teleop_right,
+        #     '/left_hand/hand_joint_pos',
+        #     self.run_teleop_left,
         #     QOS_BEST_EFFORT,
         # )
+        self.right_subscriber_ = self.create_subscription(
+            HandJoints,
+            '/right_hand/hand_joint_pos',
+            self.run_teleop_right,
+            QOS_BEST_EFFORT,
+        )
 
         self.get_logger().info('Retargeting Teleop Node Started')
 
