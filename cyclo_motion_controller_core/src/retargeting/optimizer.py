@@ -122,6 +122,7 @@ class DexPilotOptimizer:
                 'finger_r_link16',
                 'finger_r_link20',
             ]
+            self.thumb_pad_axis = np.array([0.0, 0.0, 1.0], dtype=np.float32)
         elif hand_side == 'left':
             self.proximal_link_names = [
                 'finger_l_link4',
@@ -130,6 +131,7 @@ class DexPilotOptimizer:
                 'finger_l_link16',
                 'finger_l_link20',
             ]
+            self.thumb_pad_axis = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         else:
             raise ValueError(f'Unsupported hand side: {hand_side}')
 
@@ -333,7 +335,8 @@ class DexPilotOptimizer:
             if target_dir is not None
             else None
         )
-        if target_dir_array is not None and self._thumb_to_other_pair_idx.size > 0:
+        thumb_pad_target_dir = None
+        if self._thumb_to_other_pair_idx.size > 0:
             idxs = self._thumb_to_other_pair_idx
             raw = target_vector[idxs].astype(np.float64)
             dists = np.linalg.norm(raw, axis=1)
@@ -346,8 +349,9 @@ class DexPilotOptimizer:
                 raw_face = toward[k]
                 face_norm = np.linalg.norm(raw_face)
                 if face_norm > 1e-5:
-                    target_dir_array = target_dir_array.copy()
-                    target_dir_array[0, :] = (raw_face / face_norm).astype(np.float32)
+                    thumb_pad_target_dir = (
+                        raw_face / face_norm
+                    ).astype(np.float32)
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
@@ -391,8 +395,19 @@ class DexPilotOptimizer:
             else:
                 dir_loss = 0.0
 
+            if thumb_pad_target_dir is not None:
+                thumb_tip_pose = target_link_poses[self.tip_indices[0]]
+                thumb_tip_rot = thumb_tip_pose[:3, :3].astype(np.float32)
+                thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
+                thumb_pad_cos = float(thumb_pad_dir @ thumb_pad_target_dir)
+                thumb_pad_loss = (
+                    1.0 - thumb_pad_cos
+                ) * self.orientation_weight
+            else:
+                thumb_pad_loss = 0.0
+
             reg_loss = self.norm_delta * ((qpos - last_qpos) ** 2).sum()
-            total_loss = pos_loss + dir_loss + reg_loss
+            total_loss = pos_loss + dir_loss + thumb_pad_loss + reg_loss
             result = float(total_loss)
 
             if grad_out.size > 0:
@@ -471,6 +486,33 @@ class DexPilotOptimizer:
                     jacobians = jacobians[:, :, self.idx_pin2target]
 
                 grad_qpos = np.matmul(grad_pos, jacobians).sum(axis=0).ravel()
+
+                if thumb_pad_target_dir is not None:
+                    thumb_tip_idx = self.tip_indices[0]
+                    thumb_tip_rot = target_link_poses[thumb_tip_idx][:3, :3]
+                    thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
+                    thumb_angular_grad = (
+                        np.cross(thumb_pad_target_dir, thumb_pad_dir)
+                        * self.orientation_weight
+                    )
+                    thumb_tip_link_id = self.computed_link_indices[
+                        thumb_tip_idx
+                    ]
+                    thumb_tip_jacobian = (
+                        self.robot.compute_single_link_local_jacobian(
+                            qpos,
+                            thumb_tip_link_id,
+                        )[3:6, ...]
+                    )
+                    thumb_tip_rot = target_link_poses[thumb_tip_idx][:3, :3]
+                    thumb_angular_jacobian = thumb_tip_rot @ thumb_tip_jacobian
+                    if thumb_angular_jacobian.shape[1] > self.opt_dof:
+                        thumb_angular_jacobian = thumb_angular_jacobian[
+                            :,
+                            self.idx_pin2target,
+                        ]
+                    grad_qpos += thumb_angular_grad @ thumb_angular_jacobian
+
                 grad_qpos += 2 * self.norm_delta * (x - last_qpos)
                 grad_out[:] = np.asarray(grad_qpos, dtype=np.float64)
 
