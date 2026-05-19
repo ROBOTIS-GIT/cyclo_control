@@ -114,6 +114,7 @@ class DexPilotOptimizer:
         self.orientation_weight = orientation_weight
         self.thumb_pad_enter_dist = self.escape_dist
         self.thumb_position_weight = 4.0
+        self.thumb_attach_weight = 500.0
         self.thumb_pad_weight = self.orientation_weight * 0.35
         self.max_thumb_snap_fingers = 2
 
@@ -481,8 +482,32 @@ class DexPilotOptimizer:
             else:
                 thumb_pad_loss = 0.0
 
+            thumb_attach_loss = 0.0
+            if np.any(thumb_pair_alpha > 0.0):
+                thumb_tip_pos = body_pos[self.tip_indices[0]]
+                for pair_idx, finger_idx in enumerate(
+                    self._thumb_opponent_finger_indices
+                ):
+                    attach_alpha = thumb_pair_alpha[pair_idx]
+                    if attach_alpha <= 0.0:
+                        continue
+                    opponent_tip_pos = body_pos[self.tip_indices[finger_idx]]
+                    attach_diff = thumb_tip_pos - opponent_tip_pos
+                    thumb_attach_loss += (
+                        0.5
+                        * self.thumb_attach_weight
+                        * attach_alpha
+                        * float(attach_diff @ attach_diff)
+                    )
+
             reg_loss = self.norm_delta * ((qpos - last_qpos) ** 2).sum()
-            total_loss = pos_loss + dir_loss + thumb_pad_loss + reg_loss
+            total_loss = (
+                pos_loss
+                + dir_loss
+                + thumb_attach_loss
+                + thumb_pad_loss
+                + reg_loss
+            )
             result = float(total_loss)
 
             if grad_out.size > 0:
@@ -513,6 +538,25 @@ class DexPilotOptimizer:
                     grad_pos[task_idx, :] += vec_diff_grad[i, :]
                     # origin_pos contributes negatively
                     grad_pos[origin_idx, :] -= vec_diff_grad[i, :]
+
+                if np.any(thumb_pair_alpha > 0.0):
+                    thumb_tip_idx = self.tip_indices[0]
+                    thumb_tip_pos = body_pos[thumb_tip_idx]
+                    for pair_idx, finger_idx in enumerate(
+                        self._thumb_opponent_finger_indices
+                    ):
+                        attach_alpha = thumb_pair_alpha[pair_idx]
+                        if attach_alpha <= 0.0:
+                            continue
+                        opponent_tip_idx = self.tip_indices[finger_idx]
+                        opponent_tip_pos = body_pos[opponent_tip_idx]
+                        attach_grad = (
+                            self.thumb_attach_weight
+                            * attach_alpha
+                            * (thumb_tip_pos - opponent_tip_pos)
+                        )
+                        grad_pos[thumb_tip_idx, :] += attach_grad
+                        grad_pos[opponent_tip_idx, :] -= attach_grad
 
                 # Compute gradient for direction loss
                 if target_dir_array is not None:
