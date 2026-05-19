@@ -129,20 +129,20 @@ class RetargetingTeleop(Node):
         #     QOS_BEST_EFFORT,
         # )
 
-        # self.right_publisher_ = self.create_publisher(
-        #     JointTrajectory,
-        #     (
-        #         '/leader/'
-        #         'joint_trajectory_command_broadcaster_right_hand/'
-        #         'joint_trajectory'
-        #     ),
-        #     QOS_BEST_EFFORT,
-        # )
         self.right_publisher_ = self.create_publisher(
-            JointState,
-            '/joint_states',
+            JointTrajectory,
+            (
+                '/leader/'
+                'joint_trajectory_command_broadcaster_right_hand/'
+                'joint_trajectory'
+            ),
             QOS_BEST_EFFORT,
         )
+        # self.right_publisher_ = self.create_publisher(
+        #     JointState,
+        #     '/joint_states',
+        #     QOS_BEST_EFFORT,
+        # )
 
         # self.left_subscriber_ = self.create_subscription(
         #     HandJoints,
@@ -206,23 +206,6 @@ class RetargetingTeleop(Node):
             duration,
         )
 
-    # def _publish_trajectory(
-    #     self,
-    #     publisher,
-    #     joint_names: Sequence[str],
-    #     goal: np.ndarray,
-    #     duration: float,
-    # ) -> None:
-    #     """Build and publish a `JointTrajectory` message."""
-    #     msg = JointTrajectory()
-    #     msg.joint_names = list(joint_names)
-    #     goal_point = JointTrajectoryPoint()
-    #     goal_point.positions = goal.tolist()
-    #     goal_point.time_from_start.sec = int(duration)
-    #     goal_point.time_from_start.nanosec = 0
-    #     msg.points.append(goal_point)
-    #     publisher.publish(msg)
-
     def _publish_trajectory(
         self,
         publisher,
@@ -230,12 +213,29 @@ class RetargetingTeleop(Node):
         goal: np.ndarray,
         duration: float,
     ) -> None:
-        """Build and publish a `JointState` message."""
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = list(joint_names)
-        msg.position = goal.tolist()
+        """Build and publish a `JointTrajectory` message."""
+        msg = JointTrajectory()
+        msg.joint_names = list(joint_names)
+        goal_point = JointTrajectoryPoint()
+        goal_point.positions = goal.tolist()
+        goal_point.time_from_start.sec = int(duration)
+        goal_point.time_from_start.nanosec = 0
+        msg.points.append(goal_point)
         publisher.publish(msg)
+
+    # def _publish_trajectory(
+    #     self,
+    #     publisher,
+    #     joint_names: Sequence[str],
+    #     goal: np.ndarray,
+    #     duration: float,
+    # ) -> None:
+    #     """Build and publish a `JointState` message."""
+    #     msg = JointState()
+    #     msg.header.stamp = self.get_clock().now().to_msg()
+    #     msg.name = list(joint_names)
+    #     msg.position = goal.tolist()
+    #     publisher.publish(msg)
 
 def main(args=None) -> None:
     """Run the retargeting teleoperation node."""
