@@ -115,6 +115,7 @@ class DexPilotOptimizer:
         self.thumb_pad_enter_dist = self.escape_dist
         self.thumb_position_weight = 4.0
         self.thumb_pad_weight = self.orientation_weight * 0.35
+        self.max_thumb_snap_fingers = 2
 
         self.opt = nlopt.opt(nlopt.LD_SLSQP, len(idx_pin2target))
         self.opt.set_ftol_abs(1e-6)
@@ -324,8 +325,35 @@ class DexPilotOptimizer:
         distance_alpha = self.smoothstep(
             (self.escape_dist - target_vec_dist) / transition_width
         )
+        thumb_pad_activation = 0.0
+        thumb_opponent_weights = None
+        thumb_pair_alpha = np.zeros(
+            self._thumb_to_other_pair_idx.size,
+            dtype=np.float64,
+        )
+        if self._thumb_to_other_pair_idx.size > 0:
+            thumb_dists = target_vec_dist[self._thumb_to_other_pair_idx]
+            thumb_alpha = distance_alpha[self._thumb_to_other_pair_idx]
+            active_candidates = np.flatnonzero(thumb_alpha > 0.0)
+            if active_candidates.size > 0:
+                order = np.argsort(thumb_dists[active_candidates])
+                active_pairs = active_candidates[order][
+                    : self.max_thumb_snap_fingers
+                ]
+                thumb_pair_alpha[active_pairs] = thumb_alpha[active_pairs]
+                thumb_pad_activation = float(thumb_pair_alpha.max())
+                opponent_weight = thumb_pair_alpha / np.square(
+                    thumb_dists + 1e-6
+                )
+                opponent_weight_sum = float(opponent_weight.sum())
+                if opponent_weight_sum > 1e-8:
+                    thumb_opponent_weights = (
+                        opponent_weight / opponent_weight_sum
+                    )
+
         projection_alpha = np.zeros(len_proj, dtype=np.float64)
         projection_alpha[:len_s1] = distance_alpha[:len_s1]
+        projection_alpha[self._thumb_to_other_pair_idx] = thumb_pair_alpha
         projection_alpha[len_s1:len_proj] = (
             distance_alpha[len_s1:len_proj]
             * self.projected[len_s1:len_proj].astype(np.float64)
@@ -374,25 +402,6 @@ class DexPilotOptimizer:
             if target_dir is not None
             else None
         )
-        thumb_pad_activation = 0.0
-        thumb_opponent_weights = None
-        if self._thumb_to_other_pair_idx.size > 0:
-            idxs = self._thumb_to_other_pair_idx
-            raw = target_vector[idxs].astype(np.float64)
-            dists = np.linalg.norm(raw, axis=1)
-            thumb_transition_width = max(
-                self.thumb_pad_enter_dist - self.project_dist,
-                1e-6,
-            )
-            thumb_alpha = self.smoothstep(
-                (self.thumb_pad_enter_dist - dists) / thumb_transition_width
-            )
-            if np.any(thumb_alpha > 0.0):
-                thumb_pad_activation = float(np.max(thumb_alpha))
-                face_weight = thumb_alpha / np.square(dists + 1e-6)
-                weight_sum = float(face_weight.sum())
-                if weight_sum > 1e-8:
-                    thumb_opponent_weights = face_weight / weight_sum
 
         direction_weight_array = np.ones(self.num_fingers, dtype=np.float32)
         direction_weight_array[0] = 1.0 - thumb_pad_activation
