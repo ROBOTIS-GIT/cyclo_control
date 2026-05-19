@@ -56,6 +56,7 @@ class DexPilotOptimizer:
         """Initialize the optimizer and cache robot/link metadata."""
         self.robot = robot
         self.num_fingers = 5
+        self.hand_side = hand_side
         self.finger_scaling = np.array(finger_scaling, dtype=np.float32)
 
         joint_names = robot.dof_joint_names
@@ -90,6 +91,9 @@ class DexPilotOptimizer:
             & (np.array(origin_link_index, dtype=int) > 1)
             & (np.arange(len(task_link_index)) < len_proj_pairs)
         )
+        self._thumb_opponent_finger_indices = (
+            self.origin_finger_indices[self._thumb_to_other_pair_idx] - 1
+        )
 
         self.target_link_human_indices = (
             np.stack([origin_link_index, task_link_index], axis=0) * 4
@@ -109,7 +113,8 @@ class DexPilotOptimizer:
         self.eta2 = eta2
         self.orientation_weight = orientation_weight
         self.thumb_pad_enter_dist = self.escape_dist
-        self.thumb_pad_weight = self.orientation_weight * 2.0
+        self.thumb_position_weight = 4.0
+        self.thumb_pad_weight = self.orientation_weight * 0.35
 
         self.opt = nlopt.opt(nlopt.LD_SLSQP, len(idx_pin2target))
         self.opt.set_ftol_abs(1e-6)
@@ -125,6 +130,10 @@ class DexPilotOptimizer:
                 'finger_r_link20',
             ]
             self.thumb_pad_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            self.opponent_plane_axis = np.array(
+                [0.0, 1.0, 0.0],
+                dtype=np.float32,
+            )
         elif hand_side == 'left':
             self.proximal_link_names = [
                 'finger_l_link4',
@@ -134,6 +143,10 @@ class DexPilotOptimizer:
                 'finger_l_link20',
             ]
             self.thumb_pad_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            self.opponent_plane_axis = np.array(
+                [0.0, 1.0, 0.0],
+                dtype=np.float32,
+            )
         else:
             raise ValueError(f'Unsupported hand side: {hand_side}')
 
@@ -327,6 +340,11 @@ class DexPilotOptimizer:
             normal_weight * (1.0 - projection_alpha)
             + high_weight * projection_alpha
         )
+        weight_proj[self._thumb_to_other_pair_idx] *= (
+            1.0
+            + (self.thumb_position_weight - 1.0)
+            * projection_alpha[self._thumb_to_other_pair_idx]
+        )
         weight = np.concatenate(
             [
                 weight_proj,
@@ -358,6 +376,7 @@ class DexPilotOptimizer:
         )
         thumb_pad_target_dir = None
         thumb_pad_activation = 0.0
+        thumb_opponent_weights = None
         if self._thumb_to_other_pair_idx.size > 0:
             idxs = self._thumb_to_other_pair_idx
             raw = target_vector[idxs].astype(np.float64)
@@ -372,6 +391,9 @@ class DexPilotOptimizer:
             if np.any(thumb_alpha > 0.0):
                 thumb_pad_activation = float(np.max(thumb_alpha))
                 face_weight = thumb_alpha / np.square(dists + 1e-6)
+                weight_sum = float(face_weight.sum())
+                if weight_sum > 1e-8:
+                    thumb_opponent_weights = face_weight / weight_sum
                 toward = -raw / (dists[:, None] + 1e-6)
                 blended_face = (toward * face_weight[:, None]).sum(axis=0)
                 face_norm = np.linalg.norm(blended_face)
@@ -427,7 +449,38 @@ class DexPilotOptimizer:
             else:
                 dir_loss = 0.0
 
-            if thumb_pad_target_dir is not None:
+            if (
+                self.hand_side == 'left'
+                and thumb_opponent_weights is not None
+            ):
+                thumb_tip_pose = target_link_poses[self.tip_indices[0]]
+                thumb_tip_rot = thumb_tip_pose[:3, :3].astype(np.float32)
+                thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
+                opponent_dirs = []
+                for finger_idx in self._thumb_opponent_finger_indices:
+                    opponent_tip_pose = target_link_poses[
+                        self.tip_indices[finger_idx]
+                    ]
+                    opponent_tip_rot = opponent_tip_pose[:3, :3].astype(
+                        np.float32
+                    )
+                    opponent_dirs.append(
+                        opponent_tip_rot @ self.opponent_plane_axis
+                    )
+                opponent_plane_dir = (
+                    np.stack(opponent_dirs, axis=0)
+                    * thumb_opponent_weights[:, None]
+                ).sum(axis=0)
+                opponent_plane_norm = np.linalg.norm(opponent_plane_dir)
+                if opponent_plane_norm > 1e-5:
+                    opponent_plane_dir /= opponent_plane_norm
+                    thumb_plane_cos = float(thumb_pad_dir @ opponent_plane_dir)
+                    thumb_pad_loss = (
+                        1.0 - thumb_plane_cos ** 2
+                    ) * self.thumb_pad_weight * thumb_pad_activation
+                else:
+                    thumb_pad_loss = 0.0
+            elif thumb_pad_target_dir is not None:
                 thumb_tip_pose = target_link_poses[self.tip_indices[0]]
                 thumb_tip_rot = thumb_tip_pose[:3, :3].astype(np.float32)
                 thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
@@ -523,7 +576,58 @@ class DexPilotOptimizer:
 
                 grad_qpos = np.matmul(grad_pos, jacobians).sum(axis=0).ravel()
 
-                if thumb_pad_target_dir is not None:
+                if (
+                    self.hand_side == 'left'
+                    and thumb_opponent_weights is not None
+                ):
+                    thumb_tip_idx = self.tip_indices[0]
+                    thumb_tip_rot = target_link_poses[thumb_tip_idx][:3, :3]
+                    thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
+                    opponent_dirs = []
+                    for finger_idx in self._thumb_opponent_finger_indices:
+                        opponent_tip_pose = target_link_poses[
+                            self.tip_indices[finger_idx]
+                        ]
+                        opponent_tip_rot = opponent_tip_pose[:3, :3]
+                        opponent_dirs.append(
+                            opponent_tip_rot @ self.opponent_plane_axis
+                        )
+                    opponent_plane_dir = (
+                        np.stack(opponent_dirs, axis=0)
+                        * thumb_opponent_weights[:, None]
+                    ).sum(axis=0)
+                    opponent_plane_norm = np.linalg.norm(opponent_plane_dir)
+                    if opponent_plane_norm > 1e-5:
+                        opponent_plane_dir /= opponent_plane_norm
+                        plane_cos = float(thumb_pad_dir @ opponent_plane_dir)
+                        thumb_angular_grad = (
+                            2.0
+                            * plane_cos
+                            * np.cross(opponent_plane_dir, thumb_pad_dir)
+                            * self.thumb_pad_weight
+                            * thumb_pad_activation
+                        )
+                        thumb_tip_link_id = self.computed_link_indices[
+                            thumb_tip_idx
+                        ]
+                        thumb_tip_jacobian = (
+                            self.robot.compute_single_link_local_jacobian(
+                                qpos,
+                                thumb_tip_link_id,
+                            )[3:6, ...]
+                        )
+                        thumb_angular_jacobian = (
+                            thumb_tip_rot @ thumb_tip_jacobian
+                        )
+                        if thumb_angular_jacobian.shape[1] > self.opt_dof:
+                            thumb_angular_jacobian = thumb_angular_jacobian[
+                                :,
+                                self.idx_pin2target,
+                            ]
+                        grad_qpos += (
+                            thumb_angular_grad @ thumb_angular_jacobian
+                        )
+                elif thumb_pad_target_dir is not None:
                     thumb_tip_idx = self.tip_indices[0]
                     thumb_tip_rot = target_link_poses[thumb_tip_idx][:3, :3]
                     thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
