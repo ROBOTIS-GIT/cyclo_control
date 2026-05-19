@@ -236,6 +236,12 @@ class DexPilotOptimizer:
             projected_dist,
         )
 
+    @staticmethod
+    def smoothstep(value: np.ndarray) -> np.ndarray:
+        """Return a smooth 0..1 ramp for values clipped to that interval."""
+        clipped = np.clip(value, 0.0, 1.0)
+        return clipped * clipped * (3.0 - 2.0 * clipped)
+
     def build_vector_scaling(self) -> np.ndarray:
         """Build per-vector scaling factors from per-finger multipliers."""
         factors = np.ones(len(self.origin_finger_indices), dtype=np.float32)
@@ -299,12 +305,26 @@ class DexPilotOptimizer:
             target_vec_dist[len_s1:len_proj] <= 0.02,
         )
 
+        transition_width = max(self.escape_dist - self.project_dist, 1e-6)
+        distance_alpha = self.smoothstep(
+            (self.escape_dist - target_vec_dist) / transition_width
+        )
+        projection_alpha = np.zeros(len_proj, dtype=np.float64)
+        projection_alpha[:len_s1] = distance_alpha[:len_s1]
+        projection_alpha[len_s1:len_proj] = (
+            distance_alpha[len_s1:len_proj]
+            * self.projected[len_s1:len_proj].astype(np.float64)
+        )
+
         normal_weight = np.ones(len_proj, dtype=np.float64)
         high_weight = np.array(
             [200] * len_s1 + [400] * len_s2,
             dtype=np.float64,
         )
-        weight_proj = np.where(self.projected, high_weight, normal_weight)
+        weight_proj = (
+            normal_weight * (1.0 - projection_alpha)
+            + high_weight * projection_alpha
+        )
         weight = np.concatenate(
             [
                 weight_proj,
@@ -317,10 +337,9 @@ class DexPilotOptimizer:
         dir_vec = target_vector[:len_proj] / (target_vec_dist[:, None] + 1e-6)
         projected_vec = dir_vec * self.projected_dist[:, None]
 
-        reference_vec_proj = np.where(
-            self.projected[:, None],
-            projected_vec,
-            normal_vec[:len_proj],
+        reference_vec_proj = (
+            normal_vec[:len_proj] * (1.0 - projection_alpha[:, None])
+            + projected_vec * projection_alpha[:, None]
         )
         reference_vec = np.concatenate(
             [reference_vec_proj, normal_vec[len_proj:]],
@@ -336,22 +355,23 @@ class DexPilotOptimizer:
             else None
         )
         thumb_pad_target_dir = None
+        thumb_pad_activation = 0.0
         if self._thumb_to_other_pair_idx.size > 0:
             idxs = self._thumb_to_other_pair_idx
             raw = target_vector[idxs].astype(np.float64)
             dists = np.linalg.norm(raw, axis=1)
-            proj = self.projected[idxs]
-            close = dists < self.project_dist
-            candidates = proj | close
-            if np.any(candidates):
-                toward = -raw
-                k = int(np.argmin(np.where(candidates, dists, np.inf)))
-                raw_face = toward[k]
-                face_norm = np.linalg.norm(raw_face)
+            thumb_alpha = self.smoothstep(
+                (self.escape_dist - dists) / transition_width
+            )
+            if np.any(thumb_alpha > 0.0):
+                thumb_pad_activation = float(np.max(thumb_alpha))
+                toward = -raw / (dists[:, None] + 1e-6)
+                blended_face = (toward * thumb_alpha[:, None]).sum(axis=0)
+                face_norm = np.linalg.norm(blended_face)
                 if face_norm > 1e-5:
-                    thumb_pad_target_dir = (
-                        raw_face / face_norm
-                    ).astype(np.float32)
+                    thumb_pad_target_dir = (blended_face / face_norm).astype(
+                        np.float32
+                    )
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
@@ -402,7 +422,7 @@ class DexPilotOptimizer:
                 thumb_pad_cos = float(thumb_pad_dir @ thumb_pad_target_dir)
                 thumb_pad_loss = (
                     1.0 - thumb_pad_cos
-                ) * self.orientation_weight
+                ) * self.orientation_weight * thumb_pad_activation
             else:
                 thumb_pad_loss = 0.0
 
@@ -494,6 +514,7 @@ class DexPilotOptimizer:
                     thumb_angular_grad = (
                         np.cross(thumb_pad_target_dir, thumb_pad_dir)
                         * self.orientation_weight
+                        * thumb_pad_activation
                     )
                     thumb_tip_link_id = self.computed_link_indices[
                         thumb_tip_idx
