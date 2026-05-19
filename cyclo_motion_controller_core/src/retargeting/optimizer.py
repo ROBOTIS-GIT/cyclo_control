@@ -108,10 +108,7 @@ class DexPilotOptimizer:
         self.eta1 = eta1
         self.eta2 = eta2
         self.orientation_weight = orientation_weight
-        self.thumb_pad_enter_dist = max(
-            self.escape_dist * 2.0,
-            self.project_dist + 0.04,
-        )
+        self.thumb_pad_enter_dist = self.escape_dist
         self.thumb_pad_weight = self.orientation_weight * 2.0
 
         self.opt = nlopt.opt(nlopt.LD_SLSQP, len(idx_pin2target))
@@ -384,7 +381,7 @@ class DexPilotOptimizer:
                     )
 
         direction_weight_array = np.ones(self.num_fingers, dtype=np.float32)
-        direction_weight_array[0] = 1.0 - 0.85 * thumb_pad_activation
+        direction_weight_array[0] = 1.0 - thumb_pad_activation
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
