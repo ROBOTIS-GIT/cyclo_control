@@ -108,6 +108,11 @@ class DexPilotOptimizer:
         self.eta1 = eta1
         self.eta2 = eta2
         self.orientation_weight = orientation_weight
+        self.thumb_pad_enter_dist = max(
+            self.escape_dist * 2.0,
+            self.project_dist + 0.04,
+        )
+        self.thumb_pad_weight = self.orientation_weight * 2.0
 
         self.opt = nlopt.opt(nlopt.LD_SLSQP, len(idx_pin2target))
         self.opt.set_ftol_abs(1e-6)
@@ -360,18 +365,26 @@ class DexPilotOptimizer:
             idxs = self._thumb_to_other_pair_idx
             raw = target_vector[idxs].astype(np.float64)
             dists = np.linalg.norm(raw, axis=1)
+            thumb_transition_width = max(
+                self.thumb_pad_enter_dist - self.project_dist,
+                1e-6,
+            )
             thumb_alpha = self.smoothstep(
-                (self.escape_dist - dists) / transition_width
+                (self.thumb_pad_enter_dist - dists) / thumb_transition_width
             )
             if np.any(thumb_alpha > 0.0):
                 thumb_pad_activation = float(np.max(thumb_alpha))
+                face_weight = thumb_alpha / np.square(dists + 1e-6)
                 toward = -raw / (dists[:, None] + 1e-6)
-                blended_face = (toward * thumb_alpha[:, None]).sum(axis=0)
+                blended_face = (toward * face_weight[:, None]).sum(axis=0)
                 face_norm = np.linalg.norm(blended_face)
                 if face_norm > 1e-5:
                     thumb_pad_target_dir = (blended_face / face_norm).astype(
                         np.float32
                     )
+
+        direction_weight_array = np.ones(self.num_fingers, dtype=np.float32)
+        direction_weight_array[0] = 1.0 - 0.85 * thumb_pad_activation
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
@@ -411,7 +424,9 @@ class DexPilotOptimizer:
                 r_dir_norm_val = np.clip(r_dir_norm_val, a_min=1e-6, a_max=None)
                 r_dir_norm = r_dir / r_dir_norm_val
                 cos_sim = (r_dir_norm * target_dir_array).sum(axis=1)
-                dir_loss = (1.0 - cos_sim).sum() * self.orientation_weight
+                dir_loss = (
+                    (1.0 - cos_sim) * direction_weight_array
+                ).sum() * self.orientation_weight
             else:
                 dir_loss = 0.0
 
@@ -422,7 +437,7 @@ class DexPilotOptimizer:
                 thumb_pad_cos = float(thumb_pad_dir @ thumb_pad_target_dir)
                 thumb_pad_loss = (
                     1.0 - thumb_pad_cos
-                ) * self.orientation_weight * thumb_pad_activation
+                ) * self.thumb_pad_weight * thumb_pad_activation
             else:
                 thumb_pad_loss = 0.0
 
@@ -481,10 +496,14 @@ class DexPilotOptimizer:
 
                         # Gradient of cos_sim w.r.t. r_dir
                         cos_sim_grad = norm_grad @ target_dir_i
+                        dir_weight = (
+                            self.orientation_weight
+                            * direction_weight_array[i]
+                        )
 
                         # Gradient w.r.t. body_pos
-                        grad_pos[tip_idx, :] -= cos_sim_grad * self.orientation_weight
-                        grad_pos[prox_idx, :] += cos_sim_grad * self.orientation_weight
+                        grad_pos[tip_idx, :] -= cos_sim_grad * dir_weight
+                        grad_pos[prox_idx, :] += cos_sim_grad * dir_weight
 
                 # Reshape grad_pos for jacobian multiplication
                 grad_pos = grad_pos[:, None, :]
@@ -513,7 +532,7 @@ class DexPilotOptimizer:
                     thumb_pad_dir = thumb_tip_rot @ self.thumb_pad_axis
                     thumb_angular_grad = (
                         np.cross(thumb_pad_target_dir, thumb_pad_dir)
-                        * self.orientation_weight
+                        * self.thumb_pad_weight
                         * thumb_pad_activation
                     )
                     thumb_tip_link_id = self.computed_link_indices[
