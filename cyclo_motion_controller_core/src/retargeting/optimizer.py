@@ -122,7 +122,7 @@ class DexPilotOptimizer:
                 'finger_r_link16',
                 'finger_r_link20',
             ]
-            self.thumb_pad_axis = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+            self.thumb_pad_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         elif hand_side == 'left':
             self.proximal_link_names = [
                 'finger_l_link4',
@@ -131,7 +131,7 @@ class DexPilotOptimizer:
                 'finger_l_link16',
                 'finger_l_link20',
             ]
-            self.thumb_pad_axis = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+            self.thumb_pad_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         else:
             raise ValueError(f'Unsupported hand side: {hand_side}')
 
