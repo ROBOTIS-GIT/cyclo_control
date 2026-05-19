@@ -26,6 +26,7 @@ from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from retargeting.seq_retarget import ROBOTISHandRetargeter
 from robotis_interfaces.msg import HandJoints
+from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
@@ -59,10 +60,10 @@ class RetargetingTeleop(Node):
             'hx5_d20_left.urdf',
         )
 
-        self.right_retargeter = ROBOTISHandRetargeter(
-            path_to_urdf=right_urdf_path,
-            hand_side='right',
-        )
+        # self.right_retargeter = ROBOTISHandRetargeter(
+        #     path_to_urdf=right_urdf_path,
+        #     hand_side='right',
+        # )
         self.left_retargeter = ROBOTISHandRetargeter(
             path_to_urdf=left_urdf_path,
             hand_side='left',
@@ -113,15 +114,21 @@ class RetargetingTeleop(Node):
             'finger_r_joint20',
         ]
 
+        # self.left_publisher_ = self.create_publisher(
+        #     JointTrajectory,
+        #     (
+        #         '/leader/'
+        #         'joint_trajectory_command_broadcaster_left_hand/'
+        #         'joint_trajectory'
+        #     ),
+        #     QOS_BEST_EFFORT,
+        # )
         self.left_publisher_ = self.create_publisher(
-            JointTrajectory,
-            (
-                '/leader/'
-                'joint_trajectory_command_broadcaster_left_hand/'
-                'joint_trajectory'
-            ),
+            JointState,
+            '/joint_states',
             QOS_BEST_EFFORT,
         )
+
         self.right_publisher_ = self.create_publisher(
             JointTrajectory,
             (
@@ -131,6 +138,11 @@ class RetargetingTeleop(Node):
             ),
             QOS_BEST_EFFORT,
         )
+        # self.right_publisher_ = self.create_publisher(
+        #     JointState,
+        #     '/joint_states',
+        #     QOS_BEST_EFFORT,
+        # )
 
         self.left_subscriber_ = self.create_subscription(
             HandJoints,
@@ -138,12 +150,12 @@ class RetargetingTeleop(Node):
             self.run_teleop_left,
             QOS_BEST_EFFORT,
         )
-        self.right_subscriber_ = self.create_subscription(
-            HandJoints,
-            '/right_hand/hand_joint_pos',
-            self.run_teleop_right,
-            QOS_BEST_EFFORT,
-        )
+        # self.right_subscriber_ = self.create_subscription(
+        #     HandJoints,
+        #     '/right_hand/hand_joint_pos',
+        #     self.run_teleop_right,
+        #     QOS_BEST_EFFORT,
+        # )
 
         self.get_logger().info('Retargeting Teleop Node Started')
 
@@ -194,6 +206,23 @@ class RetargetingTeleop(Node):
             duration,
         )
 
+    # def _publish_trajectory(
+    #     self,
+    #     publisher,
+    #     joint_names: Sequence[str],
+    #     goal: np.ndarray,
+    #     duration: float,
+    # ) -> None:
+    #     """Build and publish a `JointTrajectory` message."""
+    #     msg = JointTrajectory()
+    #     msg.joint_names = list(joint_names)
+    #     goal_point = JointTrajectoryPoint()
+    #     goal_point.positions = goal.tolist()
+    #     goal_point.time_from_start.sec = int(duration)
+    #     goal_point.time_from_start.nanosec = 0
+    #     msg.points.append(goal_point)
+    #     publisher.publish(msg)
+
     def _publish_trajectory(
         self,
         publisher,
@@ -201,16 +230,12 @@ class RetargetingTeleop(Node):
         goal: np.ndarray,
         duration: float,
     ) -> None:
-        """Build and publish a `JointTrajectory` message."""
-        msg = JointTrajectory()
-        msg.joint_names = list(joint_names)
-        goal_point = JointTrajectoryPoint()
-        goal_point.positions = goal.tolist()
-        goal_point.time_from_start.sec = int(duration)
-        goal_point.time_from_start.nanosec = 0
-        msg.points.append(goal_point)
+        """Build and publish a `JointState` message."""
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = list(joint_names)
+        msg.position = goal.tolist()
         publisher.publish(msg)
-
 
 def main(args=None) -> None:
     """Run the retargeting teleoperation node."""
