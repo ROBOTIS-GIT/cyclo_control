@@ -64,10 +64,10 @@ class RetargetingTeleop(Node):
             path_to_urdf=right_urdf_path,
             hand_side='right',
         )
-        # self.left_retargeter = ROBOTISHandRetargeter(
-        #     path_to_urdf=left_urdf_path,
-        #     hand_side='left',
-        # )
+        self.left_retargeter = ROBOTISHandRetargeter(
+            path_to_urdf=left_urdf_path,
+            hand_side='left',
+        )
 
         self.left_joint_names = [
             'finger_l_joint1',
@@ -144,12 +144,12 @@ class RetargetingTeleop(Node):
         #     QOS_BEST_EFFORT,
         # )
 
-        # self.left_subscriber_ = self.create_subscription(
-        #     HandJoints,
-        #     '/left_hand/hand_joint_pos',
-        #     self.run_teleop_left,
-        #     QOS_BEST_EFFORT,
-        # )
+        self.left_subscriber_ = self.create_subscription(
+            HandJoints,
+            '/left_hand/hand_joint_pos',
+            self.run_teleop_left,
+            QOS_BEST_EFFORT,
+        )
         self.right_subscriber_ = self.create_subscription(
             HandJoints,
             '/right_hand/hand_joint_pos',
