@@ -20,12 +20,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/base_unit.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-4.344917500e-02 -3.992420300e-03 2.438889300e-02"/>
       <mass value="7.911750300e-01"/>
@@ -49,12 +49,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-1.509477700e-02 -2.915253100e-03 -5.802932700e-04"/>
       <mass value="1.979262000e-01"/>
@@ -78,12 +78,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-6.650923500e-05 2.244270300e-03 1.334962000e-01"/>
       <mass value="4.954724200e-01"/>
@@ -107,12 +107,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-1.742877100e-04 4.972386500e-02 1.240044900e-01"/>
       <mass value="9.866013000e-02"/>
@@ -136,12 +136,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link4.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="2.692126300e-05 -3.545546100e-02 7.576592300e-04"/>
       <mass value="2.668720000e-02"/>
@@ -165,12 +165,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link5.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-2.692126300e-05 -7.576592300e-04 3.395546100e-02"/>
       <mass value="2.668720000e-02"/>
@@ -194,12 +194,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link6.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="3.756721200e-03 -7.729958800e-02 -3.207961700e-02"/>
       <mass value="1.091269900e-01"/>
@@ -223,12 +223,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://open_manipulator_description/meshes/omy_l100/link7.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
     <inertial>
       <origin xyz="-2.635467700e-04 -2.054786700e-03 -8.785326800e-03"/>
       <mass value="4.060915900e-03"/>

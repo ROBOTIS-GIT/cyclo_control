@@ -54,7 +54,8 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'omy',
-                    'omy_f3m.urdf',
+                    # 'omy_f3m.urdf',
+                    'omy_l100.urdf'
                 ]
             ),
             description='Path to robot URDF file.',
@@ -63,10 +64,11 @@ def generate_launch_description():
             'srdf_path',
             default_value=PathJoinSubstitution(
                 [
-                    FindPackageShare('cyclo_motion_controller_models'),
-                    'models',
-                    'omy',
-                    'omy_f3m.srdf',
+                    # FindPackageShare('cyclo_motion_controller_models'),
+                    # 'models',
+                    # 'omy',
+                    # 'omy_f3m.srdf',
+                    ''
                 ]
             ),
             description='Path to robot SRDF file.',
@@ -84,17 +86,22 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'controlled_link',
-            default_value='end_effector_link',
+            # default_value='end_effector_link',
+            default_value='link6',
             description='Controlled end-effector link name.',
         ),
         DeclareLaunchArgument(
             'controller_type',
             default_value='movel',
-            description='Controller type (movej, movel). Default: movel.',
+            description=(
+                'Controller type (movej, movel, joint_impedance, '
+                'cartesian_impedance). Default: movel.'
+            ),
         ),
         DeclareLaunchArgument(
             'marker_goal_topic',
-            default_value='/omy_movel_controller/movel',
+            # default_value='/omy_movel_controller/movel',
+            default_value='/omy_cartesian_impedance_controller/movel',
             description='MoveL topic published by the interactive marker.',
         ),
         DeclareLaunchArgument(
@@ -150,6 +157,42 @@ def generate_launch_description():
         ),
     )
 
+    omy_joint_impedance_controller_node = Node(
+        package='cyclo_motion_controller_ros',
+        executable='omy_joint_impedance_controller_node',
+        parameters=[
+            config_file,
+            {
+                'urdf_path': urdf_path,
+                'srdf_path': srdf_path,
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+            },
+        ],
+        output='screen',
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'joint_impedance'"])
+        ),
+    )
+
+    omy_cartesian_impedance_controller_node = Node(
+        package='cyclo_motion_controller_ros',
+        executable='omy_cartesian_impedance_controller_node',
+        parameters=[
+            config_file,
+            {
+                'urdf_path': urdf_path,
+                'srdf_path': srdf_path,
+                'base_frame': base_frame,
+                'controlled_link': controlled_link,
+            },
+        ],
+        output='screen',
+        condition=IfCondition(
+            PythonExpression(["'", controller_type, "' == 'cartesian_impedance'"])
+        ),
+    )
+
     interactive_marker_node = Node(
         package='cyclo_motion_controller_ros',
         executable='interactive_marker_node',
@@ -173,8 +216,8 @@ def generate_launch_description():
             PythonExpression(
                 [
                     "'",
-                    controller_type,
-                    "' == 'movel' and '",
+                    # controller_type,
+                    # "' == 'movel' and '",
                     start_interactive_marker,
                     "' == 'true'",
                 ]
@@ -187,6 +230,8 @@ def generate_launch_description():
         + [
             omy_movej_controller_node,
             omy_movel_controller_node,
+            omy_joint_impedance_controller_node,
+            omy_cartesian_impedance_controller_node,
             interactive_marker_node,
         ]
     )

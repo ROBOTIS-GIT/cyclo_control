@@ -13,6 +13,7 @@ find_package(ament_cmake_python REQUIRED)
 
 set(SOURCES
     src/kinematics/kinematics_solver.cpp
+    src/dynamics/dynamics_solver.cpp
     src/controllers/ai_worker/vr_controller.cpp
     src/controllers/ai_worker/ai_worker_movej_controller.cpp
     src/controllers/ai_worker/ai_worker_movel_controller.cpp
@@ -20,6 +21,8 @@ set(SOURCES
     src/controllers/ai_worker/ai_worker_bimanual_movej_controller.cpp
     src/controllers/open_manipulator/open_manipulator_movej_controller.cpp
     src/controllers/open_manipulator/open_manipulator_movel_controller.cpp
+    src/controllers/open_manipulator/open_manipulator_joint_impedance_controller.cpp
+    src/controllers/open_manipulator/open_manipulator_cartesian_impedance_controller.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
