@@ -16,7 +16,6 @@
 
 #include "cyclo_motion_controller_ros/nodes/ai_worker/vr_controller_node.hpp"
 #include <algorithm>
-#include <cmath>
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -27,10 +26,7 @@ VRController::VRController()
 : Node("vr_controller"),
   r_goal_pose_received_(false),
   l_goal_pose_received_(false),
-  r_elbow_pose_received_(false),
-  l_elbow_pose_received_(false),
   reference_diverged_(true),
-  activate_pending_(false),
   joint_state_received_(false),
   dt_(0.01)
 {
@@ -38,17 +34,16 @@ VRController::VRController()
   RCLCPP_INFO(this->get_logger(), "VR Controller - Starting up...");
   RCLCPP_INFO(this->get_logger(), "Node name: %s", this->get_name());
   RCLCPP_INFO(this->get_logger(), "========================================");
-  activate_start_ = this->get_clock()->now();
-
         // Load parameters
   control_frequency_ = this->declare_parameter("control_frequency", 100.0);
   time_step_ = this->declare_parameter("time_step", 0.01);
   trajectory_time_ = this->declare_parameter("trajectory_time", 0.0);
   kp_position_ = this->declare_parameter("kp_position", 50.0);
   kp_orientation_ = this->declare_parameter("kp_orientation", 50.0);
+  kp_elbow_position_ = this->declare_parameter("kp_elbow_position", 30.0);
   weight_position_ = this->declare_parameter("weight_position", 10.0);
   weight_orientation_ = this->declare_parameter("weight_orientation", 1.0);
-  weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 0.5);
+  weight_elbow_position_ = this->declare_parameter("weight_elbow_position", 2.0);
   weight_damping_ = this->declare_parameter("weight_damping", 0.1);
   slack_penalty_ = this->declare_parameter("slack_penalty", 1000.0);
   cbf_alpha_ = this->declare_parameter("cbf_alpha", 5.0);
@@ -58,12 +53,8 @@ VRController::VRController()
   urdf_path_ = this->declare_parameter("urdf_path", std::string(""));
   srdf_path_ = this->declare_parameter("srdf_path", std::string(""));
   reactivate_topic_ = this->declare_parameter("reactivate_topic", std::string("/reactivate"));
-  r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
-  l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
-  r_elbow_pose_topic_ = this->declare_parameter(
-      "r_elbow_pose_topic", std::string("/r_subgoal_pose"));
-  l_elbow_pose_topic_ = this->declare_parameter(
-      "l_elbow_pose_topic", std::string("/l_subgoal_pose"));
+  r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_wrist_pose"));
+  l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_wrist_pose"));
   joint_states_topic_ = this->declare_parameter("joint_states_topic", std::string("/joint_states"));
   right_traj_topic_ = this->declare_parameter("right_traj_topic",
       std::string("/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"));
@@ -91,8 +82,6 @@ VRController::VRController()
       std::string("gripper_r_joint1"));
   left_gripper_joint_name_ = this->declare_parameter("left_gripper_joint",
       std::string("gripper_l_joint1"));
-  startup_ref_pos_threshold_ = this->declare_parameter("startup_ref_pos_threshold", 0.15);
-  startup_ref_ori_threshold_deg_ = this->declare_parameter("startup_ref_ori_threshold_deg", 45.0);
 
   dt_ = time_step_;
   last_joint_state_time_ = this->now();
@@ -107,14 +96,6 @@ VRController::VRController()
   l_goal_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             l_goal_pose_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
             std::bind(&VRController::leftGoalPoseCallback, this, std::placeholders::_1));
-
-  r_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            r_elbow_pose_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
-            std::bind(&VRController::rightElbowPoseCallback, this, std::placeholders::_1));
-
-  l_elbow_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            l_elbow_pose_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
-            std::bind(&VRController::leftElbowPoseCallback, this, std::placeholders::_1));
 
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
@@ -138,9 +119,6 @@ VRController::VRController()
 
 
         // Initialize publishers
-  reference_divergence_pub_ = this->create_publisher<std_msgs::msg::Bool>("/reference_diverged",
-      10);
-  controller_error_pub_ = this->create_publisher<std_msgs::msg::String>("~/controller_error", 10);
   lift_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             lift_topic_, 10);
 
@@ -311,23 +289,6 @@ void VRController::leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::S
             msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 }
 
-void VRController::rightElbowPoseCallback(
-  const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-{
-  r_elbow_pose_ = computePoseMat(*msg);
-  r_elbow_pose_received_ = true;
-  RCLCPP_DEBUG(this->get_logger(), "Right elbow pose received: [%.3f, %.3f, %.3f]",
-            msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-}
-
-void VRController::leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-{
-  l_elbow_pose_ = computePoseMat(*msg);
-  l_elbow_pose_received_ = true;
-  RCLCPP_DEBUG(this->get_logger(), "Left elbow pose received: [%.3f, %.3f, %.3f]",
-            msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-}
-
 void VRController::rightRawTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
@@ -389,7 +350,7 @@ void VRController::jointStateCallback(const sensor_msgs::msg::JointState::Shared
     joint_state_received_ = true;
     joint_state_timeout_active_ = false;
 
-    if (!start_requested_ || !control_enabled_ || activate_pending_ || reference_diverged_) {
+    if (!start_requested_ || !control_enabled_ || reference_diverged_) {
       syncCommandStateToFeedback();
     }
   } catch (const std::exception & e) {
@@ -400,10 +361,6 @@ void VRController::jointStateCallback(const sensor_msgs::msg::JointState::Shared
 void VRController::referenceDivergenceCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   if (!msg->data) {
-    return;
-  }
-        // Ignore reference divergence if controller is activating
-  if (activate_pending_) {
     return;
   }
   if (!reference_diverged_) {
@@ -425,12 +382,14 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
   if (reactivate_state_) {
     RCLCPP_WARN(this->get_logger(),
       "Reactivate topic '%s' set to true. "
-      "Waiting for reference alignment before enabling controller.",
+      "Waiting for relative wrist references before enabling controller.",
       reactivate_topic_.c_str());
     start_requested_ = true;
     control_enabled_ = false;
-    activate_pending_ = false;
     reference_diverged_ = true;
+    r_goal_pose_received_ = false;
+    l_goal_pose_received_ = false;
+    forearm_reference_initialized_ = false;
     syncCommandStateToFeedback();
   } else {
     RCLCPP_WARN(this->get_logger(),
@@ -438,8 +397,10 @@ void VRController::reactivateCallback(const std_msgs::msg::Bool::SharedPtr msg)
       reactivate_topic_.c_str());
     start_requested_ = false;
     control_enabled_ = false;
-    activate_pending_ = false;
     reference_diverged_ = true;
+    r_goal_pose_received_ = false;
+    l_goal_pose_received_ = false;
+    forearm_reference_initialized_ = false;
     syncCommandStateToFeedback();
   }
 }
@@ -487,7 +448,6 @@ void VRController::controlLoopCallback()
     if (!joint_state_timeout_active_) {
       joint_state_timeout_active_ = true;
       control_enabled_ = false;
-      activate_pending_ = false;
       reference_diverged_ = true;
       syncCommandStateToFeedback();
       RCLCPP_WARN(
@@ -515,7 +475,7 @@ void VRController::controlLoopCallback()
     }
   }
 
-        // Startup arming: wait for reactivate AND small goal-current pose error for both arms.
+        // Wait for the VR publisher to finish relative-reference calibration and reactivate.
   if (!start_requested_) {
     syncCommandStateToFeedback();
     if (debug_count++ % 100 == 0) {
@@ -527,93 +487,25 @@ void VRController::controlLoopCallback()
     return;
   }
 
-        // Only perform the goal-vs-current mismatch check during startup (before enabling control).
+        // A calibrated relative reference is anchored at the current follower pose, so no
+        // absolute goal-current alignment check or activation delay is required.
   if (!control_enabled_) {
     syncCommandStateToFeedback();
     if (!r_goal_pose_received_ || !l_goal_pose_received_) {
       if (debug_count++ % 100 == 0) {
         RCLCPP_WARN_THROTTLE(
                         this->get_logger(), *this->get_clock(), 2000,
-                        "Waiting for goal poses: right=%s left=%s",
+                        "Waiting for wrist goals: right=%s left=%s",
                         r_goal_pose_received_ ? "OK" : "MISSING",
                         l_goal_pose_received_ ? "OK" : "MISSING");
       }
       return;
     }
 
-    auto pose_error = [](const Eigen::Affine3d & cur, const Eigen::Affine3d & goal, double & pos_m,
-      double & ori_deg) {
-        pos_m = (goal.translation() - cur.translation()).norm();
-        const Eigen::Quaterniond q_cur(cur.linear());
-        const Eigen::Quaterniond q_goal(goal.linear());
-        const double dot = std::abs(q_cur.dot(q_goal));
-        const double clamped = std::min(1.0, std::max(-1.0, dot));
-        const double angle_rad = 2.0 * std::acos(clamped);
-        ori_deg = angle_rad * 180.0 / M_PI;
-      };
-
-    double r_pos_err = 0.0, r_ori_err = 0.0;
-    double l_pos_err = 0.0, l_ori_err = 0.0;
-    pose_error(r_gripper_pose_meas, r_goal_pose_, r_pos_err, r_ori_err);
-    pose_error(l_gripper_pose_meas, l_goal_pose_, l_pos_err, l_ori_err);
-
-    const bool r_ok =
-      (r_pos_err <= startup_ref_pos_threshold_) &&
-      (r_ori_err <= startup_ref_ori_threshold_deg_);
-    const bool l_ok =
-      (l_pos_err <= startup_ref_pos_threshold_) &&
-      (l_ori_err <= startup_ref_ori_threshold_deg_);
-
-    if (!(r_ok && l_ok)) {
-      reference_diverged_ = true;
-
-      if (reference_divergence_pub_) {
-        std_msgs::msg::Bool msg;
-        msg.data = true;
-        reference_divergence_pub_->publish(msg);
-      }
-      if (controller_error_pub_) {
-        std_msgs::msg::String err;
-        err.data =
-          "Startup reference mismatch: "
-          "R(pos=" + std::to_string(r_pos_err) + "m, ori=" + std::to_string(r_ori_err) + "deg) "
-          "L(pos=" + std::to_string(l_pos_err) + "m, ori=" + std::to_string(l_ori_err) + "deg) "
-          "thresholds(pos=" + std::to_string(startup_ref_pos_threshold_) + "m, ori=" +
-          std::to_string(startup_ref_ori_threshold_deg_) + "deg)";
-        controller_error_pub_->publish(err);
-      }
-
-      RCLCPP_ERROR_THROTTLE(
-        this->get_logger(), *this->get_clock(), 2000,
-        "Startup mismatch. Waiting. "
-        "R: pos=%.3f m ori=%.1f deg, "
-        "L: pos=%.3f m ori=%.1f deg "
-        "(thr pos=%.3f, ori=%.1f)",
-        r_pos_err, r_ori_err, l_pos_err, l_ori_err, startup_ref_pos_threshold_,
-        startup_ref_ori_threshold_deg_);
-      return;
-    }
-
-            // Arm controller once the mismatch is small enough
     control_enabled_ = true;
-    activate_start_ = this->get_clock()->now();
-    activate_pending_ = true;
-    reference_diverged_ = true;          // will be cleared after activation delay
+    reference_diverged_ = false;
     syncCommandStateToFeedback();
-    RCLCPP_WARN(
-                this->get_logger(),
-                "Startup check passed. Activating controller.");
-  }
-
-  if (activate_pending_) {
-    syncCommandStateToFeedback();
-    const auto elapsed = this->get_clock()->now() - activate_start_;
-    if (elapsed.seconds() >= 3.0) {
-      reference_diverged_ = false;
-      activate_pending_ = false;
-      syncCommandStateToFeedback();
-      RCLCPP_WARN(this->get_logger(), "Controller activated.");
-    }
+    RCLCPP_WARN(this->get_logger(), "Relative references received. Controller activated.");
   }
 
   if (reference_diverged_) {
@@ -641,51 +533,50 @@ void VRController::controlLoopCallback()
             // Get current and goal end-effector poses
     right_gripper_pose_ = kinematics_solver_->getPose(r_gripper_name_);
     left_gripper_pose_ = kinematics_solver_->getPose(l_gripper_name_);
-    Eigen::Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
-    Eigen::Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
-
+    const Eigen::Affine3d right_elbow_pose = kinematics_solver_->getPose(r_elbow_name_);
+    const Eigen::Affine3d left_elbow_pose = kinematics_solver_->getPose(l_elbow_name_);
             // Initialize goals to current EE pose on first cycle if not received
     if (!r_goal_pose_received_ && !l_goal_pose_received_) {
       r_goal_pose_ = right_gripper_pose_;
       l_goal_pose_ = left_gripper_pose_;
     }
-    if (!r_elbow_pose_received_) {
-      r_elbow_pose_ = right_elbow_pose;
-    }
-    if (!l_elbow_pose_received_) {
-      l_elbow_pose_ = left_elbow_pose;
-    }
-
             // Publish current end-effector pose
     publishGripperPose(right_gripper_pose_, left_gripper_pose_);
 
-            // Slow-start ramp after activation delay
-    const auto activate_elapsed = this->get_clock()->now() - activate_start_;
-    double slow_start_scale = 1.0;
-    double slow_start_duration = 8.0;
-    if (slow_start_duration > 0.0) {
-      const double ramp_time = activate_elapsed.seconds() - 3.0;
-      if (ramp_time < slow_start_duration) {
-        slow_start_scale = std::clamp(ramp_time / slow_start_duration, 0.0, 1.0);
-      }
-    }
-
-            // Compute desired velocity (scaled during slow-start)
+            // Compute desired velocity from the calibrated relative references.
     cyclo_motion_controller::common::Vector6d right_desired_vel =
-      computeDesiredVelocity(right_gripper_pose_, r_goal_pose_) * slow_start_scale;
+      computeDesiredVelocity(right_gripper_pose_, r_goal_pose_);
     cyclo_motion_controller::common::Vector6d left_desired_vel =
-      computeDesiredVelocity(left_gripper_pose_, l_goal_pose_) * slow_start_scale;
+      computeDesiredVelocity(left_gripper_pose_, l_goal_pose_);
     cyclo_motion_controller::common::Vector6d right_elbow_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
     cyclo_motion_controller::common::Vector6d left_elbow_desired_vel =
       cyclo_motion_controller::common::Vector6d::Zero();
-    right_elbow_desired_vel.head(3) =
-      kp_position_ * (r_elbow_pose_.translation() - right_elbow_pose.translation()) *
-      slow_start_scale;
-    left_elbow_desired_vel.head(3) =
-      kp_position_ * (l_elbow_pose_.translation() - left_elbow_pose.translation()) *
-      slow_start_scale;
-
+    // Infer the elbow subgoal from the wrist goal. Preserve the current
+    // elbow-to-wrist direction in the wrist-local frame, then rotate that
+    // vector with the desired wrist orientation. Its norm is the measured
+    // robot forearm link length, so no human elbow tracking/calibration is used.
+    if (!forearm_reference_initialized_) {
+      right_forearm_local_reference_ = right_gripper_pose_.linear().transpose() *
+        (right_gripper_pose_.translation() - right_elbow_pose.translation());
+      left_forearm_local_reference_ = left_gripper_pose_.linear().transpose() *
+        (left_gripper_pose_.translation() - left_elbow_pose.translation());
+      forearm_reference_initialized_ = true;
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Forearm references captured: right=%.3f m left=%.3f m",
+        right_forearm_local_reference_.norm(), left_forearm_local_reference_.norm());
+    }
+    const Eigen::Vector3d right_elbow_goal =
+      r_goal_pose_.translation() -
+      r_goal_pose_.linear() * right_forearm_local_reference_;
+    const Eigen::Vector3d left_elbow_goal =
+      l_goal_pose_.translation() -
+      l_goal_pose_.linear() * left_forearm_local_reference_;
+    right_elbow_desired_vel.head(3) = kp_elbow_position_ *
+      (right_elbow_goal - right_elbow_pose.translation());
+    left_elbow_desired_vel.head(3) = kp_elbow_position_ *
+      (left_elbow_goal - left_elbow_pose.translation());
     std::map<std::string, cyclo_motion_controller::common::Vector6d> desired_task_velocities;
     desired_task_velocities[r_gripper_name_] = right_desired_vel;
     desired_task_velocities[l_gripper_name_] = left_desired_vel;
@@ -698,21 +589,20 @@ void VRController::controlLoopCallback()
       cyclo_motion_controller::common::Vector6d::Ones();
     cyclo_motion_controller::common::Vector6d weight_left =
       cyclo_motion_controller::common::Vector6d::Ones();
-    weight_right.head(3).setConstant(weight_position_);
-    weight_right.tail(3).setConstant(weight_orientation_);
-    weight_left.head(3).setConstant(weight_position_);
-    weight_left.tail(3).setConstant(weight_orientation_);
-    weights[r_gripper_name_] = weight_right;
-    weights[l_gripper_name_] = weight_left;
     cyclo_motion_controller::common::Vector6d weight_right_elbow =
       cyclo_motion_controller::common::Vector6d::Zero();
     cyclo_motion_controller::common::Vector6d weight_left_elbow =
       cyclo_motion_controller::common::Vector6d::Zero();
+    weight_right.head(3).setConstant(weight_position_);
+    weight_right.tail(3).setConstant(weight_orientation_);
+    weight_left.head(3).setConstant(weight_position_);
+    weight_left.tail(3).setConstant(weight_orientation_);
     weight_right_elbow.head(3).setConstant(weight_elbow_position_);
     weight_left_elbow.head(3).setConstant(weight_elbow_position_);
+    weights[r_gripper_name_] = weight_right;
+    weights[l_gripper_name_] = weight_left;
     weights[r_elbow_name_] = weight_right_elbow;
     weights[l_elbow_name_] = weight_left_elbow;
-
     Eigen::VectorXd damping = Eigen::VectorXd::Ones(kinematics_solver_->getDof()) * weight_damping_;
 
             // Set weights and desired task velocities in QP controller

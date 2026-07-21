@@ -30,7 +30,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
-#include <std_msgs/msg/string.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "common/type_define.hpp"
@@ -59,6 +58,7 @@ private:
   double trajectory_time_;
   double kp_position_;
   double kp_orientation_;
+  double kp_elbow_position_;
   double weight_position_;
   double weight_orientation_;
   double weight_elbow_position_;
@@ -71,8 +71,6 @@ private:
   std::string reactivate_topic_;
   std::string r_goal_pose_topic_;
   std::string l_goal_pose_topic_;
-  std::string r_elbow_pose_topic_;
-  std::string l_elbow_pose_topic_;
   std::string joint_states_topic_;
   std::string right_traj_topic_;
   std::string left_traj_topic_;
@@ -95,8 +93,6 @@ private:
         // Subscribers
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_goal_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_goal_pose_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr r_elbow_pose_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr l_elbow_pose_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
   rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_raw_traj_sub_;
   rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_raw_traj_sub_;
@@ -109,8 +105,6 @@ private:
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr lift_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr r_gripper_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr l_gripper_pose_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr reference_divergence_pub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr controller_error_pub_;
 
         // Timer for control loop
   rclcpp::TimerBase::SharedPtr control_timer_;
@@ -135,25 +129,18 @@ private:
   Eigen::Affine3d left_gripper_pose_;
   Eigen::Affine3d r_goal_pose_;
   Eigen::Affine3d l_goal_pose_;
-  Eigen::Affine3d r_elbow_pose_;
-  Eigen::Affine3d l_elbow_pose_;
+  Eigen::Vector3d right_forearm_local_reference_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d left_forearm_local_reference_ = Eigen::Vector3d::Zero();
+  bool forearm_reference_initialized_ = false;
 
   bool r_goal_pose_received_;
   bool l_goal_pose_received_;
-  bool r_elbow_pose_received_;
-  bool l_elbow_pose_received_;
   bool reference_diverged_;
-  rclcpp::Time activate_start_;
-  bool activate_pending_;
   bool control_enabled_ = false;        // start only after reactivate service
   bool start_requested_ = false;        // reactivate has been requested
   bool joint_state_received_;
   bool joint_state_timeout_active_ = false;
   bool reactivate_state_ = false;
-
-        // Startup reference vs current pose check
-  double startup_ref_pos_threshold_ = 0.15;              // meters
-  double startup_ref_ori_threshold_deg_ = 45.0;          // degrees
 
         // Latest gripper positions from raw joint trajectory (leader side)
   bool right_raw_gripper_received_ = false;
@@ -181,8 +168,6 @@ private:
         // Callbacks
   void rightGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
   void leftGoalPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
-  void rightElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
-  void leftElbowPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
   void rightRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
   void leftRawTrajectoryCallback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);

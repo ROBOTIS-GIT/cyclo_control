@@ -50,6 +50,7 @@ private:
   double ref_pos_jump_threshold_;
   double ref_ori_jump_threshold_deg_;
   std::string reference_divergence_topic_;
+  std::string reactivate_topic_;
   std::string r_goal_pose_topic_;
   std::string l_goal_pose_topic_;
 
@@ -62,5 +63,6 @@ private:
   geometry_msgs::msg::Pose l_goal_prev_;
   bool r_goal_prev_set_;
   bool l_goal_prev_set_;
+  bool reference_active_;
 };
 }  // namespace cyclo_motion_controller_ros
