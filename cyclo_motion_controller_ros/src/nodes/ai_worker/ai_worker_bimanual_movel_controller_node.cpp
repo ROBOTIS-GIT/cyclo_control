@@ -18,6 +18,8 @@
 
 #include <algorithm>
 
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 AIWorkerBimanualMoveLControllerNode::AIWorkerBimanualMoveLControllerNode()
@@ -104,6 +106,10 @@ AIWorkerBimanualMoveLControllerNode::AIWorkerBimanualMoveLControllerNode()
     this->create_publisher<geometry_msgs::msg::PoseStamped>(r_gripper_pose_topic_, 10);
   l_gripper_pose_pub_ =
     this->create_publisher<geometry_msgs::msg::PoseStamped>(l_gripper_pose_topic_, 10);
+  r_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/r_gripper_pose_6d", 10);
+  l_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/l_gripper_pose_6d", 10);
 
   try {
     RCLCPP_INFO(this->get_logger(), "URDF path: %s", urdf_path_.c_str());
@@ -716,6 +722,7 @@ void AIWorkerBimanualMoveLControllerNode::publishGripperPose(
   right_msg.pose.orientation.y = right_quat.y();
   right_msg.pose.orientation.z = right_quat.z();
   r_gripper_pose_pub_->publish(right_msg);
+  r_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(right_pose));
 
   geometry_msgs::msg::PoseStamped left_msg;
   left_msg.header.stamp = this->now();
@@ -730,6 +737,7 @@ void AIWorkerBimanualMoveLControllerNode::publishGripperPose(
   left_msg.pose.orientation.y = left_quat.y();
   left_msg.pose.orientation.z = left_quat.z();
   l_gripper_pose_pub_->publish(left_msg);
+  l_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(left_pose));
 }
 
 }  // namespace cyclo_motion_controller_ros

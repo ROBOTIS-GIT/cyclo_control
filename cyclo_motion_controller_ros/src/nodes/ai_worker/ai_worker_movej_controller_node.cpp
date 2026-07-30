@@ -18,6 +18,8 @@
 
 #include <algorithm>
 
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 AIWorkerMoveJController::AIWorkerMoveJController()
@@ -61,6 +63,8 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   left_traj_filtered_topic_ = this->declare_parameter(
     "left_traj_filtered_topic",
     std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
+  r_gripper_name_ = this->declare_parameter("r_gripper_name", std::string("arm_r_link7"));
+  l_gripper_name_ = this->declare_parameter("l_gripper_name", std::string("arm_l_link7"));
   right_gripper_joint_name_ = this->declare_parameter(
     "right_gripper_joint", std::string("gripper_r_joint1"));
   left_gripper_joint_name_ = this->declare_parameter(
@@ -76,6 +80,10 @@ AIWorkerMoveJController::AIWorkerMoveJController()
     this->create_publisher<trajectory_msgs::msg::JointTrajectory>(right_traj_filtered_topic_, 10);
   arm_l_pub_ =
     this->create_publisher<trajectory_msgs::msg::JointTrajectory>(left_traj_filtered_topic_, 10);
+  r_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/r_gripper_pose_6d", 10);
+  l_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/l_gripper_pose_6d", 10);
 
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
     joint_states_topic_, 10,
@@ -373,6 +381,9 @@ void AIWorkerMoveJController::controlLoopCallback()
   try {
     const Eigen::VectorXd q_feedback = q_commanded_;
     kinematics_solver_->updateState(q_feedback, qdot_);
+    publishGripperPose6d(
+      kinematics_solver_->getPose(r_gripper_name_),
+      kinematics_solver_->getPose(l_gripper_name_));
 
     Eigen::VectorXd q_ref = q_feedback;
     Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(q_feedback.size());
@@ -407,6 +418,14 @@ void AIWorkerMoveJController::controlLoopCallback()
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Error in control loop: %s", e.what());
   }
+}
+
+void AIWorkerMoveJController::publishGripperPose6d(
+  const Eigen::Affine3d & right_pose,
+  const Eigen::Affine3d & left_pose) const
+{
+  r_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(right_pose));
+  l_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(left_pose));
 }
 
 bool AIWorkerMoveJController::jointStateTimedOut() const

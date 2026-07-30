@@ -18,6 +18,8 @@
 
 #include <algorithm>
 
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 namespace
@@ -90,6 +92,10 @@ AIWorkerBimanualMoveJController::AIWorkerBimanualMoveJController()
     this->create_publisher<trajectory_msgs::msg::JointTrajectory>(right_traj_filtered_topic_, 10);
   arm_l_pub_ =
     this->create_publisher<trajectory_msgs::msg::JointTrajectory>(left_traj_filtered_topic_, 10);
+  r_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/r_gripper_pose_6d", 10);
+  l_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/l_gripper_pose_6d", 10);
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
     joint_states_topic_, 10,
     std::bind(&AIWorkerBimanualMoveJController::jointStateCallback, this, std::placeholders::_1));
@@ -576,6 +582,9 @@ void AIWorkerBimanualMoveJController::controlLoopCallback()
   try {
     const Eigen::VectorXd q_feedback = q_commanded_;
     kinematics_solver_->updateState(q_feedback, qdot_);
+    publishGripperPose6d(
+      kinematics_solver_->getPose(r_gripper_name_),
+      kinematics_solver_->getPose(l_gripper_name_));
 
     Eigen::VectorXd q_ref = q_feedback;
     if (right_movej_target_initialized_ && right_release_follow_enabled_) {
@@ -728,6 +737,14 @@ void AIWorkerBimanualMoveJController::controlLoopCallback()
   } catch (const std::exception & e) {
     RCLCPP_ERROR(this->get_logger(), "Bimanual moveJ loop error: %s", e.what());
   }
+}
+
+void AIWorkerBimanualMoveJController::publishGripperPose6d(
+  const Eigen::Affine3d & right_pose,
+  const Eigen::Affine3d & left_pose) const
+{
+  r_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(right_pose));
+  l_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(left_pose));
 }
 
 bool AIWorkerBimanualMoveJController::jointStateTimedOut() const

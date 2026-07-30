@@ -18,6 +18,8 @@
 
 #include <algorithm>
 
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 AIWorkerMoveLController::AIWorkerMoveLController()
@@ -99,6 +101,10 @@ AIWorkerMoveLController::AIWorkerMoveLController()
     this->create_publisher<geometry_msgs::msg::PoseStamped>(r_gripper_pose_topic_, 10);
   l_gripper_pose_pub_ =
     this->create_publisher<geometry_msgs::msg::PoseStamped>(l_gripper_pose_topic_, 10);
+  r_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/r_gripper_pose_6d", 10);
+  l_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/l_gripper_pose_6d", 10);
   controller_error_pub_ = this->create_publisher<std_msgs::msg::String>(controller_error_topic_,
       10);
 
@@ -583,6 +589,7 @@ void AIWorkerMoveLController::publishGripperPose(
     r_msg.pose.orientation.y = quat.y();
     r_msg.pose.orientation.z = quat.z();
     r_gripper_pose_pub_->publish(r_msg);
+    r_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(r_gripper_pose));
   }
 
   if (l_gripper_pose_pub_) {
@@ -598,6 +605,7 @@ void AIWorkerMoveLController::publishGripperPose(
     l_msg.pose.orientation.y = quat.y();
     l_msg.pose.orientation.z = quat.z();
     l_gripper_pose_pub_->publish(l_msg);
+    l_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(l_gripper_pose));
   }
 }
 

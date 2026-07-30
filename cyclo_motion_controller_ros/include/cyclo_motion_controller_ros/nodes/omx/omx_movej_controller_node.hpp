@@ -27,6 +27,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
@@ -84,6 +85,7 @@ private:
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr joint_command_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ee_pose_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr ee_pose_6d_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr controller_error_pub_;
 
   rclcpp::TimerBase::SharedPtr control_timer_;

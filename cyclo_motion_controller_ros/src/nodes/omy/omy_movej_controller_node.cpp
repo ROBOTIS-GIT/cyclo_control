@@ -17,6 +17,7 @@
 #include "cyclo_motion_controller_ros/nodes/omy/omy_movej_controller_node.hpp"
 
 #include "common/type_define.hpp"
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
 
 namespace cyclo_motion_controller_ros
 {
@@ -69,6 +70,8 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
     this->create_publisher<trajectory_msgs::msg::JointTrajectory>(joint_command_topic_, 10);
   ee_pose_pub_ =
     this->create_publisher<geometry_msgs::msg::PoseStamped>(ee_pose_topic_, 10);
+  ee_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("~/current_pose_6d", 10);
   controller_error_pub_ =
     this->create_publisher<std_msgs::msg::String>(controller_error_topic_, 10);
 
@@ -185,6 +188,7 @@ void OmyMoveJControllerNode::publishCurrentPose(const Eigen::Affine3d & pose) co
   pose_msg.pose.orientation.y = quat.y();
   pose_msg.pose.orientation.z = quat.z();
   ee_pose_pub_->publish(pose_msg);
+  ee_pose_6d_pub_->publish(utils::makeEePose6dMessage(pose));
 }
 
 void OmyMoveJControllerNode::publishTrajectory(const Eigen::VectorXd & q_command) const

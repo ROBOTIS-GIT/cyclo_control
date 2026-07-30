@@ -28,6 +28,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <robotis_interfaces/msg/move_l.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
@@ -88,6 +89,8 @@ private:
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr lift_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr r_gripper_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr l_gripper_pose_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr r_gripper_pose_6d_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr l_gripper_pose_6d_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr controller_error_pub_;
 
   rclcpp::TimerBase::SharedPtr control_timer_;

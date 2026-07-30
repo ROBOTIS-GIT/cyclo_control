@@ -17,6 +17,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include <map>
 #include <memory>
@@ -26,6 +27,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "common/type_define.hpp"
@@ -44,6 +46,8 @@ private:
   void initializeJointConfig();
   void extractJointStates(const sensor_msgs::msg::JointState::SharedPtr & msg);
   void publishTrajectory(const Eigen::VectorXd & q_command) const;
+  void publishGripperPose6d(
+    const Eigen::Affine3d & right_pose, const Eigen::Affine3d & left_pose) const;
   bool jointStateTimedOut() const;
   void syncCommandStateToFeedback();
   void syncRightArmToFeedback();
@@ -91,6 +95,8 @@ private:
   std::string left_traj_topic_;
   std::string right_traj_filtered_topic_;
   std::string left_traj_filtered_topic_;
+  std::string r_gripper_name_;
+  std::string l_gripper_name_;
   std::string right_gripper_joint_name_;
   std::string left_gripper_joint_name_;
   std::string urdf_path_;
@@ -102,6 +108,8 @@ private:
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_r_pub_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_l_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr r_gripper_pose_6d_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr l_gripper_pose_6d_pub_;
 
   rclcpp::TimerBase::SharedPtr control_timer_;
 

@@ -20,6 +20,8 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "cyclo_motion_controller_ros/utils/ee_pose_6d.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 VRController::VRController()
@@ -133,6 +135,10 @@ VRController::VRController()
 
   l_gripper_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
             l_gripper_pose_topic_, 10);
+  r_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/r_gripper_pose_6d", 10);
+  l_gripper_pose_6d_pub_ =
+    this->create_publisher<std_msgs::msg::Float64MultiArray>("/l_gripper_pose_6d", 10);
 
         // Initialize motion controller
   try {
@@ -783,6 +789,7 @@ void VRController::publishGripperPose(
     r_gripper_pose_msg.pose.orientation.y = r_gripper_pose_quat.y();
     r_gripper_pose_msg.pose.orientation.z = r_gripper_pose_quat.z();
     r_gripper_pose_pub_->publish(r_gripper_pose_msg);
+    r_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(r_gripper_pose));
   }
   if (l_gripper_pose_pub_) {
     geometry_msgs::msg::PoseStamped l_gripper_pose_msg;
@@ -797,6 +804,7 @@ void VRController::publishGripperPose(
     l_gripper_pose_msg.pose.orientation.y = l_gripper_pose_quat.y();
     l_gripper_pose_msg.pose.orientation.z = l_gripper_pose_quat.z();
     l_gripper_pose_pub_->publish(l_gripper_pose_msg);
+    l_gripper_pose_6d_pub_->publish(utils::makeEePose6dMessage(l_gripper_pose));
   }
 }
 
