@@ -296,9 +296,7 @@ def generate_launch_description():
         ],
         output='screen',
         condition=IfCondition(
-            PythonExpression(
-                ["'", controller_type, "' == 'vr' or '", controller_type, "' == 'leader'"]
-            )
+            PythonExpression(["'", controller_type, "' == 'vr'"])
         ),
     )
 
@@ -309,7 +307,8 @@ def generate_launch_description():
             config_file,
             {
                 'urdf_path': leader_urdf_path,
-                'reactivate_topic': reactivate_topic,
+                'follower_urdf_path': follower_urdf_path,
+                'follower_srdf_path': follower_srdf_path,
             },
         ],
         output='screen',
