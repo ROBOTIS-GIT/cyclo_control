@@ -71,10 +71,14 @@ LeaderController::LeaderController()
   left_command_topic_ = this->declare_parameter(
     "left_command_topic",
     std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
-  right_teleop_enable_topic_ = this->declare_parameter(
-    "right_teleop_enable_topic", std::string("/right_relative_teleop_enable"));
-  left_teleop_enable_topic_ = this->declare_parameter(
-    "left_teleop_enable_topic", std::string("/left_relative_teleop_enable"));
+  right_teleop_mode_service_ = this->declare_parameter(
+    "right_teleop_mode_service", std::string("/leader/get_right_mode"));
+  left_teleop_mode_service_ = this->declare_parameter(
+    "left_teleop_mode_service", std::string("/leader/get_left_mode"));
+  right_command_mode_topic_ = this->declare_parameter(
+    "right_command_mode_topic", std::string("/leader/right_command"));
+  left_command_mode_topic_ = this->declare_parameter(
+    "left_command_mode_topic", std::string("/leader/left_commnad"));
   command_timeout_ = this->declare_parameter("command_timeout", 0.1);
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
@@ -87,6 +91,14 @@ LeaderController::LeaderController()
     "follower_l_gripper_name", std::string("end_effector_l_link"));
   r_elbow_name_ = this->declare_parameter("r_elbow_name", std::string("arm_r_link4"));
   l_elbow_name_ = this->declare_parameter("l_elbow_name", std::string("arm_l_link4"));
+  leader_r_gripper_joint_name_ = this->declare_parameter(
+    "leader_r_gripper_joint_name", std::string("gripper_r_joint1"));
+  leader_l_gripper_joint_name_ = this->declare_parameter(
+    "leader_l_gripper_joint_name", std::string("gripper_l_joint1"));
+  follower_r_gripper_joint_name_ = this->declare_parameter(
+    "follower_r_gripper_joint_name", std::string("gripper_r_joint1"));
+  follower_l_gripper_joint_name_ = this->declare_parameter(
+    "follower_l_gripper_joint_name", std::string("gripper_l_joint1"));
   lift_joint_name_ = this->declare_parameter("lift_joint_name", std::string("lift_joint"));
   model_lift_joint_name_ = this->declare_parameter("model_lift_joint_name", std::string("joint"));
 
@@ -99,12 +111,18 @@ LeaderController::LeaderController()
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             joint_states_topic_, 10,
             std::bind(&LeaderController::jointStateCallback, this, std::placeholders::_1));
-  right_teleop_enable_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-    right_teleop_enable_topic_, 10,
-    std::bind(&LeaderController::rightTeleopEnableCallback, this, std::placeholders::_1));
-  left_teleop_enable_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-    left_teleop_enable_topic_, 10,
-    std::bind(&LeaderController::leftTeleopEnableCallback, this, std::placeholders::_1));
+  right_teleop_mode_client_ =
+    this->create_client<std_srvs::srv::Trigger>(
+    right_teleop_mode_service_);
+  left_teleop_mode_client_ =
+    this->create_client<std_srvs::srv::Trigger>(
+    left_teleop_mode_service_);
+  right_command_mode_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
+    right_command_mode_topic_, 10,
+    std::bind(&LeaderController::rightCommandModeCallback, this, std::placeholders::_1));
+  left_command_mode_sub_ = this->create_subscription<std_msgs::msg::UInt8>(
+    left_command_mode_topic_, 10,
+    std::bind(&LeaderController::leftCommandModeCallback, this, std::placeholders::_1));
 
   r_goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
             r_goal_pose_topic_, 10);
@@ -116,8 +134,11 @@ LeaderController::LeaderController()
             left_command_topic_, 10);
 
   RCLCPP_INFO(
-    this->get_logger(), "Relative teleoperation enable topics: right=%s, left=%s",
-    right_teleop_enable_topic_.c_str(), left_teleop_enable_topic_.c_str());
+    this->get_logger(), "Relative teleoperation mode services: right=%s, left=%s",
+    right_teleop_mode_service_.c_str(), left_teleop_mode_service_.c_str());
+  RCLCPP_INFO(
+    this->get_logger(), "Mode command topics: right=%s, left=%s",
+    right_command_mode_topic_.c_str(), left_command_mode_topic_.c_str());
 
   try {
     if (urdf_path_.empty() || follower_urdf_path_.empty()) {
@@ -188,7 +209,7 @@ LeaderController::LeaderController()
   RCLCPP_INFO(this->get_logger(), "Node is ready! Waiting for messages...");
   RCLCPP_INFO(
     this->get_logger(),
-    "Both arms start in hold mode; use each relative teleoperation enable topic to move them.");
+    "Both arms remain unconfigured until their leader mode services are discovered.");
 }
 
 LeaderController::~LeaderController()
@@ -238,6 +259,8 @@ void LeaderController::rightTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
   updateJointPositionsFromTrajectory(*msg);
+  right_gripper_received_ = updateGripperFromTrajectory(
+    *msg, leader_r_gripper_joint_name_, right_gripper_position_) || right_gripper_received_;
   right_traj_received_ = true;
   last_right_traj_time_ = this->now();
 }
@@ -246,6 +269,8 @@ void LeaderController::leftTrajectoryCallback(
   const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
 {
   updateJointPositionsFromTrajectory(*msg);
+  left_gripper_received_ = updateGripperFromTrajectory(
+    *msg, leader_l_gripper_joint_name_, left_gripper_position_) || left_gripper_received_;
   left_traj_received_ = true;
   last_left_traj_time_ = this->now();
 }
@@ -313,6 +338,23 @@ void LeaderController::updateJointPositionsFromTrajectory(
   }
 }
 
+bool LeaderController::updateGripperFromTrajectory(
+  const trajectory_msgs::msg::JointTrajectory & msg,
+  const std::string & leader_gripper_joint_name, double & gripper_position)
+{
+  if (msg.points.empty()) {
+    return false;
+  }
+  const auto & positions = msg.points.front().positions;
+  for (size_t i = 0; i < msg.joint_names.size(); ++i) {
+    if (msg.joint_names[i] == leader_gripper_joint_name && i < positions.size()) {
+      gripper_position = positions[i];
+      return true;
+    }
+  }
+  return false;
+}
+
 void LeaderController::updateLiftJointFromJointState(const sensor_msgs::msg::JointState & msg)
 {
   if (lift_joint_index_ < 0 || lift_joint_index_ >= q_.size()) {
@@ -334,32 +376,147 @@ void LeaderController::updateLiftJointFromJointState(const sensor_msgs::msg::Joi
   }
 }
 
-void LeaderController::rightTeleopEnableCallback(const std_msgs::msg::Bool::SharedPtr msg)
+void LeaderController::monitorTeleopModeServices()
 {
-  if (!msg || msg->data == right_teleop_enabled_) {
-    return;
+  const bool right_ready = right_teleop_mode_client_->service_is_ready();
+  const bool left_ready = left_teleop_mode_client_->service_is_ready();
+  if (!right_ready && right_service_was_ready_) {
+    right_teleop_state_ = TeleopState::UNCONFIGURED;
+    right_mode_request_pending_ = false;
+    right_mode_transition_pending_ = true;
+    RCLCPP_WARN(this->get_logger(), "Right mode service disappeared; state is UNCONFIGURED");
+  } else if (right_ready && !right_service_was_ready_) {
+    RCLCPP_INFO(
+      this->get_logger(), "Right mode service discovered; requesting current mode");
+    requestRightTeleopMode();
   }
-  right_teleop_enabled_ = msg->data;
-  right_mode_transition_pending_ = true;
-  RCLCPP_INFO(
-    this->get_logger(), "Right relative teleoperation %s",
-    right_teleop_enabled_ ? "requested" : "stopped; holding current pose");
+  if (!left_ready && left_service_was_ready_) {
+    left_teleop_state_ = TeleopState::UNCONFIGURED;
+    left_mode_request_pending_ = false;
+    left_mode_transition_pending_ = true;
+    RCLCPP_WARN(this->get_logger(), "Left mode service disappeared; state is UNCONFIGURED");
+  } else if (left_ready && !left_service_was_ready_) {
+    RCLCPP_INFO(
+      this->get_logger(), "Left mode service discovered; requesting current mode");
+    requestLeftTeleopMode();
+  }
+  right_service_was_ready_ = right_ready;
+  left_service_was_ready_ = left_ready;
 }
 
-void LeaderController::leftTeleopEnableCallback(const std_msgs::msg::Bool::SharedPtr msg)
+void LeaderController::requestRightTeleopMode()
 {
-  if (!msg || msg->data == left_teleop_enabled_) {
+  if (!right_teleop_mode_client_->service_is_ready() || right_mode_request_pending_) {
     return;
   }
-  left_teleop_enabled_ = msg->data;
-  left_mode_transition_pending_ = true;
+  right_mode_request_pending_ = true;
+  right_teleop_mode_client_->async_send_request(
+    std::make_shared<std_srvs::srv::Trigger::Request>(),
+    [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+      right_mode_request_pending_ = false;
+      if (!right_teleop_mode_client_->service_is_ready()) {
+        return;
+      }
+      const auto response = future.get();
+      TeleopState state;
+      if (!response->success || !parseModeResponse(response->message, state)) {
+        RCLCPP_WARN(this->get_logger(), "Invalid right mode response: '%s'",
+          response->message.c_str());
+        return;
+      }
+      right_teleop_state_ = state;
+      right_mode_transition_pending_ = true;
+      RCLCPP_INFO(
+        this->get_logger(), "Right mode configured from service: %s",
+        state == TeleopState::ENABLED ? "ENABLED" : "DISABLED");
+    });
+}
+
+void LeaderController::requestLeftTeleopMode()
+{
+  if (!left_teleop_mode_client_->service_is_ready() || left_mode_request_pending_) {
+    return;
+  }
+  left_mode_request_pending_ = true;
+  left_teleop_mode_client_->async_send_request(
+    std::make_shared<std_srvs::srv::Trigger::Request>(),
+    [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+      left_mode_request_pending_ = false;
+      if (!left_teleop_mode_client_->service_is_ready()) {
+        return;
+      }
+      const auto response = future.get();
+      TeleopState state;
+      if (!response->success || !parseModeResponse(response->message, state)) {
+        RCLCPP_WARN(this->get_logger(), "Invalid left mode response: '%s'",
+          response->message.c_str());
+        return;
+      }
+      left_teleop_state_ = state;
+      left_mode_transition_pending_ = true;
+      RCLCPP_INFO(
+        this->get_logger(), "Left mode configured from service: %s",
+        state == TeleopState::ENABLED ? "ENABLED" : "DISABLED");
+    });
+}
+
+void LeaderController::rightCommandModeCallback(const std_msgs::msg::UInt8::SharedPtr msg)
+{
+  if (msg) {
+    applyModeCommand(msg->data, right_teleop_state_, right_mode_transition_pending_, "Right");
+  }
+}
+
+void LeaderController::leftCommandModeCallback(const std_msgs::msg::UInt8::SharedPtr msg)
+{
+  if (msg) {
+    applyModeCommand(msg->data, left_teleop_state_, left_mode_transition_pending_, "Left");
+  }
+}
+
+void LeaderController::applyModeCommand(
+  uint8_t command, TeleopState & state, bool & transition_pending, const char * side)
+{
+  if (state == TeleopState::UNCONFIGURED) {
+    RCLCPP_WARN(this->get_logger(), "%s mode command ignored while UNCONFIGURED", side);
+    return;
+  }
+  const TeleopState previous = state;
+  if (command == 0) {
+    state = TeleopState::DISABLED;
+  } else if (command == 1) {
+    state = TeleopState::ENABLED;
+  } else if (command == 2) {
+    state = state == TeleopState::ENABLED ? TeleopState::DISABLED : TeleopState::ENABLED;
+  } else {
+    RCLCPP_WARN(this->get_logger(), "%s invalid mode command: %u", side, command);
+    return;
+  }
+  if (state != previous) {
+    transition_pending = true;
+  }
   RCLCPP_INFO(
-    this->get_logger(), "Left relative teleoperation %s",
-    left_teleop_enabled_ ? "requested" : "stopped; holding current pose");
+    this->get_logger(), "%s teleoperation state: %s", side,
+    state == TeleopState::ENABLED ? "ENABLED" : "DISABLED");
+}
+
+bool LeaderController::parseModeResponse(
+  const std::string & message, TeleopState & state) const
+{
+  if (message == "1") {
+    state = TeleopState::ENABLED;
+    return true;
+  }
+  if (message == "0") {
+    state = TeleopState::DISABLED;
+    return true;
+  }
+  return false;
 }
 
 void LeaderController::controlLoopCallback()
 {
+  monitorTeleopModeServices();
   const rclcpp::Time now = this->now();
   const bool right_traj_has_publisher =
     (r_traj_sub_ && r_traj_sub_->get_publisher_count() > 0);
@@ -397,7 +554,7 @@ void LeaderController::controlLoopCallback()
     const Eigen::Affine3d left_current = follower_kinematics_->getPose(follower_l_gripper_name_);
 
     if (right_mode_transition_pending_) {
-      if (!right_teleop_enabled_) {
+      if (right_teleop_state_ != TeleopState::ENABLED) {
         right_goal_ = right_current;
         right_goal_initialized_ = true;
         right_mode_transition_pending_ = false;
@@ -411,7 +568,7 @@ void LeaderController::controlLoopCallback()
       }
     }
     if (left_mode_transition_pending_) {
-      if (!left_teleop_enabled_) {
+      if (left_teleop_state_ != TeleopState::ENABLED) {
         left_goal_ = left_current;
         left_goal_initialized_ = true;
         left_mode_transition_pending_ = false;
@@ -425,20 +582,24 @@ void LeaderController::controlLoopCallback()
       }
     }
 
-    if (right_teleop_enabled_ && !right_mode_transition_pending_ && right_recent) {
+    if (right_teleop_state_ == TeleopState::ENABLED &&
+      !right_mode_transition_pending_ && right_recent)
+    {
       right_goal_ = right_follower_anchor_ *
         right_leader_anchor_.inverse() * right_leader_current;
     }
-    if (left_teleop_enabled_ && !left_mode_transition_pending_ && left_recent) {
+    if (left_teleop_state_ == TeleopState::ENABLED &&
+      !left_mode_transition_pending_ && left_recent)
+    {
       left_goal_ = left_follower_anchor_ *
         left_leader_anchor_.inverse() * left_leader_current;
     }
-    if (right_teleop_enabled_ && !right_recent) {
+    if (right_teleop_state_ == TeleopState::ENABLED && !right_recent) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 2000,
         "Right leader command is stale; holding the last right goal");
     }
-    if (left_teleop_enabled_ && !left_recent) {
+    if (left_teleop_state_ == TeleopState::ENABLED && !left_recent) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 2000,
         "Left leader command is stale; holding the last left goal");
@@ -540,13 +701,20 @@ Eigen::VectorXd LeaderController::computeElbowUpPreferredJointVelocity() const
 
 void LeaderController::publishFollowerTrajectory(const Eigen::VectorXd & desired)
 {
-  arm_r_pub_->publish(makeArmTrajectory(right_arm_joints_, desired));
-  arm_l_pub_->publish(makeArmTrajectory(left_arm_joints_, desired));
+  arm_r_pub_->publish(
+    makeArmTrajectory(
+      right_arm_joints_, desired, follower_r_gripper_joint_name_,
+      right_gripper_position_, right_gripper_received_));
+  arm_l_pub_->publish(
+    makeArmTrajectory(
+      left_arm_joints_, desired, follower_l_gripper_joint_name_,
+      left_gripper_position_, left_gripper_received_));
 }
 
 trajectory_msgs::msg::JointTrajectory LeaderController::makeArmTrajectory(
   const std::vector<std::string> & joint_names,
-  const Eigen::VectorXd & desired) const
+  const Eigen::VectorXd & desired, const std::string & gripper_joint_name,
+  double gripper_position, bool gripper_received) const
 {
   trajectory_msgs::msg::JointTrajectory trajectory;
   trajectory.joint_names = joint_names;
@@ -557,6 +725,10 @@ trajectory_msgs::msg::JointTrajectory LeaderController::makeArmTrajectory(
     if (iter != follower_joint_index_map_.end()) {
       point.positions.push_back(desired[iter->second]);
     }
+  }
+  if (gripper_received) {
+    trajectory.joint_names.push_back(gripper_joint_name);
+    point.positions.push_back(gripper_position);
   }
   trajectory.points.push_back(point);
   return trajectory;

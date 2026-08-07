@@ -185,8 +185,10 @@ leader_controller:
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"
     right_command_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_command_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
-    right_teleop_enable_topic: "/right_relative_teleop_enable"
-    left_teleop_enable_topic: "/left_relative_teleop_enable"
+    right_teleop_mode_service: "/leader/get_right_mode"
+    left_teleop_mode_service: "/leader/get_left_mode"
+    right_command_mode_topic: "/leader/right_command"
+    left_command_mode_topic: "/leader/left_commnad"
 
     command_timeout: 0.1
 
@@ -198,6 +200,10 @@ leader_controller:
     follower_l_gripper_name: "arm_l_link7"
     r_elbow_name: "arm_r_link4"
     l_elbow_name: "arm_l_link4"
+    leader_r_gripper_joint_name: "gripper_r_joint1"
+    leader_l_gripper_joint_name: "gripper_l_joint1"
+    follower_r_gripper_joint_name: "gripper_r_joint1"
+    follower_l_gripper_joint_name: "gripper_l_joint1"
     lift_joint_name: "lift_joint"
     model_lift_joint_name: "joint"
 
