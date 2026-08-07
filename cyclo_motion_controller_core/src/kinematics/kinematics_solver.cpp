@@ -68,6 +68,11 @@ KinematicsSolver::KinematicsSolver(const std::string & urdf_path, const std::str
   q_.setZero(dof_);
   qdot_.setZero(dof_);
 
+  collision_results_.resize(geom_model_.collisionPairs.size());
+  for (auto & result : collision_results_) {
+    result.setZero(dof_);
+  }
+
         // // Set joint state limits (truncate to nq)
         // if (static_cast<int>(model_.lowerPositionLimit.size()) < dof_ ||
         //     static_cast<int>(model_.upperPositionLimit.size()) < dof_) {
@@ -247,19 +252,23 @@ int KinematicsSolver::getCollisionPairCount() const
   return static_cast<int>(geom_model_.collisionPairs.size());
 }
 
-std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
+const std::vector<MinDistResult> & KinematicsSolver::getCollisionPairDistancesCached(
   const bool & with_grad,
   const bool & with_graddot,
   const bool verbose)
 {
-  std::vector<MinDistResult> results;
-  results.resize(geom_model_.collisionPairs.size());
-  for (auto & res : results) {
-    res.setZero(q_.size());
+  for (auto & res : collision_results_) {
+    res.distance = std::numeric_limits<double>::max();
+    if (with_grad || with_graddot) {
+      res.grad.setZero();
+    }
+    if (with_graddot) {
+      res.grad_dot.setZero();
+    }
   }
 
   if (geom_model_.collisionPairs.empty()) {
-    return results;
+    return collision_results_;
   }
 
   pinocchio::computeDistances(model_, data_, geom_model_, geom_data_, q_);
@@ -268,7 +277,7 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
   int minPairIdx = -1;
   for (std::size_t idx = 0; idx < geom_data_.distanceResults.size(); ++idx) {
     const auto & dist_res = geom_data_.distanceResults[idx];
-    results[idx].distance = dist_res.min_distance;
+    collision_results_[idx].distance = dist_res.min_distance;
     if (dist_res.min_distance < minDistance) {
       minDistance = dist_res.min_distance;
       minPairIdx = static_cast<int>(idx);
@@ -288,8 +297,9 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
   }
 
   if (with_grad || with_graddot) {
-    pinocchio::computeJointJacobians(model_, data_, q_);
-    pinocchio::updateGeometryPlacements(model_, data_, geom_model_, geom_data_, q_);
+    // updateState() has already computed joint Jacobians and frame placements for q_.
+    // Only collision geometry placements still need to be refreshed here.
+    pinocchio::updateGeometryPlacements(model_, data_, geom_model_, geom_data_);
 
     if (with_graddot) {
       pinocchio::computeJointJacobiansTimeVariation(model_, data_, q_, qdot_);
@@ -300,6 +310,21 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
                v.z(), 0, -v.x(),
                -v.y(), v.x(), 0).finished();
       };
+
+    Eigen::MatrixXd J_jointA = Eigen::MatrixXd::Zero(6, q_.size());
+    Eigen::MatrixXd J_jointB = Eigen::MatrixXd::Zero(6, q_.size());
+    Eigen::MatrixXd JA = Eigen::MatrixXd::Zero(3, q_.size());
+    Eigen::MatrixXd JB = Eigen::MatrixXd::Zero(3, q_.size());
+    Eigen::MatrixXd J_jointA_dot;
+    Eigen::MatrixXd J_jointB_dot;
+    Eigen::MatrixXd JA_dot;
+    Eigen::MatrixXd JB_dot;
+    if (with_graddot) {
+      J_jointA_dot.setZero(6, q_.size());
+      J_jointB_dot.setZero(6, q_.size());
+      JA_dot.setZero(3, q_.size());
+      JB_dot.setZero(3, q_.size());
+    }
 
     for (std::size_t idx = 0; idx < geom_data_.distanceResults.size(); ++idx) {
       const auto & pair = geom_model_.collisionPairs[idx];
@@ -318,25 +343,25 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
         n.setZero();
       }
 
-      Eigen::MatrixXd J_jointA = Eigen::MatrixXd::Zero(6, q_.size());
-      Eigen::MatrixXd J_jointB = Eigen::MatrixXd::Zero(6, q_.size());
+      J_jointA.setZero();
+      J_jointB.setZero();
       pinocchio::getJointJacobian(model_, data_, jointA, pinocchio::LOCAL_WORLD_ALIGNED, J_jointA);
       pinocchio::getJointJacobian(model_, data_, jointB, pinocchio::LOCAL_WORLD_ALIGNED, J_jointB);
 
       const Eigen::Vector3d rA = pA - data_.oMi[jointA].translation();
       const Eigen::Vector3d rB = pB - data_.oMi[jointB].translation();
 
-      const Eigen::MatrixXd JA = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
-      const Eigen::MatrixXd JB = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
+      JA.noalias() = J_jointA.topRows<3>() - skew(rA) * J_jointA.bottomRows<3>();
+      JB.noalias() = J_jointB.topRows<3>() - skew(rB) * J_jointB.bottomRows<3>();
 
-      results[idx].grad = (n.transpose() * (JB - JA)).transpose();
+      collision_results_[idx].grad.noalias() = (n.transpose() * (JB - JA)).transpose();
       if (dist_res.min_distance < 0) {
-        results[idx].grad *= -1.0;
+        collision_results_[idx].grad *= -1.0;
       }
 
       if (with_graddot) {
-        Eigen::MatrixXd J_jointA_dot = Eigen::MatrixXd::Zero(6, q_.size());
-        Eigen::MatrixXd J_jointB_dot = Eigen::MatrixXd::Zero(6, q_.size());
+        J_jointA_dot.setZero();
+        J_jointB_dot.setZero();
         pinocchio::getJointJacobianTimeVariation(model_, data_, jointA,
               pinocchio::LOCAL_WORLD_ALIGNED, J_jointA_dot);
         pinocchio::getJointJacobianTimeVariation(model_, data_, jointB,
@@ -348,17 +373,18 @@ std::vector<MinDistResult> KinematicsSolver::getCollisionPairDistances(
         const Eigen::Vector3d rA_dot = pA_dot - J_jointA.topRows<3>() * qdot_;
         const Eigen::Vector3d rB_dot = pB_dot - J_jointB.topRows<3>() * qdot_;
 
-        const Eigen::MatrixXd JA_dot = J_jointA_dot.topRows<3>() -
+        JA_dot.noalias() = J_jointA_dot.topRows<3>() -
           (skew(rA_dot) * J_jointA.bottomRows<3>() + skew(rA) * J_jointA_dot.bottomRows<3>());
-        const Eigen::MatrixXd JB_dot = J_jointB_dot.topRows<3>() -
+        JB_dot.noalias() = J_jointB_dot.topRows<3>() -
           (skew(rB_dot) * J_jointB.bottomRows<3>() + skew(rB) * J_jointB_dot.bottomRows<3>());
 
-        results[idx].grad_dot = (n.transpose() * (JB_dot - JA_dot)).transpose();
+        collision_results_[idx].grad_dot.noalias() =
+          (n.transpose() * (JB_dot - JA_dot)).transpose();
       }
     }
   }
 
-  return results;
+  return collision_results_;
 }
 
 }  // namespace kinematics

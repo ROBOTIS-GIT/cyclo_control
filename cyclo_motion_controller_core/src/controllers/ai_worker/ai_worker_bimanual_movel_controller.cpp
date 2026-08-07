@@ -159,14 +159,12 @@ void AIWorkerBimanualMoveLController::setCost()
     si_index_.qdot_start, si_index_.qdot_start, si_index_.qdot_size,
     si_index_.qdot_size) += 2.0 * w_damping_.asDiagonal();
 
-  q_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size) =
-    Eigen::VectorXd::Constant(si_index_.slack_q_min_size, slack_penalty_);
-  q_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size) =
-    Eigen::VectorXd::Constant(si_index_.slack_q_max_size, slack_penalty_);
+  q_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size).setConstant(slack_penalty_);
+  q_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size).setConstant(slack_penalty_);
   q_ds_(si_index_.slack_sing_start) = slack_penalty_;
   if (si_index_.slack_sel_col_size > 0) {
-    q_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size) =
-      Eigen::VectorXd::Constant(si_index_.slack_sel_col_size, slack_penalty_);
+    q_ds_.segment(si_index_.slack_sel_col_start, si_index_.slack_sel_col_size)
+    .setConstant(slack_penalty_);
   }
 }
 
@@ -175,9 +173,9 @@ void AIWorkerBimanualMoveLController::setBoundConstraint()
   l_bound_ds_.setConstant(nbc_, -OSQP_INFTY);
   u_bound_ds_.setConstant(nbc_, OSQP_INFTY);
   l_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) =
-    robot_data_->getJointVelocityLimit().first;
+    robot_data_->getJointVelocityLowerLimitRef();
   u_bound_ds_.segment(si_index_.qdot_start, si_index_.qdot_size) =
-    robot_data_->getJointVelocityLimit().second;
+    robot_data_->getJointVelocityUpperLimitRef();
   l_bound_ds_.segment(si_index_.slack_q_min_start, si_index_.slack_q_min_size).setZero();
   l_bound_ds_.segment(si_index_.slack_q_max_start, si_index_.slack_q_max_size).setZero();
   l_bound_ds_(si_index_.slack_sing_start) = 0.0;
@@ -192,9 +190,9 @@ void AIWorkerBimanualMoveLController::setIneqConstraint()
   l_ineq_ds_.setConstant(nineqc_, -OSQP_INFTY);
   u_ineq_ds_.setConstant(nineqc_, OSQP_INFTY);
 
-  const Eigen::VectorXd q_min = robot_data_->getJointPositionLimit().first;
-  const Eigen::VectorXd q_max = robot_data_->getJointPositionLimit().second;
-  const Eigen::VectorXd q = robot_data_->getJointPosition();
+  const auto & q_min = robot_data_->getJointPositionLowerLimitRef();
+  const auto & q_max = robot_data_->getJointPositionUpperLimitRef();
+  const auto & q = robot_data_->getJointPositionRef();
 
   A_ineq_ds_.block(si_index_.con_q_min_start, si_index_.qdot_start,
     si_index_.con_q_min_size, si_index_.qdot_size) =
@@ -215,7 +213,7 @@ void AIWorkerBimanualMoveLController::setIneqConstraint()
     -cbf_alpha_ * (q_max - q);
 
   if (si_index_.con_sel_col_size > 0) {
-    const auto pair_results = robot_data_->getCollisionPairDistances(true, false, false);
+    const auto & pair_results = robot_data_->getCollisionPairDistancesCached(true, false, false);
     const int pair_count = std::min<int>(si_index_.con_sel_col_size, pair_results.size());
     for (int i = 0; i < pair_count; ++i) {
       const auto & res = pair_results[i];

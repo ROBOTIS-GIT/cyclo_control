@@ -141,27 +141,23 @@ public:
                 // Convert to sparse format for OSQP
     Eigen::SparseMatrix<double> P = P_ds_.sparseView();
     Eigen::SparseMatrix<double> A = A_ds_.sparseView();
-    Eigen::VectorXd q = q_ds_;
-    Eigen::VectorXd l = l_ds_;
-    Eigen::VectorXd u = u_ds_;
-
     const bool pattern_changed =
       !has_prev_pattern_ ||
       !hasSameSparsityPattern(P, prev_hessian_pattern_) ||
       !hasSameSparsityPattern(A, prev_constraint_pattern_);
 
     if (!solver_initialized_ || pattern_changed) {
-      if (!initializeSolver(P, A, q, l, u)) {return false;}
+      if (!initializeSolver(P, A, q_ds_, l_ds_, u_ds_)) {return false;}
     } else {
       const bool updated =
         solver_.updateHessianMatrix(P) &&
         solver_.updateLinearConstraintsMatrix(A) &&
-        solver_.updateGradient(q) &&
-        solver_.updateBounds(l, u);
+        solver_.updateGradient(q_ds_) &&
+        solver_.updateBounds(l_ds_, u_ds_);
 
       if (!updated) {
         solver_initialized_ = false;
-        if (!initializeSolver(P, A, q, l, u)) {return false;}
+        if (!initializeSolver(P, A, q_ds_, l_ds_, u_ds_)) {return false;}
       }
     }
 
@@ -171,9 +167,11 @@ public:
     if (solver_.getStatus() != OsqpEigen::Status::Solved) {return false;}
 
     sol = solver_.getSolution();
-    prev_hessian_pattern_ = P;
-    prev_constraint_pattern_ = A;
-    has_prev_pattern_ = true;
+    if (pattern_changed) {
+      prev_hessian_pattern_ = P;
+      prev_constraint_pattern_ = A;
+      has_prev_pattern_ = true;
+    }
 
     return true;
   }

@@ -794,33 +794,34 @@ void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
 {
   try {
             // Build indices for each arm segment
-    std::vector<int> left_arm_indices, right_arm_indices;
-
-    for (const auto & joint_name : left_arm_joints_) {
-      auto it = model_joint_index_map_.find(joint_name);
-      if (it != model_joint_index_map_.end()) {
-        left_arm_indices.push_back(it->second);
+    if (left_arm_indices_.empty() && right_arm_indices_.empty()) {
+      left_arm_indices_.reserve(left_arm_joints_.size());
+      right_arm_indices_.reserve(right_arm_joints_.size());
+      for (const auto & joint_name : left_arm_joints_) {
+        auto it = model_joint_index_map_.find(joint_name);
+        if (it != model_joint_index_map_.end()) {
+          left_arm_indices_.push_back(it->second);
+        }
       }
-    }
-
-    for (const auto & joint_name : right_arm_joints_) {
-      auto it = model_joint_index_map_.find(joint_name);
-      if (it != model_joint_index_map_.end()) {
-        right_arm_indices.push_back(it->second);
+      for (const auto & joint_name : right_arm_joints_) {
+        auto it = model_joint_index_map_.find(joint_name);
+        if (it != model_joint_index_map_.end()) {
+          right_arm_indices_.push_back(it->second);
+        }
       }
     }
 
             // Publish left arm trajectory without gripper joint
-    if (!left_arm_indices.empty()) {
+    if (!left_arm_indices_.empty()) {
       auto traj_left = createArmTrajectoryMsg(
-                    left_arm_joints_, q_desired, left_arm_indices);
+                    left_arm_joints_, q_desired, left_arm_indices_);
       arm_l_pub_->publish(traj_left);
     }
 
             // Publish right arm trajectory without gripper joint
-    if (!right_arm_indices.empty()) {
+    if (!right_arm_indices_.empty()) {
       auto traj_right = createArmTrajectoryMsg(
-                    right_arm_joints_, q_desired, right_arm_indices);
+                    right_arm_joints_, q_desired, right_arm_indices_);
       arm_r_pub_->publish(traj_right);
     }
 
@@ -851,6 +852,7 @@ trajectory_msgs::msg::JointTrajectory VRController::createArmTrajectoryMsg(
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
+  point.positions.reserve(arm_indices.size());
   for (int idx : arm_indices) {
     if (idx >= 0 && idx < static_cast<int>(positions.size())) {
       point.positions.push_back(positions[idx]);

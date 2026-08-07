@@ -121,12 +121,14 @@ public:
     * @return (Eigen::VectorXd) Joint positions of the manipulator.
     */
   virtual Eigen::VectorXd getJointPosition() const {return q_;}
+  const Eigen::VectorXd & getJointPositionRef() const {return q_;}
 
     /**
     * @brief Get the joint velocities of the manipulator.
     * @return (Eigen::VectorXd) Joint velocities of the manipulator.
     */
   virtual Eigen::VectorXd getJointVelocity() const {return qdot_;}
+  const Eigen::VectorXd & getJointVelocityRef() const {return qdot_;}
 
     /**
     * @brief Get lower and upper joint position limits of the manipulator.
@@ -136,6 +138,8 @@ public:
   {
     return std::make_pair(q_lb_, q_ub_);
   }
+  const Eigen::VectorXd & getJointPositionLowerLimitRef() const {return q_lb_;}
+  const Eigen::VectorXd & getJointPositionUpperLimitRef() const {return q_ub_;}
 
     /**
     * @brief Get lower and upper joint velocity limits of the manipulator.
@@ -145,6 +149,8 @@ public:
   {
     return std::make_pair(qdot_lb_, qdot_ub_);
   }
+  const Eigen::VectorXd & getJointVelocityLowerLimitRef() const {return qdot_lb_;}
+  const Eigen::VectorXd & getJointVelocityUpperLimitRef() const {return qdot_ub_;}
 
     /**
      * @brief Override joint velocity bounds for a specific generalized coordinate index.
@@ -183,6 +189,14 @@ public:
      * @return (std::vector<MinDistResult>) Results per collision pair.
      */
   virtual std::vector<MinDistResult> getCollisionPairDistances(
+    const bool & with_grad = false,
+    const bool & with_graddot = false,
+    const bool verbose = false)
+  {
+    return getCollisionPairDistancesCached(with_grad, with_graddot, verbose);
+  }
+
+  virtual const std::vector<MinDistResult> & getCollisionPairDistancesCached(
     const bool & with_grad,
     const bool & with_graddot,
     const bool verbose);
@@ -203,6 +217,7 @@ protected:
   pinocchio::Data data_;
   pinocchio::GeometryModel geom_model_;
   pinocchio::GeometryData geom_data_;
+  std::vector<MinDistResult> collision_results_;
 
     // Cached frame name lists
   std::vector<std::string> link_frame_names_;     // URDF <link> names

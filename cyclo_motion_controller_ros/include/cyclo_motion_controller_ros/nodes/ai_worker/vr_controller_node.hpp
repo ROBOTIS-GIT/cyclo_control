@@ -176,6 +176,8 @@ private:
   int lift_joint_index_ = -1;        // index in model q/qdot; -1 if not present
   std::map<std::string, int> joint_index_map_;
   std::vector<std::string> model_joint_names_;
+  std::vector<int> left_arm_indices_;
+  std::vector<int> right_arm_indices_;
   std::unordered_map<std::string, int> model_joint_index_map_;
 
         // Callbacks

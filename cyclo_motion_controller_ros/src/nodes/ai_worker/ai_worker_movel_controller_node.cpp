@@ -497,31 +497,31 @@ void AIWorkerMoveLController::syncArmStateToFeedback(
 
 void AIWorkerMoveLController::publishTrajectory(const Eigen::VectorXd & q_desired)
 {
-  std::vector<int> left_arm_indices;
-  std::vector<int> right_arm_indices;
-
-  for (const auto & joint_name : left_arm_joints_) {
-    auto it = model_joint_index_map_.find(joint_name);
-    if (it != model_joint_index_map_.end()) {
-      left_arm_indices.push_back(it->second);
+  if (left_arm_indices_.empty() && right_arm_indices_.empty()) {
+    left_arm_indices_.reserve(left_arm_joints_.size());
+    right_arm_indices_.reserve(right_arm_joints_.size());
+    for (const auto & joint_name : left_arm_joints_) {
+      auto it = model_joint_index_map_.find(joint_name);
+      if (it != model_joint_index_map_.end()) {
+        left_arm_indices_.push_back(it->second);
+      }
+    }
+    for (const auto & joint_name : right_arm_joints_) {
+      auto it = model_joint_index_map_.find(joint_name);
+      if (it != model_joint_index_map_.end()) {
+        right_arm_indices_.push_back(it->second);
+      }
     }
   }
 
-  for (const auto & joint_name : right_arm_joints_) {
-    auto it = model_joint_index_map_.find(joint_name);
-    if (it != model_joint_index_map_.end()) {
-      right_arm_indices.push_back(it->second);
-    }
-  }
-
-  if (!left_arm_indices.empty()) {
+  if (!left_arm_indices_.empty()) {
     arm_l_pub_->publish(createArmTrajectoryMsg(
-      left_arm_joints_, q_desired, left_arm_indices));
+      left_arm_joints_, q_desired, left_arm_indices_));
   }
 
-  if (!right_arm_indices.empty()) {
+  if (!right_arm_indices_.empty()) {
     arm_r_pub_->publish(createArmTrajectoryMsg(
-      right_arm_joints_, q_desired, right_arm_indices));
+      right_arm_joints_, q_desired, right_arm_indices_));
   }
 
   if (lift_joint_index_ >= 0 && !lift_joint_.empty() && lift_vel_bound_ != 0.0 &&
@@ -542,6 +542,7 @@ trajectory_msgs::msg::JointTrajectory AIWorkerMoveLController::createArmTrajecto
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
+  point.positions.reserve(arm_indices.size());
   for (int idx : arm_indices) {
     if (idx >= 0 && idx < static_cast<int>(positions.size())) {
       point.positions.push_back(positions[idx]);
