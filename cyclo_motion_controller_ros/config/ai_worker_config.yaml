@@ -188,7 +188,7 @@ leader_controller:
     right_teleop_mode_service: "/leader/get_right_mode"
     left_teleop_mode_service: "/leader/get_left_mode"
     right_command_mode_topic: "/leader/right_command"
-    left_command_mode_topic: "/leader/left_commnad"
+    left_command_mode_topic: "/leader/left_command"
 
     command_timeout: 0.1
 

@@ -78,7 +78,7 @@ LeaderController::LeaderController()
   right_command_mode_topic_ = this->declare_parameter(
     "right_command_mode_topic", std::string("/leader/right_command"));
   left_command_mode_topic_ = this->declare_parameter(
-    "left_command_mode_topic", std::string("/leader/left_commnad"));
+    "left_command_mode_topic", std::string("/leader/left_command"));
   command_timeout_ = this->declare_parameter("command_timeout", 0.1);
   r_goal_pose_topic_ = this->declare_parameter("r_goal_pose_topic", std::string("/r_goal_pose"));
   l_goal_pose_topic_ = this->declare_parameter("l_goal_pose_topic", std::string("/l_goal_pose"));
