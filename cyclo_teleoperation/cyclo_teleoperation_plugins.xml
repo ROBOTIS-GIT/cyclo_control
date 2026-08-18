@@ -1,0 +1,14 @@
+<library path="cyclo_teleoperation_modes">
+  <class
+    name="cyclo_teleoperation/AiWorkerMoveJMode"
+    type="cyclo_teleoperation::robots::ai_worker::MoveJMode"
+    base_class_type="cyclo_teleoperation::TeleoperationMode">
+    <description>Absolute joint-space AI Worker teleoperation mode.</description>
+  </class>
+  <class
+    name="cyclo_teleoperation/AiWorkerElbowUpLeaderMode"
+    type="cyclo_teleoperation::robots::ai_worker::ElbowUpLeaderMode"
+    base_class_type="cyclo_teleoperation::TeleoperationMode">
+    <description>Relative leader-pose mode with an elbow-up null-space preference.</description>
+  </class>
+</library>
