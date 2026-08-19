@@ -2,6 +2,10 @@
 Changelog for package cyclo_motion_controller_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.1 (2026-08-19)
+------------------
+* None
+
 0.3.0 (2026-06-18)
 ------------------
 * Added AI Worker bimanual MoveL and MoveJ controller nodes and launch options, including rigid grasp and virtual object commands
