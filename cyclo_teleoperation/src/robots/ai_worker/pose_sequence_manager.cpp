@@ -148,7 +148,8 @@ bool PoseSequenceManager::startRunner(
   const Sequence & sequence,
   const Purpose purpose,
   const std::vector<int> & indices,
-  const ModeContext & context)
+  const ModeContext & context,
+  const bool final_step_only)
 {
   if (sequence.steps.empty()) {
     return true;
@@ -158,7 +159,7 @@ bool PoseSequenceManager::startRunner(
   for (size_t i = 0; i < indices.size(); ++i) {
     runner.start[i] = context.follower_position[indices[i]];
   }
-  runner.step_index = 0;
+  runner.step_index = final_step_only ? sequence.steps.size() - 1 : 0;
   runner.start_time = context.now_seconds;
   runner.purpose = purpose;
   runner.active = true;
@@ -284,6 +285,87 @@ void PoseSequenceManager::cancelInitialPose()
 {
   cancelRunner(left_runner_, Purpose::kInitialPose);
   cancelRunner(right_runner_, Purpose::kInitialPose);
+}
+
+bool PoseSequenceManager::startFinalInitialPose(
+  const uint16_t mode,
+  const uint8_t arms,
+  const ModeContext & context)
+{
+  error_message_.clear();
+  const auto sequence = initial_poses_.find(mode);
+  if (sequence == initial_poses_.end()) {
+    error_message_ = "Initial pose is disabled for control mode " + std::to_string(mode);
+    return false;
+  }
+
+  if (arms == 0) {
+    error_message_ = "No arm was selected for the initial pose";
+    return false;
+  }
+  if ((arms & kLeftArm) != 0 && sequence->second.left.steps.empty()) {
+    error_message_ = "Left initial pose is not configured for control mode " +
+      std::to_string(mode);
+    return false;
+  }
+  if ((arms & kRightArm) != 0 && sequence->second.right.steps.empty()) {
+    error_message_ = "Right initial pose is not configured for control mode " +
+      std::to_string(mode);
+    return false;
+  }
+
+  bool success = true;
+  if ((arms & kLeftArm) != 0) {
+    success = startRunner(
+      left_runner_, sequence->second.left, Purpose::kFinalInitialPose,
+      left_indices_, context, true) && success;
+  }
+  if ((arms & kRightArm) != 0) {
+    success = startRunner(
+      right_runner_, sequence->second.right, Purpose::kFinalInitialPose,
+      right_indices_, context, true) && success;
+  }
+  return success;
+}
+
+bool PoseSequenceManager::updateFinalInitialPoses(
+  const ModeContext & context,
+  ModeOutput & output)
+{
+  return updateRunner(
+    left_runner_, Purpose::kFinalInitialPose, left_indices_, context, output) &&
+         updateRunner(
+    right_runner_, Purpose::kFinalInitialPose, right_indices_, context, output);
+}
+
+void PoseSequenceManager::cancelFinalInitialPoses(const uint8_t arms)
+{
+  if ((arms & kLeftArm) != 0) {
+    cancelRunner(left_runner_, Purpose::kFinalInitialPose);
+  }
+  if ((arms & kRightArm) != 0) {
+    cancelRunner(right_runner_, Purpose::kFinalInitialPose);
+  }
+}
+
+uint8_t PoseSequenceManager::activeFinalInitialPoseArms() const
+{
+  return activeArms(Purpose::kFinalInitialPose, false);
+}
+
+uint8_t PoseSequenceManager::movingFinalInitialPoseArms() const
+{
+  return activeArms(Purpose::kFinalInitialPose, true);
+}
+
+uint8_t PoseSequenceManager::leftFinalInitialPoseState() const
+{
+  return left_runner_.purpose == Purpose::kFinalInitialPose ? left_runner_.state : 0;
+}
+
+uint8_t PoseSequenceManager::rightFinalInitialPoseState() const
+{
+  return right_runner_.purpose == Purpose::kFinalInitialPose ? right_runner_.state : 0;
 }
 
 bool PoseSequenceManager::hasExitPose(const uint16_t mode) const

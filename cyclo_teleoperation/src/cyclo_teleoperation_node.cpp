@@ -332,11 +332,21 @@ private:
     }
     const auto requested_arms = armsFromName(message->enabled_arms);
     const auto preset_target_arms = armsFromName(message->preset_target_arm);
-    if (!requested_arms || !preset_target_arms) {
+    const auto initial_pose_target_arms = armsFromName(message->initial_pose_target_arm);
+    if (!requested_arms || !preset_target_arms || !initial_pose_target_arms) {
       transition_id_ = message->transition_id;
       publishStatus(
         robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
-        "enabled_arms or preset_target_arm contains an invalid value");
+        "An arm selector in the control command contains an invalid value");
+      return;
+    }
+    const uint8_t preset_target = *preset_target_arms;
+    const uint8_t initial_pose_target = *initial_pose_target_arms;
+    if (preset_target != 0 && initial_pose_target != 0) {
+      transition_id_ = message->transition_id;
+      publishStatus(
+        robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+        "Preset and initial pose cannot be requested in the same command");
       return;
     }
     if (
@@ -347,6 +357,60 @@ private:
       publishStatus(
         robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
         "Preset is not configured for the requested arm");
+      return;
+    }
+
+    const uint8_t moving_initial_pose_arms =
+      pose_sequences_->movingFinalInitialPoseArms();
+    const bool changing_mode =
+      mode_ready_ && message->control_mode != active_control_mode_;
+    if (changing_mode && moving_initial_pose_arms != 0) {
+      transition_id_ = message->transition_id;
+      publishStatus(
+        robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+        "Control mode cannot be changed while an initial pose movement is in progress");
+      return;
+    }
+    if (initial_pose_target != 0) {
+      const uint8_t available_arms =
+        mode_ready_ ? pose_sequences_->initialPoseArms(active_control_mode_) : 0;
+      if (
+        !mode_ready_ || transition_pending_ || mode_transition_started_ ||
+        message->control_mode != active_control_mode_ ||
+        (initial_pose_target & available_arms) != initial_pose_target)
+      {
+        transition_id_ = message->transition_id;
+        publishStatus(
+          robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+          "Initial pose trigger ignored because it is disabled for the active control mode");
+        return;
+      }
+      if (
+        (initial_pose_target &
+        (pose_sequences_->movingPresetArms() | moving_initial_pose_arms)) != 0)
+      {
+        transition_id_ = message->transition_id;
+        publishStatus(
+          robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+          "Initial pose trigger ignored because another pose movement is in progress");
+        return;
+      }
+    }
+    if ((preset_target & moving_initial_pose_arms) != 0) {
+      transition_id_ = message->transition_id;
+      publishStatus(
+        robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+        "Preset cannot be started while an initial pose movement is in progress");
+      return;
+    }
+
+    const uint8_t newly_enabled_arms = *requested_arms &
+      static_cast<uint8_t>(~requested_arms_);
+    if ((newly_enabled_arms & moving_initial_pose_arms) != 0) {
+      transition_id_ = message->transition_id;
+      publishStatus(
+        robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+        "Teleoperation cannot be enabled while an initial pose movement is in progress");
       return;
     }
 
@@ -366,8 +430,7 @@ private:
       }
     }
     requested_arms_ = *requested_arms;
-    const uint8_t preset_target = *preset_target_arms;
-    requested_arms_ &= static_cast<uint8_t>(~preset_target);
+    requested_arms_ &= static_cast<uint8_t>(~(preset_target | initial_pose_target));
     left_preset_id_ = message->left_preset_id;
     right_preset_id_ = message->right_preset_id;
     transition_pending_ =
@@ -376,6 +439,16 @@ private:
     if (preset_target != 0) {
       preset_update_pending_arms_ |= preset_target;
       preset_cancel_pending_arms_ &= static_cast<uint8_t>(~preset_target);
+    }
+    if (initial_pose_target != 0) {
+      final_initial_pose_update_pending_arms_ |= initial_pose_target;
+      final_initial_pose_cancel_pending_arms_ &=
+        static_cast<uint8_t>(~initial_pose_target);
+    }
+    const uint8_t resume_arms = newly_enabled_arms &
+      pose_sequences_->activeFinalInitialPoseArms();
+    if (resume_arms != 0) {
+      final_initial_pose_cancel_pending_arms_ |= resume_arms;
     }
   }
 
@@ -501,6 +574,9 @@ private:
     transition_target_mode_ = requested_control_mode_;
     transition_source_mode_ = active_control_mode_;
     paused_preset_arms_ = pose_sequences_->activePresetArms();
+    pose_sequences_->cancelFinalInitialPoses(kBothArms);
+    final_initial_pose_update_pending_arms_ = 0;
+    final_initial_pose_cancel_pending_arms_ = 0;
     publishStatus(
       robotis_interfaces::msg::ControlModeStatus::STATE_LOADING,
       "Loading control mode " + std::to_string(requested_control_mode_));
@@ -576,7 +652,9 @@ private:
         Eigen::VectorXd::Zero(profile_->leaderPosition().size()));
       const uint8_t initial_arms =
         requested_arms_ & freshLeaderArms() &
-        static_cast<uint8_t>(~pose_sequences_->movingPresetArms());
+        static_cast<uint8_t>(
+        ~(pose_sequences_->movingPresetArms() |
+        pose_sequences_->movingFinalInitialPoseArms()));
       const ModeContext initial_context = makeContext(initial_arms);
       if (!mode_->activate(initial_context)) {
         throw std::runtime_error("mode activation was rejected");
@@ -600,7 +678,8 @@ private:
       arms_pending_ = requested_arms_ != active_arms_;
       const bool mode_has_output =
         (mode_->controlledArms(initial_context) |
-        pose_sequences_->activePresetArms()) != 0;
+        pose_sequences_->activePresetArms() |
+        pose_sequences_->activeFinalInitialPoseArms()) != 0;
       publishStatus(
         !mode_has_output ?
         robotis_interfaces::msg::ControlModeStatus::STATE_HOLDING :
@@ -630,7 +709,9 @@ private:
   {
     const uint8_t desired =
       requested_arms_ & freshLeaderArms() &
-      static_cast<uint8_t>(~pose_sequences_->movingPresetArms());
+      static_cast<uint8_t>(
+      ~(pose_sequences_->movingPresetArms() |
+      pose_sequences_->movingFinalInitialPoseArms()));
     if (desired == active_arms_) {
       arms_pending_ = requested_arms_ != desired;
       return;
@@ -645,6 +726,7 @@ private:
     active_arms_ = desired;
     if (enabled != 0 && mode_) {
       pose_sequences_->cancelPresets(enabled);
+      pose_sequences_->cancelFinalInitialPoses(enabled);
       mode_->onArmsEnabled(enabled, makeContext(active_arms_));
     }
     arms_pending_ = requested_arms_ != active_arms_;
@@ -653,8 +735,9 @@ private:
       robotis_interfaces::msg::ControlModeStatus::STATE_HOLDING :
       robotis_interfaces::msg::ControlModeStatus::STATE_ACTIVE,
       arms_pending_ ?
-      (pose_sequences_->movingPresetArms() != 0 ?
-      "Waiting for preset movement to finish" :
+      ((pose_sequences_->movingPresetArms() |
+      pose_sequences_->movingFinalInitialPoseArms()) != 0 ?
+      "Waiting for pose movement to finish" :
       "Holding arm with stale leader reference") : "Arm state updated");
   }
 
@@ -799,11 +882,38 @@ private:
       pose_sequences_->cancelPresets(cancel_arms);
     }
 
+    if (final_initial_pose_cancel_pending_arms_ != 0) {
+      const uint8_t cancel_arms = final_initial_pose_cancel_pending_arms_;
+      final_initial_pose_cancel_pending_arms_ = 0;
+      captureArmHoldTarget(cancel_arms);
+      syncArmCommandToFeedback(cancel_arms);
+      pose_sequences_->cancelFinalInitialPoses(cancel_arms);
+    }
+
     if (
       arms_pending_ ||
       (requested_arms_ & freshLeaderArms()) != active_arms_)
     {
       updateActiveArms();
+    }
+
+    if (final_initial_pose_update_pending_arms_ != 0) {
+      const uint8_t update_arms = final_initial_pose_update_pending_arms_;
+      final_initial_pose_update_pending_arms_ = 0;
+      syncArmCommandToFeedback(update_arms);
+      pose_sequences_->cancelPresets(update_arms);
+      if (!pose_sequences_->startFinalInitialPose(
+          active_control_mode_, update_arms, makeContext(active_arms_)))
+      {
+        publishStatus(
+          robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
+          pose_sequences_->errorMessage());
+        profile_->publish(command_position_);
+        return;
+      }
+      publishStatus(
+        robotis_interfaces::msg::ControlModeStatus::STATE_ACTIVE,
+        "Moving selected arm to the final step of the active mode initial pose");
     }
 
     if (preset_update_pending_arms_ != 0) {
@@ -823,7 +933,9 @@ private:
 
     const ModeContext context = makeContext(active_arms_);
     const uint8_t controlled_arms =
-      mode_->controlledArms(context) | pose_sequences_->activePresetArms();
+      mode_->controlledArms(context) |
+      pose_sequences_->activePresetArms() |
+      pose_sequences_->activeFinalInitialPoseArms();
     if (controlled_arms == 0) {
       command_position_ = hold_target_;
       command_velocity_.setZero();
@@ -846,6 +958,9 @@ private:
         throw std::runtime_error("active mode rejected update");
       }
       if (!pose_sequences_->updatePresets(context, output)) {
+        throw std::runtime_error(pose_sequences_->errorMessage());
+      }
+      if (!pose_sequences_->updateFinalInitialPoses(context, output)) {
         throw std::runtime_error(pose_sequences_->errorMessage());
       }
 
@@ -880,15 +995,23 @@ private:
 
       const uint8_t left_state = pose_sequences_->leftPresetState();
       const uint8_t right_state = pose_sequences_->rightPresetState();
+      const uint8_t left_initial_pose_state =
+        pose_sequences_->leftFinalInitialPoseState();
+      const uint8_t right_initial_pose_state =
+        pose_sequences_->rightFinalInitialPoseState();
       if (
         left_state != last_left_preset_state_ ||
-        right_state != last_right_preset_state_)
+        right_state != last_right_preset_state_ ||
+        left_initial_pose_state != last_left_initial_pose_state_ ||
+        right_initial_pose_state != last_right_initial_pose_state_)
       {
         last_left_preset_state_ = left_state;
         last_right_preset_state_ = right_state;
+        last_left_initial_pose_state_ = left_initial_pose_state;
+        last_right_initial_pose_state_ = right_initial_pose_state;
         publishStatus(
           robotis_interfaces::msg::ControlModeStatus::STATE_ACTIVE,
-          "Preset state updated");
+          "Pose sequence state updated");
       }
     } catch (const std::exception & error) {
       hold_target_ = profile_->followerPosition();
@@ -896,8 +1019,11 @@ private:
       active_arms_ = 0;
       requested_arms_ = 0;
       pose_sequences_->cancelPresets(kBothArms);
+      pose_sequences_->cancelFinalInitialPoses(kBothArms);
       preset_update_pending_arms_ = 0;
       preset_cancel_pending_arms_ = 0;
+      final_initial_pose_update_pending_arms_ = 0;
+      final_initial_pose_cancel_pending_arms_ = 0;
       publishStatus(
         robotis_interfaces::msg::ControlModeStatus::STATE_ERROR,
         std::string("Control update failed; holding all arms: ") + error.what());
@@ -920,6 +1046,13 @@ private:
     status.right_preset_id = right_preset_id_;
     status.left_preset_state = pose_sequences_ ? pose_sequences_->leftPresetState() : 0;
     status.right_preset_state = pose_sequences_ ? pose_sequences_->rightPresetState() : 0;
+    status.initial_pose_available_arms = armsToName(
+      pose_sequences_ && mode_ready_ ?
+      pose_sequences_->initialPoseArms(active_control_mode_) : 0);
+    status.left_initial_pose_state =
+      pose_sequences_ ? pose_sequences_->leftFinalInitialPoseState() : 0;
+    status.right_initial_pose_state =
+      pose_sequences_ ? pose_sequences_->rightFinalInitialPoseState() : 0;
     status.state = state;
     status.message = message;
     status_publisher_->publish(status);
@@ -948,6 +1081,8 @@ private:
   bool arms_pending_ = false;
   uint8_t preset_update_pending_arms_ = 0;
   uint8_t preset_cancel_pending_arms_ = 0;
+  uint8_t final_initial_pose_update_pending_arms_ = 0;
+  uint8_t final_initial_pose_cancel_pending_arms_ = 0;
   uint8_t paused_preset_arms_ = 0;
   bool mode_ready_ = false;
   bool follower_received_ = false;
@@ -958,6 +1093,8 @@ private:
   bool command_initialized_ = false;
   uint8_t last_left_preset_state_ = 0;
   uint8_t last_right_preset_state_ = 0;
+  uint8_t last_left_initial_pose_state_ = 0;
+  uint8_t last_right_initial_pose_state_ = 0;
   Eigen::VectorXd hold_target_;
   Eigen::VectorXd command_position_;
   Eigen::VectorXd command_velocity_;

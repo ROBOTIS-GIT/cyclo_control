@@ -44,6 +44,15 @@ public:
   uint8_t activeInitialPoseArms() const;
   void cancelInitialPose();
 
+  bool startFinalInitialPose(
+    uint16_t mode, uint8_t arms, const ModeContext & context);
+  bool updateFinalInitialPoses(const ModeContext & context, ModeOutput & output);
+  void cancelFinalInitialPoses(uint8_t arms);
+  uint8_t activeFinalInitialPoseArms() const;
+  uint8_t movingFinalInitialPoseArms() const;
+  uint8_t leftFinalInitialPoseState() const;
+  uint8_t rightFinalInitialPoseState() const;
+
   bool hasExitPose(uint16_t mode) const;
   bool startExitPose(uint16_t mode, const ModeContext & context);
   bool updateExitPose(const ModeContext & context, ModeOutput & output);
@@ -71,6 +80,7 @@ private:
   {
     kNone,
     kInitialPose,
+    kFinalInitialPose,
     kExitPose,
     kPreset,
   };
@@ -116,7 +126,8 @@ private:
     const Sequence & sequence,
     Purpose purpose,
     const std::vector<int> & indices,
-    const ModeContext & context);
+    const ModeContext & context,
+    bool final_step_only = false);
   bool updateRunner(
     Runner & runner,
     Purpose purpose,
