@@ -15,11 +15,11 @@
 // Author: Yeonguk Kim
 
 #include "cyclo_motion_controller_ros/nodes/ai_worker/ai_worker_bimanual_movej_controller_node.hpp"
-#include "cyclo_motion_controller_ros/utils/trajectory_command_utils.hpp"
 
 #include <algorithm>
 
 #include "common/type_define.hpp"
+#include "cyclo_motion_controller_ros/utils/trajectory_command_utils.hpp"
 
 namespace cyclo_motion_controller_ros
 {
