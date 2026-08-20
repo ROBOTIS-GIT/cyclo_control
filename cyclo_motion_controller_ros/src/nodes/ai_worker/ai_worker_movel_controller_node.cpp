@@ -15,6 +15,7 @@
 // Author: Yeonguk Kim
 
 #include "cyclo_motion_controller_ros/nodes/ai_worker/ai_worker_movel_controller_node.hpp"
+#include "cyclo_motion_controller_ros/utils/trajectory_command_utils.hpp"
 
 #include <algorithm>
 
@@ -65,6 +66,12 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   left_traj_topic_ = this->declare_parameter(
     "left_traj_topic",
     std::string("/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"));
+  right_raw_traj_topic_ = this->declare_parameter(
+    "right_raw_traj_topic",
+    std::string("/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"));
+  left_raw_traj_topic_ = this->declare_parameter(
+    "left_raw_traj_topic",
+    std::string("/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"));
   lift_topic_ = this->declare_parameter(
     "lift_topic",
     std::string("/leader/joystick_controller_right/joint_trajectory"));
@@ -91,6 +98,14 @@ AIWorkerMoveLController::AIWorkerMoveLController()
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
     joint_states_topic_, 10,
     std::bind(&AIWorkerMoveLController::jointStateCallback, this, std::placeholders::_1));
+  right_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+    right_raw_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
+    std::bind(&AIWorkerMoveLController::rightRawTrajectoryCallback, this,
+      std::placeholders::_1));
+  left_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+    left_raw_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
+    std::bind(&AIWorkerMoveLController::leftRawTrajectoryCallback, this,
+      std::placeholders::_1));
 
   arm_r_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(right_traj_topic_, 10);
   arm_l_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(left_traj_topic_, 10);
@@ -190,13 +205,13 @@ void AIWorkerMoveLController::extractJointStates(
   q_.setZero(dof);
   qdot_.setZero(dof);
 
-  for (size_t i = 0; i < msg->name.size(); ++i) {
-    if (msg->name[i] == right_gripper_joint_name_ && i < msg->position.size()) {
-      right_gripper_position_ = msg->position[i];
-    }
-    if (msg->name[i] == left_gripper_joint_name_ && i < msg->position.size()) {
-      left_gripper_position_ = msg->position[i];
-    }
+  if (!right_gripper_command_received_) {
+    trajectory_command_utils::updateJointPosition(
+      *msg, right_gripper_joint_name_, right_gripper_position_);
+  }
+  if (!left_gripper_command_received_) {
+    trajectory_command_utils::updateJointPosition(
+      *msg, left_gripper_joint_name_, left_gripper_position_);
   }
 
   const int max_index = std::min<int>(dof, static_cast<int>(model_joint_names_.size()));
@@ -212,6 +227,34 @@ void AIWorkerMoveLController::extractJointStates(
     }
     if (idx < static_cast<int>(msg->velocity.size())) {
       qdot_[i] = msg->velocity[idx];
+    }
+  }
+}
+
+void AIWorkerMoveLController::rightRawTrajectoryCallback(
+  const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+{
+  if (msg && trajectory_command_utils::hasJoint(
+      joint_index_map_, right_gripper_joint_name_))
+  {
+    if (trajectory_command_utils::updateJointPosition(
+        *msg, right_gripper_joint_name_, right_gripper_position_))
+    {
+      right_gripper_command_received_ = true;
+    }
+  }
+}
+
+void AIWorkerMoveLController::leftRawTrajectoryCallback(
+  const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+{
+  if (msg && trajectory_command_utils::hasJoint(
+      joint_index_map_, left_gripper_joint_name_))
+  {
+    if (trajectory_command_utils::updateJointPosition(
+        *msg, left_gripper_joint_name_, left_gripper_position_))
+    {
+      left_gripper_command_received_ = true;
     }
   }
 }
@@ -515,13 +558,19 @@ void AIWorkerMoveLController::publishTrajectory(const Eigen::VectorXd & q_desire
   }
 
   if (!left_arm_indices.empty()) {
-    arm_l_pub_->publish(createArmTrajectoryMsg(
-      left_arm_joints_, q_desired, left_arm_indices));
+    auto trajectory = createArmTrajectoryMsg(
+      left_arm_joints_, q_desired, left_arm_indices);
+    trajectory_command_utils::appendJointIfPresent(
+      trajectory, joint_index_map_, left_gripper_joint_name_, left_gripper_position_);
+    arm_l_pub_->publish(trajectory);
   }
 
   if (!right_arm_indices.empty()) {
-    arm_r_pub_->publish(createArmTrajectoryMsg(
-      right_arm_joints_, q_desired, right_arm_indices));
+    auto trajectory = createArmTrajectoryMsg(
+      right_arm_joints_, q_desired, right_arm_indices);
+    trajectory_command_utils::appendJointIfPresent(
+      trajectory, joint_index_map_, right_gripper_joint_name_, right_gripper_position_);
+    arm_r_pub_->publish(trajectory);
   }
 
   if (lift_joint_index_ >= 0 && !lift_joint_.empty() && lift_vel_bound_ != 0.0 &&
