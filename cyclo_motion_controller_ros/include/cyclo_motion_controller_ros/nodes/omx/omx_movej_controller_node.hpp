@@ -104,9 +104,12 @@ private:
   bool commanded_state_initialized_;
   bool movej_target_initialized_;
   bool movej_trajectory_active_;
+  bool timed_streaming_active_ = false;
+  bool timed_command_received_ = false;
   bool joint_state_timeout_active_ = false;
 
   rclcpp::Time motion_start_time_;
+  rclcpp::Time last_timed_command_time_;
   rclcpp::Time last_joint_state_time_;
   double active_motion_duration_;
   Eigen::VectorXd movej_start_;

@@ -20,6 +20,11 @@
 
 namespace cyclo_motion_controller_ros
 {
+namespace
+{
+constexpr double kTimedStreamingCommandInterval = 0.1;
+}  // namespace
+
 OmyMoveJControllerNode::OmyMoveJControllerNode()
 : Node("omy_movej_controller"),
   joint_state_received_(false),
@@ -27,6 +32,7 @@ OmyMoveJControllerNode::OmyMoveJControllerNode()
   movej_target_initialized_(false),
   movej_trajectory_active_(false),
   motion_start_time_(this->now()),
+  last_timed_command_time_(this->now()),
   last_joint_state_time_(this->now()),
   active_motion_duration_(0.0)
 {
@@ -284,15 +290,21 @@ void OmyMoveJControllerNode::moveJCallback(
 
   const auto & point = msg->points.front();
   const auto duration = rclcpp::Duration(point.time_from_start).seconds();
-  if (duration <= -1) {
+  if (duration < 0.0) {
     const std::string error =
-      "moveJ command ignored: time_from_start must be > -1.";
+      "moveJ command ignored: time_from_start must be >= 0.";
     publishControllerError(error);
     RCLCPP_WARN(this->get_logger(), "%s", error.c_str());
     return;
   }
 
-  if (duration > 0.0) {
+  const bool timed_motion = duration > 1e-6;
+  const rclcpp::Time command_time = this->now();
+  const bool continuing_timed_motion =
+    timed_motion && movej_trajectory_active_ && timed_command_received_ &&
+    (command_time - last_timed_command_time_).seconds() <=
+    kTimedStreamingCommandInterval;
+  if (timed_motion && !continuing_timed_motion) {
     syncCommandStateToFeedback();
   }
 
@@ -321,8 +333,21 @@ void OmyMoveJControllerNode::moveJCallback(
     return;
   }
 
-  movej_start_ = q_commanded_;
+  if (!timed_motion || !continuing_timed_motion) {
+    movej_start_ = q_commanded_;
+    active_motion_duration_ = duration;
+    motion_start_time_ = this->now();
+    timed_streaming_active_ = false;
+  } else if (continuing_timed_motion) {
+    active_motion_duration_ = duration;
+    timed_streaming_active_ = true;
+  }
   movej_goal_ = target_q;
+  movej_trajectory_active_ = timed_motion;
+  timed_command_received_ = timed_motion;
+  if (timed_motion) {
+    last_timed_command_time_ = command_time;
+  }
   movej_target_initialized_ = true;
   latest_movej_command_ = *msg;
   latest_movej_command_received_ = true;
@@ -364,8 +389,22 @@ void OmyMoveJControllerNode::controlLoopCallback()
     kinematics_solver_->updateState(q_feedback, qdot_);
     publishCurrentPose(kinematics_solver_->getPose(controlled_link_));
 
-    const Eigen::VectorXd q_ref = movej_goal_;
-    const Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(movej_start_.size());
+    const double elapsed = (this->now() - motion_start_time_).seconds();
+    const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(movej_start_.size());
+    Eigen::VectorXd q_ref = movej_goal_;
+    Eigen::VectorXd qdot_ref = zeros;
+    if (timed_streaming_active_) {
+      q_ref = q_feedback;
+      qdot_ref = (movej_goal_ - q_feedback) / std::max(active_motion_duration_, time_step_);
+    } else if (movej_trajectory_active_ && elapsed < active_motion_duration_) {
+      q_ref = cyclo_motion_controller::common::math_utils::cubicVector(
+        elapsed, 0.0, active_motion_duration_, movej_start_, movej_goal_, zeros, zeros);
+      qdot_ref = cyclo_motion_controller::common::math_utils::cubicDotVector(
+        elapsed, 0.0, active_motion_duration_, movej_start_, movej_goal_, zeros, zeros);
+    } else if (movej_trajectory_active_) {
+      movej_trajectory_active_ = false;
+      RCLCPP_INFO(this->get_logger(), "moveJ command completed.");
+    }
 
     const Eigen::VectorXd desired_joint_vel =
       qdot_ref + kp_joint_ * (q_ref - q_feedback);
@@ -408,6 +447,8 @@ void OmyMoveJControllerNode::syncCommandStateToFeedback()
   movej_start_ = q_;
   movej_goal_ = q_;
   movej_trajectory_active_ = false;
+  timed_streaming_active_ = false;
+  timed_command_received_ = false;
 }
 }  // namespace cyclo_motion_controller_ros
 
