@@ -121,11 +121,11 @@ VRController::VRController()
             std::bind(&VRController::jointStateCallback, this, std::placeholders::_1));
 
   right_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-            right_raw_traj_topic_, 10,
+            right_raw_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
             std::bind(&VRController::rightRawTrajectoryCallback, this,
       std::placeholders::_1));
   left_raw_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-            left_raw_traj_topic_, 10,
+            left_raw_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
             std::bind(&VRController::leftRawTrajectoryCallback, this, std::placeholders::_1));
 
   ref_divergence_sub_ = this->create_subscription<std_msgs::msg::Bool>(
@@ -381,6 +381,34 @@ void VRController::jointStateCallback(const sensor_msgs::msg::JointState::Shared
     if (joint_index_map_.empty()) {
       for (size_t i = 0; i < msg->name.size(); ++i) {
         joint_index_map_[msg->name[i]] = static_cast<int>(i);
+      }
+
+      const bool has_left_gripper =
+        joint_index_map_.find(left_gripper_joint_name_) != joint_index_map_.end();
+      const bool has_right_gripper =
+        joint_index_map_.find(right_gripper_joint_name_) != joint_index_map_.end();
+      RCLCPP_INFO(
+        this->get_logger(), "Arm trajectory gripper joints: left=%s, right=%s",
+        has_left_gripper ? "enabled" : "disabled",
+        has_right_gripper ? "enabled" : "disabled");
+    }
+
+    if (!left_raw_gripper_received_) {
+      const auto left_gripper_it = joint_index_map_.find(left_gripper_joint_name_);
+      if (
+        left_gripper_it != joint_index_map_.end() && left_gripper_it->second >= 0 &&
+        left_gripper_it->second < static_cast<int>(msg->position.size()))
+      {
+        left_raw_gripper_position_ = msg->position[left_gripper_it->second];
+      }
+    }
+    if (!right_raw_gripper_received_) {
+      const auto right_gripper_it = joint_index_map_.find(right_gripper_joint_name_);
+      if (
+        right_gripper_it != joint_index_map_.end() && right_gripper_it->second >= 0 &&
+        right_gripper_it->second < static_cast<int>(msg->position.size()))
+      {
+        right_raw_gripper_position_ = msg->position[right_gripper_it->second];
       }
     }
 
@@ -810,17 +838,31 @@ void VRController::publishTrajectory(const Eigen::VectorXd & q_desired)
       }
     }
 
-            // Publish left arm trajectory without gripper joint
+            // Publish left arm trajectory and append the gripper when it is present
     if (!left_arm_indices.empty()) {
       auto traj_left = createArmTrajectoryMsg(
                     left_arm_joints_, q_desired, left_arm_indices);
+      if (
+        joint_index_map_.find(left_gripper_joint_name_) != joint_index_map_.end() &&
+        !traj_left.points.empty())
+      {
+        traj_left.joint_names.push_back(left_gripper_joint_name_);
+        traj_left.points.front().positions.push_back(left_raw_gripper_position_);
+      }
       arm_l_pub_->publish(traj_left);
     }
 
-            // Publish right arm trajectory without gripper joint
+            // Publish right arm trajectory and append the gripper when it is present
     if (!right_arm_indices.empty()) {
       auto traj_right = createArmTrajectoryMsg(
                     right_arm_joints_, q_desired, right_arm_indices);
+      if (
+        joint_index_map_.find(right_gripper_joint_name_) != joint_index_map_.end() &&
+        !traj_right.points.empty())
+      {
+        traj_right.joint_names.push_back(right_gripper_joint_name_);
+        traj_right.points.front().positions.push_back(right_raw_gripper_position_);
+      }
       arm_r_pub_->publish(traj_right);
     }
 

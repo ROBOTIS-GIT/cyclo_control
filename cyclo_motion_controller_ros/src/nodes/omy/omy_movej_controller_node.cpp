@@ -16,7 +16,7 @@
 
 #include "cyclo_motion_controller_ros/nodes/omy/omy_movej_controller_node.hpp"
 
-#include "common/type_define.hpp"
+#include <algorithm>
 
 namespace cyclo_motion_controller_ros
 {
@@ -284,15 +284,16 @@ void OmyMoveJControllerNode::moveJCallback(
 
   const auto & point = msg->points.front();
   const auto duration = rclcpp::Duration(point.time_from_start).seconds();
-  if (duration <= -1) {
+  if (duration < 0.0) {
     const std::string error =
-      "moveJ command ignored: time_from_start must be > -1.";
+      "moveJ command ignored: time_from_start must be >= 0.";
     publishControllerError(error);
     RCLCPP_WARN(this->get_logger(), "%s", error.c_str());
     return;
   }
 
-  if (duration > 0.0) {
+  const bool timed_motion = duration > 1e-6;
+  if (timed_motion) {
     syncCommandStateToFeedback();
   }
 
@@ -322,7 +323,10 @@ void OmyMoveJControllerNode::moveJCallback(
   }
 
   movej_start_ = q_commanded_;
+  active_motion_duration_ = duration;
+  motion_start_time_ = this->now();
   movej_goal_ = target_q;
+  movej_trajectory_active_ = timed_motion;
   movej_target_initialized_ = true;
   latest_movej_command_ = *msg;
   latest_movej_command_received_ = true;
@@ -364,8 +368,18 @@ void OmyMoveJControllerNode::controlLoopCallback()
     kinematics_solver_->updateState(q_feedback, qdot_);
     publishCurrentPose(kinematics_solver_->getPose(controlled_link_));
 
-    const Eigen::VectorXd q_ref = movej_goal_;
-    const Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(movej_start_.size());
+    const double elapsed = (this->now() - motion_start_time_).seconds();
+    Eigen::VectorXd q_ref = movej_goal_;
+    Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(movej_start_.size());
+    if (movej_trajectory_active_ && elapsed < active_motion_duration_) {
+      const double interpolation_ratio =
+        std::clamp(elapsed / active_motion_duration_, 0.0, 1.0);
+      q_ref = movej_start_ + interpolation_ratio * (movej_goal_ - movej_start_);
+      qdot_ref = (movej_goal_ - movej_start_) / active_motion_duration_;
+    } else if (movej_trajectory_active_) {
+      movej_trajectory_active_ = false;
+      RCLCPP_INFO(this->get_logger(), "moveJ command completed.");
+    }
 
     const Eigen::VectorXd desired_joint_vel =
       qdot_ref + kp_joint_ * (q_ref - q_feedback);

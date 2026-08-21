@@ -67,6 +67,8 @@ private:
   std::string left_movel_topic_;
   std::string right_traj_topic_;
   std::string left_traj_topic_;
+  std::string right_raw_traj_topic_;
+  std::string left_raw_traj_topic_;
   std::string lift_topic_;
   double lift_vel_bound_;
   std::string r_gripper_pose_topic_;
@@ -82,6 +84,8 @@ private:
   rclcpp::Subscription<robotis_interfaces::msg::MoveL>::SharedPtr right_movel_sub_;
   rclcpp::Subscription<robotis_interfaces::msg::MoveL>::SharedPtr left_movel_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
+  rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_raw_traj_sub_;
+  rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_raw_traj_sub_;
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_r_pub_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_l_pub_;
@@ -113,6 +117,8 @@ private:
   bool right_movel_trajectory_active_;
   bool left_movel_trajectory_active_;
   bool joint_state_timeout_active_ = false;
+  bool right_gripper_command_received_ = false;
+  bool left_gripper_command_received_ = false;
 
   rclcpp::Time right_motion_start_time_;
   rclcpp::Time left_motion_start_time_;
@@ -134,6 +140,10 @@ private:
   void rightMoveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg);
   void leftMoveLCallback(const robotis_interfaces::msg::MoveL::SharedPtr msg);
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
+  void rightRawTrajectoryCallback(
+    const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
+  void leftRawTrajectoryCallback(
+    const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
   void controlLoopCallback();
 
   void initializeJointConfig();
