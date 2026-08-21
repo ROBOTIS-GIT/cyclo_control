@@ -2,6 +2,13 @@
 Changelog for package cyclo_motion_controller_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.2 (2026-08-20)
+------------------
+* Unified model-aware gripper commands with AI Worker arm trajectories
+* Fixed MoveJ time_from_start interpolation for AI Worker, OMX, and OMY controllers
+* Preserved immediate gripper commands and zero-duration leader streaming
+* Contributors: Yeonguk Kim
+
 0.3.1 (2026-08-19)
 ------------------
 * None

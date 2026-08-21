@@ -20,6 +20,8 @@ ai_worker_movel_controller:
     left_movel_topic: "/l_goal_move"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
+    right_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
+    left_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"
     lift_topic: "/leader/joystick_controller_right/joint_trajectory"
 
     lift_vel_bound: 0.0
@@ -80,12 +82,16 @@ ai_worker_bimanual_movel_controller:
     grasp_capture_topic: "/capture_grasp"
     right_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory"
     left_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory"
+    right_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory"
+    left_raw_traj_topic: "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory"
     lift_topic: "/leader/joystick_controller_right/joint_trajectory"
     lift_vel_bound: 0.0
     r_gripper_pose_topic: "/r_gripper_pose"
     l_gripper_pose_topic: "/l_gripper_pose"
     r_gripper_name: "end_effector_r_link"
     l_gripper_name: "end_effector_l_link"
+    right_gripper_joint: "gripper_r_joint1"
+    left_gripper_joint: "gripper_l_joint1"
 
 ai_worker_bimanual_movej_controller:
   ros__parameters:

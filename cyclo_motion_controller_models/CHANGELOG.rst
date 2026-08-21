@@ -2,6 +2,10 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.2 (2026-08-20)
+------------------
+* None
+
 0.3.1 (2026-08-19)
 ------------------
 * Corrected left and right joint7 position limits in the AI Worker URDF
