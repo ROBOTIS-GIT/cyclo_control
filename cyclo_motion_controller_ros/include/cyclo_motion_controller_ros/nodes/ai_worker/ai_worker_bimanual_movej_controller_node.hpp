@@ -148,10 +148,6 @@ private:
   bool left_movej_target_initialized_;
   bool right_movej_trajectory_active_ = false;
   bool left_movej_trajectory_active_ = false;
-  bool right_timed_streaming_active_ = false;
-  bool left_timed_streaming_active_ = false;
-  bool right_timed_command_received_ = false;
-  bool left_timed_command_received_ = false;
   bool joint_state_timeout_active_ = false;
   bool grasp_constraint_active_ = false;
   bool manual_grasp_latch_ = false;
@@ -178,8 +174,6 @@ private:
   double left_active_motion_duration_ = 0.0;
   rclcpp::Time right_motion_start_time_;
   rclcpp::Time left_motion_start_time_;
-  rclcpp::Time right_last_timed_command_time_;
-  rclcpp::Time left_last_timed_command_time_;
   rclcpp::Time last_joint_state_time_;
   rclcpp::Time gripper_closed_since_;
   rclcpp::Time right_gripper_open_since_;

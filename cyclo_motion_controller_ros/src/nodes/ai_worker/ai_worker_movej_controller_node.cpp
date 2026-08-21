@@ -23,11 +23,6 @@
 
 namespace cyclo_motion_controller_ros
 {
-namespace
-{
-constexpr double kTimedStreamingCommandInterval = 0.1;
-}  // namespace
-
 AIWorkerMoveJController::AIWorkerMoveJController()
 : Node("ai_worker_movej_controller"),
   joint_state_received_(false),
@@ -38,8 +33,6 @@ AIWorkerMoveJController::AIWorkerMoveJController()
   left_gripper_position_(0.0),
   right_motion_start_time_(this->now()),
   left_motion_start_time_(this->now()),
-  right_last_timed_command_time_(this->now()),
-  left_last_timed_command_time_(this->now()),
   last_joint_state_time_(this->now())
 {
   RCLCPP_INFO(this->get_logger(), "========================================");
@@ -302,12 +295,7 @@ void AIWorkerMoveJController::rightTrajectoryCallback(
   }
 
   const bool timed_motion = duration > 1e-6;
-  const rclcpp::Time command_time = this->now();
-  const bool continuing_timed_motion =
-    timed_motion && right_movej_trajectory_active_ && right_timed_command_received_ &&
-    (command_time - right_last_timed_command_time_).seconds() <=
-    kTimedStreamingCommandInterval;
-  if (timed_motion && !continuing_timed_motion) {
+  if (timed_motion) {
     syncRightArmToFeedback();
   }
 
@@ -323,21 +311,11 @@ void AIWorkerMoveJController::rightTrajectoryCallback(
   {
     right_gripper_command_received_ = true;
   }
-  if (!timed_motion || !continuing_timed_motion) {
-    right_movej_start_ = q_commanded_;
-    right_motion_start_time_ = this->now();
-    right_active_motion_duration_ = duration;
-    right_timed_streaming_active_ = false;
-  } else if (continuing_timed_motion) {
-    right_active_motion_duration_ = duration;
-    right_timed_streaming_active_ = true;
-  }
+  right_movej_start_ = q_commanded_;
+  right_motion_start_time_ = this->now();
+  right_active_motion_duration_ = duration;
   right_movej_goal_ = target_q;
   right_movej_trajectory_active_ = timed_motion;
-  right_timed_command_received_ = timed_motion;
-  if (timed_motion) {
-    right_last_timed_command_time_ = command_time;
-  }
   right_movej_target_initialized_ = true;
 }
 
@@ -358,12 +336,7 @@ void AIWorkerMoveJController::leftTrajectoryCallback(
   }
 
   const bool timed_motion = duration > 1e-6;
-  const rclcpp::Time command_time = this->now();
-  const bool continuing_timed_motion =
-    timed_motion && left_movej_trajectory_active_ && left_timed_command_received_ &&
-    (command_time - left_last_timed_command_time_).seconds() <=
-    kTimedStreamingCommandInterval;
-  if (timed_motion && !continuing_timed_motion) {
+  if (timed_motion) {
     syncLeftArmToFeedback();
   }
 
@@ -379,21 +352,11 @@ void AIWorkerMoveJController::leftTrajectoryCallback(
   {
     left_gripper_command_received_ = true;
   }
-  if (!timed_motion || !continuing_timed_motion) {
-    left_movej_start_ = q_commanded_;
-    left_motion_start_time_ = this->now();
-    left_active_motion_duration_ = duration;
-    left_timed_streaming_active_ = false;
-  } else if (continuing_timed_motion) {
-    left_active_motion_duration_ = duration;
-    left_timed_streaming_active_ = true;
-  }
+  left_movej_start_ = q_commanded_;
+  left_motion_start_time_ = this->now();
+  left_active_motion_duration_ = duration;
   left_movej_goal_ = target_q;
   left_movej_trajectory_active_ = timed_motion;
-  left_timed_command_received_ = timed_motion;
-  if (timed_motion) {
-    left_last_timed_command_time_ = command_time;
-  }
   left_movej_target_initialized_ = true;
 }
 
@@ -424,8 +387,6 @@ void AIWorkerMoveJController::controlLoopCallback()
       joint_state_timeout_active_ = true;
       right_movej_trajectory_active_ = false;
       left_movej_trajectory_active_ = false;
-      right_timed_streaming_active_ = false;
-      left_timed_streaming_active_ = false;
       RCLCPP_WARN(
         this->get_logger(),
         "Joint states timed out. Holding commands until fresh feedback is received.");
@@ -444,18 +405,13 @@ void AIWorkerMoveJController::controlLoopCallback()
       Eigen::VectorXd right_ref = right_movej_goal_;
       Eigen::VectorXd right_qdot = Eigen::VectorXd::Zero(q_feedback.size());
       const double elapsed = (this->now() - right_motion_start_time_).seconds();
-      if (right_timed_streaming_active_) {
-        right_ref = q_feedback;
+      if (right_movej_trajectory_active_ && elapsed < right_active_motion_duration_) {
+        const double interpolation_ratio =
+          std::clamp(elapsed / right_active_motion_duration_, 0.0, 1.0);
+        right_ref = right_movej_start_ +
+          interpolation_ratio * (right_movej_goal_ - right_movej_start_);
         right_qdot =
-          (right_movej_goal_ - q_feedback) / std::max(right_active_motion_duration_, time_step_);
-      } else if (right_movej_trajectory_active_ && elapsed < right_active_motion_duration_) {
-        const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(q_feedback.size());
-        right_ref = cyclo_motion_controller::common::math_utils::cubicVector(
-          elapsed, 0.0, right_active_motion_duration_,
-          right_movej_start_, right_movej_goal_, zeros, zeros);
-        right_qdot = cyclo_motion_controller::common::math_utils::cubicDotVector(
-          elapsed, 0.0, right_active_motion_duration_,
-          right_movej_start_, right_movej_goal_, zeros, zeros);
+          (right_movej_goal_ - right_movej_start_) / right_active_motion_duration_;
       } else if (right_movej_trajectory_active_) {
         right_movej_trajectory_active_ = false;
       }
@@ -467,18 +423,13 @@ void AIWorkerMoveJController::controlLoopCallback()
       Eigen::VectorXd left_ref = left_movej_goal_;
       Eigen::VectorXd left_qdot = Eigen::VectorXd::Zero(q_feedback.size());
       const double elapsed = (this->now() - left_motion_start_time_).seconds();
-      if (left_timed_streaming_active_) {
-        left_ref = q_feedback;
+      if (left_movej_trajectory_active_ && elapsed < left_active_motion_duration_) {
+        const double interpolation_ratio =
+          std::clamp(elapsed / left_active_motion_duration_, 0.0, 1.0);
+        left_ref = left_movej_start_ +
+          interpolation_ratio * (left_movej_goal_ - left_movej_start_);
         left_qdot =
-          (left_movej_goal_ - q_feedback) / std::max(left_active_motion_duration_, time_step_);
-      } else if (left_movej_trajectory_active_ && elapsed < left_active_motion_duration_) {
-        const Eigen::VectorXd zeros = Eigen::VectorXd::Zero(q_feedback.size());
-        left_ref = cyclo_motion_controller::common::math_utils::cubicVector(
-          elapsed, 0.0, left_active_motion_duration_,
-          left_movej_start_, left_movej_goal_, zeros, zeros);
-        left_qdot = cyclo_motion_controller::common::math_utils::cubicDotVector(
-          elapsed, 0.0, left_active_motion_duration_,
-          left_movej_start_, left_movej_goal_, zeros, zeros);
+          (left_movej_goal_ - left_movej_start_) / left_active_motion_duration_;
       } else if (left_movej_trajectory_active_) {
         left_movej_trajectory_active_ = false;
       }
@@ -525,10 +476,6 @@ void AIWorkerMoveJController::syncCommandStateToFeedback()
   left_movej_goal_ = q_;
   right_movej_trajectory_active_ = false;
   left_movej_trajectory_active_ = false;
-  right_timed_streaming_active_ = false;
-  left_timed_streaming_active_ = false;
-  right_timed_command_received_ = false;
-  left_timed_command_received_ = false;
 }
 
 void AIWorkerMoveJController::syncRightArmToFeedback()
