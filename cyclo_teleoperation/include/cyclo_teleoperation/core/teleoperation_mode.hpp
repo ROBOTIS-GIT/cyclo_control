@@ -39,6 +39,11 @@ public:
 
   virtual bool update(const ModeContext & context, ModeOutput & output) = 0;
 
+  virtual uint8_t timedCommandFeedbackSyncArms(const ModeContext & /*context*/) const
+  {
+    return 0;
+  }
+
   virtual uint8_t controlledArms(const ModeContext & context) const
   {
     return context.enabled_arms;

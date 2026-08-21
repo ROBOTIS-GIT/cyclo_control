@@ -167,6 +167,11 @@ bool AIWorkerProfile::updateLeaderReference(
     return false;
   }
   const auto & point = message.points.front();
+  const double duration = rclcpp::Duration(point.time_from_start).seconds();
+  if (duration < 0.0) {
+    RCLCPP_WARN(node_.get_logger(), "Leader trajectory ignored: time_from_start must be >= 0");
+    return false;
+  }
   const auto & requested_indices =
     target_arm == kLeftArm ? left_arm_indices_ : right_arm_indices_;
   std::vector<bool> received(follower_joint_names_.size(), false);
@@ -196,7 +201,17 @@ bool AIWorkerProfile::updateLeaderReference(
       left_gripper_position_ = point.positions[i];
     }
   }
-  return updated_arm_joints == requested_indices.size();
+  if (updated_arm_joints != requested_indices.size()) {
+    return false;
+  }
+  if (target_arm == kLeftArm) {
+    left_leader_duration_ = duration;
+    ++left_leader_sequence_;
+  } else if (target_arm == kRightArm) {
+    right_leader_duration_ = duration;
+    ++right_leader_sequence_;
+  }
+  return true;
 }
 
 trajectory_msgs::msg::JointTrajectory AIWorkerProfile::makeArmTrajectory(

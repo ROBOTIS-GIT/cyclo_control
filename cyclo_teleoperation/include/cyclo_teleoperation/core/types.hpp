@@ -17,6 +17,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,6 +68,10 @@ struct ModeContext
   const Eigen::VectorXd & measured_follower_position;
   const Eigen::VectorXd & leader_reference;
   const Eigen::VectorXd & leader_position;
+  double left_leader_duration;
+  double right_leader_duration;
+  uint64_t left_leader_sequence;
+  uint64_t right_leader_sequence;
   uint8_t requested_arms;
   uint8_t enabled_arms;
   uint16_t left_preset_id;

@@ -186,12 +186,6 @@ bool PoseSequenceManager::startInitialPose(
     right_indices_, context);
 }
 
-double PoseSequenceManager::quintic(const double value)
-{
-  const double x = std::clamp(value, 0.0, 1.0);
-  return x * x * x * (10.0 + x * (-15.0 + 6.0 * x));
-}
-
 bool PoseSequenceManager::updateRunner(
   Runner & runner,
   const Purpose purpose,
@@ -204,14 +198,18 @@ bool PoseSequenceManager::updateRunner(
   }
   const Step & step = runner.sequence->steps.at(runner.step_index);
   const double elapsed = context.now_seconds - runner.start_time;
+  const bool interpolating = runner.moving && elapsed < runner.sequence->duration;
   const double alpha = runner.moving ?
-    quintic(elapsed / runner.sequence->duration) : 1.0;
+    std::clamp(elapsed / runner.sequence->duration, 0.0, 1.0) : 1.0;
   for (size_t i = 0; i < indices.size(); ++i) {
     const int index = indices[i];
+    const double displacement = step.target[i] - runner.start[i];
     const double reference =
-      runner.start[i] + alpha * (step.target[i] - runner.start[i]);
+      runner.start[i] + alpha * displacement;
+    const double reference_velocity = interpolating ?
+      displacement / runner.sequence->duration : 0.0;
     output.desired_joint_velocity[index] =
-      kp_ * (reference - context.follower_position[index]);
+      reference_velocity + kp_ * (reference - context.follower_position[index]);
     output.joint_tracking_weight[index] = tracking_weight_;
     output.joint_position_limit_enabled[index] = false;
   }

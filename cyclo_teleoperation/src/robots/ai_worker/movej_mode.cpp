@@ -36,86 +36,143 @@ bool MoveJMode::configure(
     };
   kp_joint_ = parameter(prefix + ".kp_joint", 50.0);
   tracking_weight_ = parameter(prefix + ".tracking_weight", 10.0);
-  blend_duration_ = parameter(prefix + ".activation.duration", 1.5);
-  return kp_joint_ > 0.0 && tracking_weight_ > 0.0 && blend_duration_ >= 0.0;
+  return kp_joint_ > 0.0 && tracking_weight_ > 0.0;
 }
 
 bool MoveJMode::activate(const ModeContext & context)
 {
-  blend_start_ = context.follower_position;
-  left_blending_ = false;
-  right_blending_ = false;
+  left_trajectory_ = ArmTrajectory{};
+  right_trajectory_ = ArmTrajectory{};
   onArmsEnabled(context.enabled_arms, context);
   return true;
 }
 
-void MoveJMode::beginBlend(
+void MoveJMode::beginSlowStart(
   const std::vector<int> & indices,
-  const double now,
-  const Eigen::VectorXd & follower)
+  ArmTrajectory & trajectory,
+  const uint64_t command_sequence,
+  const ModeContext & context)
 {
-  if (blend_start_.size() != follower.size()) {
-    blend_start_ = follower;
-  }
+  trajectory = ArmTrajectory{};
+  trajectory.start = context.follower_position;
+  trajectory.goal = context.leader_reference;
+  trajectory.last_sequence = command_sequence;
+  trajectory.waiting_for_command = true;
   for (const int index : indices) {
-    blend_start_[index] = follower[index];
-  }
-  if (&indices == &left_indices_) {
-    left_blend_start_time_ = now;
-    left_blending_ = blend_duration_ > 0.0;
-  } else {
-    right_blend_start_time_ = now;
-    right_blending_ = blend_duration_ > 0.0;
+    trajectory.start[index] = context.follower_position[index];
+    trajectory.goal[index] = context.leader_reference[index];
   }
 }
 
 void MoveJMode::onArmsEnabled(const uint8_t arms, const ModeContext & context)
 {
   if ((arms & kLeftArm) != 0) {
-    beginBlend(left_indices_, context.now_seconds, context.follower_position);
+    beginSlowStart(
+      left_indices_, left_trajectory_, context.left_leader_sequence, context);
   }
   if ((arms & kRightArm) != 0) {
-    beginBlend(right_indices_, context.now_seconds, context.follower_position);
+    beginSlowStart(
+      right_indices_, right_trajectory_, context.right_leader_sequence, context);
   }
 }
 
-double MoveJMode::blendAlpha(const double elapsed) const
+void MoveJMode::updateArm(
+  const std::vector<int> & indices,
+  const bool enabled,
+  const double command_duration,
+  const uint64_t command_sequence,
+  ArmTrajectory & trajectory,
+  const ModeContext & context,
+  ModeOutput & output)
 {
-  if (blend_duration_ <= 0.0 || elapsed >= blend_duration_) {
-    return 1.0;
+  if (!enabled) {
+    return;
   }
-  const double x = std::clamp(elapsed / blend_duration_, 0.0, 1.0);
-  return x * x * x * (10.0 + x * (-15.0 + 6.0 * x));
+
+  constexpr double kTimedCommandEpsilon = 1e-6;
+  if (trajectory.waiting_for_command && command_sequence == trajectory.last_sequence) {
+    for (const int index : indices) {
+      output.desired_joint_velocity[index] = 0.0;
+      output.joint_tracking_weight[index] = tracking_weight_;
+    }
+    return;
+  }
+  if (command_sequence != trajectory.last_sequence) {
+    trajectory.last_sequence = command_sequence;
+    trajectory.waiting_for_command = false;
+    if (!trajectory.slow_start_complete && command_duration > kTimedCommandEpsilon) {
+      trajectory.start = context.follower_position;
+      trajectory.goal = context.leader_reference;
+      trajectory.start_time = context.now_seconds;
+      trajectory.duration = command_duration;
+      trajectory.active = true;
+    } else {
+      trajectory.active = false;
+      trajectory.slow_start_complete = true;
+    }
+  }
+
+  double interpolation_ratio = 1.0;
+  Eigen::VectorXd feedforward = Eigen::VectorXd::Zero(context.follower_position.size());
+  if (trajectory.active) {
+    const double elapsed = context.now_seconds - trajectory.start_time;
+    interpolation_ratio = std::clamp(elapsed / trajectory.duration, 0.0, 1.0);
+    feedforward = (trajectory.goal - trajectory.start) / trajectory.duration;
+    if (interpolation_ratio >= 1.0) {
+      trajectory.active = false;
+    }
+  }
+
+  for (const int index : indices) {
+    const double reference = trajectory.active ?
+      trajectory.start[index] +
+      interpolation_ratio * (trajectory.goal[index] - trajectory.start[index]) :
+      context.leader_reference[index];
+    const double reference_velocity = trajectory.active ? feedforward[index] : 0.0;
+    output.desired_joint_velocity[index] = reference_velocity +
+      kp_joint_ * (reference - context.follower_position[index]);
+    output.joint_tracking_weight[index] = tracking_weight_;
+  }
+}
+
+uint8_t MoveJMode::timedCommandFeedbackSyncArms(const ModeContext & context) const
+{
+  constexpr double kTimedCommandEpsilon = 1e-6;
+  uint8_t arms = 0;
+  auto add_arm = [&](
+    const uint8_t arm,
+    const double duration,
+    const uint64_t sequence,
+    const ArmTrajectory & trajectory)
+    {
+      if (
+        (context.enabled_arms & arm) != 0 &&
+        sequence != trajectory.last_sequence &&
+        !trajectory.slow_start_complete &&
+        duration > kTimedCommandEpsilon)
+      {
+        arms |= arm;
+      }
+    };
+  add_arm(
+    kLeftArm, context.left_leader_duration,
+    context.left_leader_sequence, left_trajectory_);
+  add_arm(
+    kRightArm, context.right_leader_duration,
+    context.right_leader_sequence, right_trajectory_);
+  return arms;
 }
 
 bool MoveJMode::update(const ModeContext & context, ModeOutput & output)
 {
-  auto update_arm = [&](const std::vector<int> & indices, const bool enabled,
-    bool & blending, const double start_time) {
-      if (!enabled) {
-        return;
-      }
-      const double alpha = blendAlpha(context.now_seconds - start_time);
-      if (alpha >= 1.0) {
-        blending = false;
-      }
-      for (const int index : indices) {
-        const double reference =
-          blending ? blend_start_[index] +
-          alpha * (context.leader_reference[index] - blend_start_[index]) :
-          context.leader_reference[index];
-        output.desired_joint_velocity[index] =
-          kp_joint_ * (reference - context.follower_position[index]);
-        output.joint_tracking_weight[index] = tracking_weight_;
-      }
-    };
-
-  update_arm(
+  updateArm(
     left_indices_, (context.enabled_arms & kLeftArm) != 0,
-    left_blending_, left_blend_start_time_);
-  update_arm(
+    context.left_leader_duration, context.left_leader_sequence,
+    left_trajectory_, context, output);
+  updateArm(
     right_indices_, (context.enabled_arms & kRightArm) != 0,
-    right_blending_, right_blend_start_time_);
+    context.right_leader_duration, context.right_leader_sequence,
+    right_trajectory_, context, output);
   return true;
 }
 }  // namespace cyclo_teleoperation::robots::ai_worker

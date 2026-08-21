@@ -33,23 +33,40 @@ public:
   bool activate(const ModeContext & context) override;
   void onArmsEnabled(uint8_t arms, const ModeContext & context) override;
   bool update(const ModeContext & context, ModeOutput & output) override;
+  uint8_t timedCommandFeedbackSyncArms(const ModeContext & context) const override;
 
 private:
-  void beginBlend(
+  struct ArmTrajectory
+  {
+    Eigen::VectorXd start;
+    Eigen::VectorXd goal;
+    double start_time = 0.0;
+    double duration = 0.0;
+    uint64_t last_sequence = 0;
+    bool active = false;
+    bool waiting_for_command = false;
+    bool slow_start_complete = false;
+  };
+
+  void beginSlowStart(
     const std::vector<int> & indices,
-    double now,
-    const Eigen::VectorXd & follower);
-  double blendAlpha(double elapsed) const;
+    ArmTrajectory & trajectory,
+    uint64_t command_sequence,
+    const ModeContext & context);
+  void updateArm(
+    const std::vector<int> & indices,
+    bool enabled,
+    double command_duration,
+    uint64_t command_sequence,
+    ArmTrajectory & trajectory,
+    const ModeContext & context,
+    ModeOutput & output);
 
   std::vector<int> left_indices_;
   std::vector<int> right_indices_;
-  Eigen::VectorXd blend_start_;
-  double left_blend_start_time_ = 0.0;
-  double right_blend_start_time_ = 0.0;
-  bool left_blending_ = false;
-  bool right_blending_ = false;
+  ArmTrajectory left_trajectory_;
+  ArmTrajectory right_trajectory_;
   double kp_joint_ = 50.0;
   double tracking_weight_ = 10.0;
-  double blend_duration_ = 1.5;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

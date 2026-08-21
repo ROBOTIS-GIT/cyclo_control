@@ -134,7 +134,6 @@ private:
     const std::vector<int> & indices,
     const ModeContext & context,
     ModeOutput & output);
-  static double quintic(double value);
   static void cancelRunner(Runner & runner, Purpose purpose);
   uint8_t activeArms(Purpose purpose, bool moving_only) const;
 

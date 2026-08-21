@@ -486,6 +486,10 @@ private:
       profile_->followerPosition(),
       profile_->leaderReference(),
       profile_->leaderPosition(),
+      profile_->leftLeaderDuration(),
+      profile_->rightLeaderDuration(),
+      profile_->leftLeaderSequence(),
+      profile_->rightLeaderSequence(),
       requested_arms_,
       enabled_arms,
       left_preset_id_,
@@ -931,6 +935,11 @@ private:
       }
     }
 
+    const uint8_t timed_command_sync_arms =
+      mode_->timedCommandFeedbackSyncArms(makeContext(active_arms_));
+    if (timed_command_sync_arms != 0) {
+      syncArmCommandToFeedback(timed_command_sync_arms);
+    }
     const ModeContext context = makeContext(active_arms_);
     const uint8_t controlled_arms =
       mode_->controlledArms(context) |

@@ -47,6 +47,10 @@ public:
   const Eigen::VectorXd & followerVelocity() const {return follower_velocity_;}
   const Eigen::VectorXd & leaderReference() const {return leader_reference_;}
   const Eigen::VectorXd & leaderPosition() const {return leader_position_;}
+  double leftLeaderDuration() const {return left_leader_duration_;}
+  double rightLeaderDuration() const {return right_leader_duration_;}
+  uint64_t leftLeaderSequence() const {return left_leader_sequence_;}
+  uint64_t rightLeaderSequence() const {return right_leader_sequence_;}
   const std::vector<int> & leftArmIndices() const {return left_arm_indices_;}
   const std::vector<int> & rightArmIndices() const {return right_arm_indices_;}
   const ModeConfiguration & modeConfiguration() const {return mode_configuration_;}
@@ -88,6 +92,10 @@ private:
   std::string temporary_leader_urdf_path_;
   double right_gripper_position_ = 0.0;
   double left_gripper_position_ = 0.0;
+  double right_leader_duration_ = 0.0;
+  double left_leader_duration_ = 0.0;
+  uint64_t right_leader_sequence_ = 0;
+  uint64_t left_leader_sequence_ = 0;
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_publisher_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_publisher_;
