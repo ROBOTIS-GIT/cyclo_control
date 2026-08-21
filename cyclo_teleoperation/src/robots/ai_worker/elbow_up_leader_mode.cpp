@@ -42,7 +42,7 @@ bool ElbowUpLeaderMode::configure(
   elbow_up_velocity_ = parameter(prefix + ".elbow_up_velocity", 0.2);
   elbow_weight_ = parameter(prefix + ".elbow_weight", 1.0);
   nullspace_damping_ = parameter(prefix + ".nullspace_damping", 0.001);
-  max_joint_velocity_ = parameter(prefix + ".max_joint_velocity", 1.0);
+  elbow_up_joint_velocity_ = parameter(prefix + ".elbow_up_joint_velocity", 1.0);
   return kp_position_ > 0.0 && kp_orientation_ > 0.0 &&
          weight_position_ > 0.0 && weight_orientation_ > 0.0;
 }
@@ -137,8 +137,11 @@ Eigen::VectorXd ElbowUpLeaderMode::elbowPreference(const uint8_t enabled_arms) c
         return Eigen::VectorXd::Zero(dof);
       }
       Eigen::VectorXd result = direction * (elbow_up_velocity_ / attainable);
-      if (max_joint_velocity_ > 0.0 && result.norm() > max_joint_velocity_) {
-        result *= max_joint_velocity_ / result.norm();
+      if (
+        elbow_up_joint_velocity_ > 0.0 &&
+        result.norm() > elbow_up_joint_velocity_)
+      {
+        result *= elbow_up_joint_velocity_ / result.norm();
       }
       return result;
     };

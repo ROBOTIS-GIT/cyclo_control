@@ -57,6 +57,6 @@ private:
   double elbow_up_velocity_ = 0.2;
   double elbow_weight_ = 1.0;
   double nullspace_damping_ = 0.001;
-  double max_joint_velocity_ = 1.0;
+  double elbow_up_joint_velocity_ = 1.0;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker
