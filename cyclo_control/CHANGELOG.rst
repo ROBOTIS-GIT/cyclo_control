@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.3.2 (2026-08-20)
+------------------
+* Unified arm and gripper trajectory commands across AI Worker motion controllers
+* Fixed MoveJ time_from_start handling for single commands and leader streaming
+* Contributors: Yeonguk Kim
+
 0.3.1 (2026-08-19)
 ------------------
 * Corrected left and right joint7 position limits in the AI Worker URDF

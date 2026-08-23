@@ -18,6 +18,9 @@
 
 #include <algorithm>
 
+#include "common/type_define.hpp"
+#include "cyclo_motion_controller_ros/utils/trajectory_command_utils.hpp"
+
 namespace cyclo_motion_controller_ros
 {
 namespace
@@ -36,6 +39,8 @@ AIWorkerBimanualMoveJController::AIWorkerBimanualMoveJController()
   left_movej_target_initialized_(false),
   right_gripper_position_(0.0),
   left_gripper_position_(0.0),
+  right_motion_start_time_(this->now()),
+  left_motion_start_time_(this->now()),
   last_joint_state_time_(this->now())
 {
   RCLCPP_INFO(this->get_logger(), "========================================");
@@ -94,11 +99,11 @@ AIWorkerBimanualMoveJController::AIWorkerBimanualMoveJController()
     joint_states_topic_, 10,
     std::bind(&AIWorkerBimanualMoveJController::jointStateCallback, this, std::placeholders::_1));
   r_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-    right_traj_topic_, 10,
+    right_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
     std::bind(&AIWorkerBimanualMoveJController::rightTrajectoryCallback, this,
       std::placeholders::_1));
   l_traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-    left_traj_topic_, 10,
+    left_traj_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
     std::bind(&AIWorkerBimanualMoveJController::leftTrajectoryCallback, this,
       std::placeholders::_1));
   grasp_capture_sub_ = this->create_subscription<std_msgs::msg::Bool>(
@@ -210,6 +215,15 @@ void AIWorkerBimanualMoveJController::jointStateCallback(
     joint_index_map_[msg->name[i]] = static_cast<int>(i);
   }
 
+  if (!right_gripper_command_received_) {
+    trajectory_command_utils::updateJointPosition(
+      *msg, right_gripper_joint_name_, right_gripper_position_);
+  }
+  if (!left_gripper_command_received_) {
+    trajectory_command_utils::updateJointPosition(
+      *msg, left_gripper_joint_name_, left_gripper_position_);
+  }
+
   extractJointStates(msg);
   last_joint_state_time_ = this->now();
   joint_state_received_ = true;
@@ -310,12 +324,14 @@ void AIWorkerBimanualMoveJController::rightTrajectoryCallback(
     return;
   }
   const auto duration = rclcpp::Duration(msg->points.front().time_from_start).seconds();
-  if (duration <= -1) {
-    RCLCPP_WARN(this->get_logger(), "Right bimanual moveJ ignored: time_from_start must be > -1.");
+  if (duration < 0.0) {
+    RCLCPP_WARN(
+      this->get_logger(), "Right bimanual moveJ ignored: time_from_start must be >= 0.");
     return;
   }
 
-  if (duration > 0.0) {
+  const bool timed_motion = duration > 1e-6;
+  if (timed_motion) {
     syncRightArmToFeedback();
   }
   Eigen::VectorXd target_q = q_commanded_;
@@ -323,10 +339,15 @@ void AIWorkerBimanualMoveJController::rightTrajectoryCallback(
     return;
   }
   right_movej_start_ = q_commanded_;
+  right_motion_start_time_ = this->now();
+  right_active_motion_duration_ = duration;
   right_movej_goal_ = target_q;
+  right_movej_trajectory_active_ = timed_motion;
   right_movej_target_initialized_ = true;
-  if (updateGripperPositionFromTrajectory(*msg, right_gripper_joint_name_,
-      right_gripper_position_))
+  if (
+    trajectory_command_utils::hasJoint(joint_index_map_, right_gripper_joint_name_) &&
+    updateGripperPositionFromTrajectory(
+      *msg, right_gripper_joint_name_, right_gripper_position_))
   {
     right_gripper_command_received_ = true;
     updateGripperTriggeredGraspMode();
@@ -348,12 +369,14 @@ void AIWorkerBimanualMoveJController::leftTrajectoryCallback(
     return;
   }
   const auto duration = rclcpp::Duration(msg->points.front().time_from_start).seconds();
-  if (duration <= -1) {
-    RCLCPP_WARN(this->get_logger(), "Left bimanual moveJ ignored: time_from_start must be > -1.");
+  if (duration < 0.0) {
+    RCLCPP_WARN(
+      this->get_logger(), "Left bimanual moveJ ignored: time_from_start must be >= 0.");
     return;
   }
 
-  if (duration > 0.0) {
+  const bool timed_motion = duration > 1e-6;
+  if (timed_motion) {
     syncLeftArmToFeedback();
   }
   Eigen::VectorXd target_q = q_commanded_;
@@ -361,9 +384,16 @@ void AIWorkerBimanualMoveJController::leftTrajectoryCallback(
     return;
   }
   left_movej_start_ = q_commanded_;
+  left_motion_start_time_ = this->now();
+  left_active_motion_duration_ = duration;
   left_movej_goal_ = target_q;
+  left_movej_trajectory_active_ = timed_motion;
   left_movej_target_initialized_ = true;
-  if (updateGripperPositionFromTrajectory(*msg, left_gripper_joint_name_, left_gripper_position_)) {
+  if (
+    trajectory_command_utils::hasJoint(joint_index_map_, left_gripper_joint_name_) &&
+    updateGripperPositionFromTrajectory(
+      *msg, left_gripper_joint_name_, left_gripper_position_))
+  {
     left_gripper_command_received_ = true;
     updateGripperTriggeredGraspMode();
   }
@@ -566,6 +596,8 @@ void AIWorkerBimanualMoveJController::controlLoopCallback()
   if (jointStateTimedOut()) {
     if (!joint_state_timeout_active_) {
       joint_state_timeout_active_ = true;
+      right_movej_trajectory_active_ = false;
+      left_movej_trajectory_active_ = false;
       RCLCPP_WARN(
         this->get_logger(),
         "Joint states timed out. Holding commands until fresh feedback is received.");
@@ -578,13 +610,42 @@ void AIWorkerBimanualMoveJController::controlLoopCallback()
     kinematics_solver_->updateState(q_feedback, qdot_);
 
     Eigen::VectorXd q_ref = q_feedback;
+    Eigen::VectorXd qdot_ref = Eigen::VectorXd::Zero(q_feedback.size());
     if (right_movej_target_initialized_ && right_release_follow_enabled_) {
-      assignArmSegment(right_movej_goal_, right_arm_joints_, q_ref);
+      Eigen::VectorXd right_ref = right_movej_goal_;
+      Eigen::VectorXd right_qdot = Eigen::VectorXd::Zero(q_feedback.size());
+      const double elapsed = (this->now() - right_motion_start_time_).seconds();
+      if (right_movej_trajectory_active_ && elapsed < right_active_motion_duration_) {
+        const double interpolation_ratio =
+          std::clamp(elapsed / right_active_motion_duration_, 0.0, 1.0);
+        right_ref = right_movej_start_ +
+          interpolation_ratio * (right_movej_goal_ - right_movej_start_);
+        right_qdot =
+          (right_movej_goal_ - right_movej_start_) / right_active_motion_duration_;
+      } else if (right_movej_trajectory_active_) {
+        right_movej_trajectory_active_ = false;
+      }
+      assignArmSegment(right_ref, right_arm_joints_, q_ref);
+      assignArmSegment(right_qdot, right_arm_joints_, qdot_ref);
     } else if (!right_release_follow_enabled_) {
       assignArmSegment(right_release_hold_goal_, right_arm_joints_, q_ref);
     }
     if (left_movej_target_initialized_ && left_release_follow_enabled_) {
-      assignArmSegment(left_movej_goal_, left_arm_joints_, q_ref);
+      Eigen::VectorXd left_ref = left_movej_goal_;
+      Eigen::VectorXd left_qdot = Eigen::VectorXd::Zero(q_feedback.size());
+      const double elapsed = (this->now() - left_motion_start_time_).seconds();
+      if (left_movej_trajectory_active_ && elapsed < left_active_motion_duration_) {
+        const double interpolation_ratio =
+          std::clamp(elapsed / left_active_motion_duration_, 0.0, 1.0);
+        left_ref = left_movej_start_ +
+          interpolation_ratio * (left_movej_goal_ - left_movej_start_);
+        left_qdot =
+          (left_movej_goal_ - left_movej_start_) / left_active_motion_duration_;
+      } else if (left_movej_trajectory_active_) {
+        left_movej_trajectory_active_ = false;
+      }
+      assignArmSegment(left_ref, left_arm_joints_, q_ref);
+      assignArmSegment(left_qdot, left_arm_joints_, qdot_ref);
     } else if (!left_release_follow_enabled_) {
       assignArmSegment(left_release_hold_goal_, left_arm_joints_, q_ref);
     }
@@ -637,7 +698,7 @@ void AIWorkerBimanualMoveJController::controlLoopCallback()
       left_grasp_enable_blend_active_,
       left_grasp_enable_blend_start_time_);
 
-    Eigen::VectorXd desired_joint_vel = kp_joint_ * (q_ref - q_feedback);
+    Eigen::VectorXd desired_joint_vel = qdot_ref + kp_joint_ * (q_ref - q_feedback);
     const auto apply_slow_start =
       [this, &desired_joint_vel](
       const char * arm_name,
@@ -747,6 +808,8 @@ void AIWorkerBimanualMoveJController::syncCommandStateToFeedback()
   left_release_hold_goal_ = q_;
   right_grasp_enable_blend_start_ = q_;
   left_grasp_enable_blend_start_ = q_;
+  right_movej_trajectory_active_ = false;
+  left_movej_trajectory_active_ = false;
   grasp_release_follow_limited_ = false;
   right_release_follow_enabled_ = true;
   left_release_follow_enabled_ = true;
@@ -915,7 +978,6 @@ createTrajectoryMsgWithGripper(
   trajectory_msgs::msg::JointTrajectory traj_msg;
   traj_msg.header.frame_id = "";
   traj_msg.joint_names = arm_joint_names;
-  traj_msg.joint_names.push_back(gripper_joint_name);
 
   trajectory_msgs::msg::JointTrajectoryPoint point;
   point.time_from_start = rclcpp::Duration::from_seconds(trajectory_time_);
@@ -925,9 +987,9 @@ createTrajectoryMsgWithGripper(
       point.velocities.push_back(0.0);
     }
   }
-  point.positions.push_back(gripper_position);
-  point.velocities.push_back(0.0);
   traj_msg.points.push_back(point);
+  trajectory_command_utils::appendJointIfPresent(
+    traj_msg, joint_index_map_, gripper_joint_name, gripper_position);
   return traj_msg;
 }
 
