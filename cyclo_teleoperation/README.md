@@ -7,7 +7,7 @@ transitions, the shared full-model QP, joint limits, and collision constraints.
 AI Worker reserves these mode IDs:
 
 - `1`: MoveJ teleoperation. A stopped arm holds its measured stop position.
-- `2+`: YAML-configured custom modes, such as `elbow_up_leader`.
+- `2+`: YAML-configured custom modes, such as `relative_pose`.
 
 Teleoperation enable/disable independently selects `left`, `right`, or `both` arms. Preset motion is
 a common per-arm overlay, not a control mode. Requesting a preset disables

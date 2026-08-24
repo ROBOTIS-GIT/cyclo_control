@@ -34,7 +34,7 @@ target_link_libraries(cyclo_teleoperation_qp PUBLIC
 add_library(cyclo_teleoperation_modes SHARED
   src/robots/ai_worker/movej_mode.cpp
   src/robots/ai_worker/pose_sequence_manager.cpp
-  src/robots/ai_worker/elbow_up_leader_mode.cpp
+  src/robots/ai_worker/relative_pose_mode.cpp
 )
 target_include_directories(cyclo_teleoperation_modes PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -6,9 +6,9 @@
     <description>Absolute joint-space AI Worker teleoperation mode.</description>
   </class>
   <class
-    name="cyclo_teleoperation/AiWorkerElbowUpLeaderMode"
-    type="cyclo_teleoperation::robots::ai_worker::ElbowUpLeaderMode"
+    name="cyclo_teleoperation/AiWorkerRelativePoseMode"
+    type="cyclo_teleoperation::robots::ai_worker::RelativePoseMode"
     base_class_type="cyclo_teleoperation::TeleoperationMode">
-    <description>Relative leader-pose mode with an elbow-up null-space preference.</description>
+    <description>Base-link-relative leader-pose teleoperation mode.</description>
   </class>
 </library>

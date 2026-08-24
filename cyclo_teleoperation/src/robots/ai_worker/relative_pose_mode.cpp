@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cyclo_teleoperation/robots/ai_worker/elbow_up_leader_mode.hpp"
-
-#include <algorithm>
-#include <cmath>
+#include "cyclo_teleoperation/robots/ai_worker/relative_pose_mode.hpp"
 
 #include <pluginlib/class_list_macros.hpp>
 
@@ -23,7 +20,7 @@
 
 namespace cyclo_teleoperation::robots::ai_worker
 {
-bool ElbowUpLeaderMode::configure(
+bool RelativePoseMode::configure(
   rclcpp::Node & node,
   const std::string & prefix,
   const ModeConfiguration & configuration)
@@ -39,15 +36,11 @@ bool ElbowUpLeaderMode::configure(
   kp_orientation_ = parameter(prefix + ".kp_orientation", 50.0);
   weight_position_ = parameter(prefix + ".weight_position", 10.0);
   weight_orientation_ = parameter(prefix + ".weight_orientation", 1.0);
-  elbow_up_velocity_ = parameter(prefix + ".elbow_up_velocity", 0.2);
-  elbow_weight_ = parameter(prefix + ".elbow_weight", 1.0);
-  nullspace_damping_ = parameter(prefix + ".nullspace_damping", 0.001);
-  elbow_up_joint_velocity_ = parameter(prefix + ".elbow_up_joint_velocity", 1.0);
   return kp_position_ > 0.0 && kp_orientation_ > 0.0 &&
          weight_position_ > 0.0 && weight_orientation_ > 0.0;
 }
 
-bool ElbowUpLeaderMode::activate(const ModeContext & context)
+bool RelativePoseMode::activate(const ModeContext & context)
 {
   configuration_.leader_kinematics->updateState(
     context.leader_position, Eigen::VectorXd::Zero(context.leader_position.size()));
@@ -59,7 +52,7 @@ bool ElbowUpLeaderMode::activate(const ModeContext & context)
   return true;
 }
 
-void ElbowUpLeaderMode::onArmsEnabled(
+void RelativePoseMode::onArmsEnabled(
   const uint8_t arms, const ModeContext & context)
 {
   configuration_.leader_kinematics->updateState(
@@ -69,7 +62,7 @@ void ElbowUpLeaderMode::onArmsEnabled(
   captureAnchor(arms);
 }
 
-void ElbowUpLeaderMode::captureAnchor(const uint8_t arms)
+void RelativePoseMode::captureAnchor(const uint8_t arms)
 {
   if ((arms & kLeftArm) != 0) {
     left_leader_anchor_ =
@@ -87,7 +80,7 @@ void ElbowUpLeaderMode::captureAnchor(const uint8_t arms)
   }
 }
 
-Eigen::Matrix<double, 6, 1> ElbowUpLeaderMode::desiredVelocity(
+Eigen::Matrix<double, 6, 1> RelativePoseMode::desiredVelocity(
   const Eigen::Affine3d & current,
   const Eigen::Affine3d & goal) const
 {
@@ -100,63 +93,7 @@ Eigen::Matrix<double, 6, 1> ElbowUpLeaderMode::desiredVelocity(
   return velocity;
 }
 
-Eigen::VectorXd ElbowUpLeaderMode::elbowPreference(const uint8_t enabled_arms) const
-{
-  const int dof = configuration_.follower_kinematics->getDof();
-  std::vector<Eigen::MatrixXd> eef_jacobians;
-  if ((enabled_arms & kLeftArm) != 0) {
-    eef_jacobians.push_back(
-      configuration_.follower_kinematics->getJacobian(configuration_.follower_left_eef));
-  }
-  if ((enabled_arms & kRightArm) != 0) {
-    eef_jacobians.push_back(
-      configuration_.follower_kinematics->getJacobian(configuration_.follower_right_eef));
-  }
-  if (eef_jacobians.empty()) {
-    return Eigen::VectorXd::Zero(dof);
-  }
-
-  Eigen::MatrixXd eef(6 * eef_jacobians.size(), dof);
-  for (size_t i = 0; i < eef_jacobians.size(); ++i) {
-    eef.middleRows(6 * i, 6) = eef_jacobians[i];
-  }
-  const double damping_squared = nullspace_damping_ * nullspace_damping_;
-  const Eigen::MatrixXd regularized =
-    eef * eef.transpose() +
-    damping_squared * Eigen::MatrixXd::Identity(eef.rows(), eef.rows());
-  const Eigen::MatrixXd nullspace =
-    Eigen::MatrixXd::Identity(dof, dof) -
-    eef.transpose() * regularized.ldlt().solve(eef);
-
-  auto preference = [&](const std::string & elbow_link) -> Eigen::VectorXd {
-      const Eigen::MatrixXd elbow =
-        configuration_.follower_kinematics->getJacobian(elbow_link);
-      const Eigen::VectorXd direction = nullspace * elbow.row(2).transpose();
-      const double attainable = elbow.row(2).dot(direction);
-      if (attainable <= 1e-8 || elbow_up_velocity_ <= 0.0) {
-        return Eigen::VectorXd::Zero(dof);
-      }
-      Eigen::VectorXd result = direction * (elbow_up_velocity_ / attainable);
-      if (
-        elbow_up_joint_velocity_ > 0.0 &&
-        result.norm() > elbow_up_joint_velocity_)
-      {
-        result *= elbow_up_joint_velocity_ / result.norm();
-      }
-      return result;
-    };
-
-  Eigen::VectorXd result = Eigen::VectorXd::Zero(dof);
-  if ((enabled_arms & kLeftArm) != 0) {
-    result += preference(configuration_.follower_left_elbow);
-  }
-  if ((enabled_arms & kRightArm) != 0) {
-    result += preference(configuration_.follower_right_elbow);
-  }
-  return result;
-}
-
-bool ElbowUpLeaderMode::update(const ModeContext & context, ModeOutput & output)
+bool RelativePoseMode::update(const ModeContext & context, ModeOutput & output)
 {
   if (
     ((context.enabled_arms & kLeftArm) != 0 && !left_anchor_valid_) ||
@@ -198,12 +135,10 @@ bool ElbowUpLeaderMode::update(const ModeContext & context, ModeOutput & output)
       configuration_.follower_right_eef, configuration_.leader_right_eef,
       right_follower_anchor_, right_leader_anchor_);
   }
-  output.preferred_joint_velocity = elbowPreference(context.enabled_arms);
-  output.preferred_joint_velocity_weight = elbow_weight_;
   return true;
 }
 }  // namespace cyclo_teleoperation::robots::ai_worker
 
 PLUGINLIB_EXPORT_CLASS(
-  cyclo_teleoperation::robots::ai_worker::ElbowUpLeaderMode,
+  cyclo_teleoperation::robots::ai_worker::RelativePoseMode,
   cyclo_teleoperation::TeleoperationMode)

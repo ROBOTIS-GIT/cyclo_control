@@ -24,7 +24,7 @@
 
 namespace cyclo_teleoperation::robots::ai_worker
 {
-class ElbowUpLeaderMode : public TeleoperationMode
+class RelativePoseMode : public TeleoperationMode
 {
 public:
   bool configure(
@@ -40,7 +40,6 @@ private:
   Eigen::Matrix<double, 6, 1> desiredVelocity(
     const Eigen::Affine3d & current,
     const Eigen::Affine3d & goal) const;
-  Eigen::VectorXd elbowPreference(uint8_t enabled_arms) const;
 
   ModeConfiguration configuration_;
   Eigen::Affine3d left_leader_anchor_ = Eigen::Affine3d::Identity();
@@ -54,9 +53,5 @@ private:
   double kp_orientation_ = 50.0;
   double weight_position_ = 10.0;
   double weight_orientation_ = 1.0;
-  double elbow_up_velocity_ = 0.2;
-  double elbow_weight_ = 1.0;
-  double nullspace_damping_ = 0.001;
-  double elbow_up_joint_velocity_ = 1.0;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

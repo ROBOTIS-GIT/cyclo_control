@@ -234,7 +234,7 @@ private:
       const std::string prefix = "control_modes." + std::to_string(mode);
       const std::string default_plugin =
         mode == 1 ? "cyclo_teleoperation/AiWorkerMoveJMode" :
-        mode == 2 ? "cyclo_teleoperation/AiWorkerElbowUpLeaderMode" : "";
+        mode == 2 ? "cyclo_teleoperation/AiWorkerRelativePoseMode" : "";
       mode_names_[mode] =
         declare_parameter(prefix + ".name", "mode_" + std::to_string(mode));
       mode_plugins_[mode] = declare_parameter(prefix + ".plugin", default_plugin);
