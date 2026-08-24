@@ -222,22 +222,40 @@ private:
     declare_parameter("pose_sequence.tracking_weight", 10.0);
 
     declare_parameter<std::vector<int64_t>>(
-      "available_control_modes", {1, 2});
+      "available_control_modes", std::vector<int64_t>{});
     declare_parameter("default_control_mode", 1);
     const auto control_modes =
       get_parameter("available_control_modes").as_integer_array();
+    if (control_modes.empty()) {
+      throw std::runtime_error(
+              "available_control_modes must contain at least one control mode ID");
+    }
     for (const int64_t raw_mode : control_modes) {
       if (raw_mode <= 0 || raw_mode > UINT16_MAX) {
         throw std::runtime_error("Control mode IDs must be in the uint16 range");
       }
       const auto mode = static_cast<uint16_t>(raw_mode);
+      if (mode_plugins_.find(mode) != mode_plugins_.end()) {
+        throw std::runtime_error(
+                "Duplicate control mode ID in available_control_modes: " +
+                std::to_string(mode));
+      }
       const std::string prefix = "control_modes." + std::to_string(mode);
-      const std::string default_plugin =
-        mode == 1 ? "cyclo_teleoperation/AiWorkerMoveJMode" :
-        mode == 2 ? "cyclo_teleoperation/AiWorkerRelativePoseMode" : "";
-      mode_names_[mode] =
+      const std::string mode_name =
         declare_parameter(prefix + ".name", "mode_" + std::to_string(mode));
-      mode_plugins_[mode] = declare_parameter(prefix + ".plugin", default_plugin);
+      const std::string plugin_name = declare_parameter(prefix + ".plugin", "");
+      if (mode_name.empty()) {
+        throw std::runtime_error(prefix + ".name must not be empty");
+      }
+      if (plugin_name.empty()) {
+        throw std::runtime_error(prefix + ".plugin must be configured in the parameter YAML");
+      }
+      if (!mode_loader_.isClassAvailable(plugin_name)) {
+        throw std::runtime_error(
+                prefix + ".plugin is not registered with pluginlib: " + plugin_name);
+      }
+      mode_names_[mode] = mode_name;
+      mode_plugins_[mode] = plugin_name;
       for (const auto & sequence_name : {std::string("initial_pose"), std::string("exit_pose")}) {
         const std::string sequence_prefix = prefix + "." + sequence_name;
         declare_parameter(sequence_prefix + ".enabled", false);
@@ -259,6 +277,14 @@ private:
         declare_parameter(sequence_prefix + ".completion_tolerance", 0.03);
         declare_parameter(sequence_prefix + ".timeout", 10.0);
       }
+    }
+    const int64_t raw_default_mode = get_parameter("default_control_mode").as_int();
+    if (
+      raw_default_mode <= 0 || raw_default_mode > UINT16_MAX ||
+      mode_plugins_.find(static_cast<uint16_t>(raw_default_mode)) == mode_plugins_.end())
+    {
+      throw std::runtime_error(
+              "default_control_mode must reference an ID in available_control_modes");
     }
 
     declare_parameter<std::vector<int64_t>>("available_presets", {1});
