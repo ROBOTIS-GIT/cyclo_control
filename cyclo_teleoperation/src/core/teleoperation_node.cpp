@@ -616,6 +616,17 @@ private:
     }
   }
 
+  void updateControlledGroupOwnership(const ControlGroupMask controlled_groups)
+  {
+    const ControlGroupMask released_groups =
+      previous_controlled_groups_ & ~controlled_groups;
+    if (released_groups != 0) {
+      captureGroupHoldTarget(released_groups);
+      syncGroupCommandToFeedback(released_groups);
+    }
+    previous_controlled_groups_ = controlled_groups;
+  }
+
   void syncCommandToFeedback()
   {
     command_position_ = robot_teleoperation_->followerPosition();
@@ -673,6 +684,7 @@ private:
       "Loading control mode " + std::to_string(requested_control_mode_));
     hold_target_ = robot_teleoperation_->followerPosition();
     syncCommandToFeedback();
+    previous_controlled_groups_ = 0;
     robot_teleoperation_->publish(hold_target_);
     active_groups_ = 0;
     if (mode_) {
@@ -784,6 +796,7 @@ private:
       mode_ready_ = false;
       active_control_mode_ = 0;
       active_groups_ = 0;
+      previous_controlled_groups_ = 0;
       transition_pending_ = false;
       mode_transition_phase_ = ModeTransitionPhase::kIdle;
       mode_transition_started_ = false;
@@ -917,6 +930,7 @@ private:
         hold_target_ = robot_teleoperation_->followerPosition();
         command_initialized_ = false;
         active_groups_ = 0;
+        previous_controlled_groups_ = 0;
         publishStatus(
           ControlStatus::kError,
           "Follower feedback timed out; holding all control groups");
@@ -1030,6 +1044,7 @@ private:
       mode_->controlledGroups(context) |
       pose_sequences_->activePresetGroups() |
       pose_sequences_->activeFinalInitialPoseGroups();
+    updateControlledGroupOwnership(controlled_groups);
     if (controlled_groups == 0) {
       command_position_ = hold_target_;
       command_velocity_.setZero();
@@ -1109,6 +1124,7 @@ private:
       syncCommandToFeedback();
       active_groups_ = 0;
       requested_groups_ = 0;
+      previous_controlled_groups_ = 0;
       pose_sequences_->cancelPresets(allGroups());
       pose_sequences_->cancelFinalInitialPoses(allGroups());
       preset_update_pending_groups_ = 0;
@@ -1170,6 +1186,7 @@ private:
   mutable std::vector<ControlGroupState> context_group_states_;
   ControlGroupMask requested_groups_ = 0;
   ControlGroupMask active_groups_ = 0;
+  ControlGroupMask previous_controlled_groups_ = 0;
   uint64_t transition_id_ = 0;
   bool transition_pending_ = false;
   bool mode_transition_started_ = false;
