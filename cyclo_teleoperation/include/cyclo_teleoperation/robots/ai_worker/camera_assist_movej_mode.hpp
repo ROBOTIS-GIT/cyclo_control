@@ -50,6 +50,7 @@ private:
     Eigen::Vector3d camera_forward_axis = Eigen::Vector3d::UnitX();
     std::string gripper_link;
     Eigen::Vector3d gripper_target_offset = Eigen::Vector3d::Zero();
+    double circle_angle = 0.7853981633974483;
   };
 
   struct LeaderTrajectory
@@ -67,6 +68,7 @@ private:
   struct CameraTaskError
   {
     double distance = 0.0;
+    double circle_offset = 0.0;
     double gaze_angle = 0.0;
     bool valid = false;
   };
@@ -76,6 +78,7 @@ private:
     Eigen::Vector3d start_direction = Eigen::Vector3d::UnitX();
     Eigen::Vector3d goal_direction = Eigen::Vector3d::UnitX();
     double start_distance = 0.0;
+    double start_circle_offset = 0.0;
     double start_time = 0.0;
     double duration = 0.0;
     uint64_t last_sequence = 0;

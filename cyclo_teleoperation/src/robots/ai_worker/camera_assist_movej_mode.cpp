@@ -106,9 +106,20 @@ bool CameraAssistMoveJMode::configure(
         arm_prefix + ".gripper_link", defaults.gripper_link);
       frames.gripper_target_offset = vector_parameter(
         arm_prefix + ".gripper_target_offset", defaults.gripper_target_offset);
+      frames.circle_angle = double_parameter(
+        arm_prefix + ".circle_angle", defaults.circle_angle);
       const double axis_norm = frames.camera_forward_axis.norm();
       if (axis_norm <= 1e-8) {
         throw std::runtime_error(arm_prefix + ".camera_forward_axis must be non-zero");
+      }
+      constexpr double kHalfPi = 1.5707963267948966;
+      if (
+        !std::isfinite(frames.circle_angle) ||
+        std::abs(frames.circle_angle) >= kHalfPi)
+      {
+        throw std::runtime_error(
+                arm_prefix + ".circle_angle must be in radians and satisfy "
+                "-pi/2 < circle_angle < pi/2");
       }
       frames.camera_forward_axis /= axis_norm;
       return frames;
@@ -275,10 +286,12 @@ void CameraAssistMoveJMode::beginRoleTransition(const ModeContext & context)
     RCLCPP_INFO(
       logger_,
       "Camera-assist independent slow start began "
-      "(teleop arms=%u, camera arm=%u, distance error=%.3f m, gaze error=%.3f rad)",
+      "(teleop arms=%u, camera arm=%u, distance error=%.3f m, "
+      "circle error=%.3f m, gaze error=%.3f rad)",
       static_cast<unsigned int>(role_enabled_groups_),
       static_cast<unsigned int>(role_camera_group_),
       camera_error.valid ? camera_error.distance : 0.0,
+      camera_error.valid ? camera_error.circle_offset : 0.0,
       camera_error.valid ? camera_error.gaze_angle : 0.0);
   }
 }
@@ -395,12 +408,15 @@ void CameraAssistMoveJMode::addCameraAssistTask(
   }
   const Eigen::Vector3d target_point_velocity =
     target_point_jacobian * target_joint_velocity;
+  const Eigen::Vector3d target_angular_velocity =
+    target_frame_jacobian.bottomRows(3) * target_joint_velocity;
 
   const Eigen::Vector3d camera_point =
     camera_pose.translation() + camera_pose.linear() * camera.camera_origin_offset;
   const Eigen::Vector3d target_point =
     target_pose.translation() + target_pose.linear() * target.gripper_target_offset;
   const Eigen::Vector3d camera_to_target = target_point - camera_point;
+  const Eigen::Vector3d camera_from_target = -camera_to_target;
   const double distance = camera_to_target.norm();
   if (distance <= 1e-6) {
     return;
@@ -408,6 +424,9 @@ void CameraAssistMoveJMode::addCameraAssistTask(
   const Eigen::Vector3d target_direction = camera_to_target / distance;
   const Eigen::Vector3d camera_forward =
     camera_pose.linear() * camera.camera_forward_axis;
+  const Eigen::Vector3d target_x_axis = target_pose.linear().col(0);
+  const double circle_offset = target_x_axis.dot(camera_from_target);
+  const double target_circle_offset = target_distance_ * std::sin(target.circle_angle);
 
   const uint64_t command_sequence = cameraCommandSequence(role_camera_group_, context);
   if (
@@ -425,6 +444,7 @@ void CameraAssistMoveJMode::addCameraAssistTask(
     if (!camera_trajectory_.slow_start_complete) {
       CameraTaskError task_error;
       task_error.distance = std::abs(distance - target_distance_);
+      task_error.circle_offset = std::abs(circle_offset - target_circle_offset);
       task_error.gaze_angle = std::acos(std::clamp(
         camera_forward.dot(target_direction), -1.0, 1.0));
       task_error.valid = true;
@@ -437,6 +457,7 @@ void CameraAssistMoveJMode::addCameraAssistTask(
       // The camera has no unique joint-space goal. Its own task-space errors therefore
       // determine an adaptive linear segment independently of the teleop arm duration.
       camera_trajectory_.start_distance = distance;
+      camera_trajectory_.start_circle_offset = circle_offset;
       camera_trajectory_.start_direction = camera_forward;
       camera_trajectory_.goal_direction = target_direction;
       camera_trajectory_.start_time = context.now_seconds;
@@ -446,9 +467,10 @@ void CameraAssistMoveJMode::addCameraAssistTask(
         RCLCPP_INFO(
           logger_,
           "Camera arm slow start began: joint error %.4f rad, "
-          "distance error %.4f m, gaze error %.4f rad, duration %.3f s",
+          "distance error %.4f m, circle error %.4f m, "
+          "gaze error %.4f rad, duration %.3f s",
           joint_tracking_error, task_error.distance,
-          task_error.gaze_angle, command_duration);
+          task_error.circle_offset, task_error.gaze_angle, command_duration);
       }
     } else {
       camera_trajectory_.active = false;
@@ -472,9 +494,14 @@ void CameraAssistMoveJMode::addCameraAssistTask(
     camera_trajectory_.start_distance + interpolation_ratio *
     (target_distance_ - camera_trajectory_.start_distance) :
     target_distance_;
+  const double reference_circle_offset = interpolating ?
+    camera_trajectory_.start_circle_offset + interpolation_ratio *
+    (target_circle_offset - camera_trajectory_.start_circle_offset) :
+    target_circle_offset;
   Eigen::Vector3d reference_direction = target_direction;
   Eigen::Vector3d reference_direction_velocity = Eigen::Vector3d::Zero();
   double reference_distance_velocity = 0.0;
+  double reference_circle_velocity = 0.0;
   if (interpolating) {
     const Eigen::Vector3d direction_delta =
       camera_trajectory_.goal_direction - camera_trajectory_.start_direction;
@@ -490,6 +517,9 @@ void CameraAssistMoveJMode::addCameraAssistTask(
     reference_distance_velocity =
       (target_distance_ - camera_trajectory_.start_distance) /
       camera_trajectory_.duration;
+    reference_circle_velocity =
+      (target_circle_offset - camera_trajectory_.start_circle_offset) /
+      camera_trajectory_.duration;
   }
 
   LinearTaskObjective distance_task;
@@ -504,6 +534,21 @@ void CameraAssistMoveJMode::addCameraAssistTask(
     (interpolating ? 0.0 : target_direction.dot(target_point_velocity)));
   distance_task.weight = Eigen::VectorXd::Constant(1, distance_weight_);
   output.linear_task_objectives.push_back(std::move(distance_task));
+
+  LinearTaskObjective circle_task;
+  circle_task.jacobian.resize(1, dof);
+  circle_task.jacobian.row(0) =
+    target_x_axis.transpose() * controlled_camera_point_jacobian;
+  const double rotating_plane_velocity =
+    target_x_axis.cross(camera_from_target).dot(target_angular_velocity);
+  const double circle_correction =
+    reference_circle_velocity +
+    distance_kp_ * (reference_circle_offset - circle_offset);
+  circle_task.desired_velocity = Eigen::VectorXd::Constant(
+    1, circle_correction + target_x_axis.dot(target_point_velocity) -
+    rotating_plane_velocity);
+  circle_task.weight = Eigen::VectorXd::Constant(1, distance_weight_);
+  output.linear_task_objectives.push_back(std::move(circle_task));
 
   const Eigen::Matrix3d direction_projection =
     Eigen::Matrix3d::Identity() -
@@ -546,7 +591,11 @@ CameraAssistMoveJMode::CameraTaskError CameraAssistMoveJMode::cameraTaskError(
   const Eigen::Vector3d target_direction = camera_to_target / distance;
   const Eigen::Vector3d camera_forward =
     camera_pose.linear() * camera.camera_forward_axis;
+  const Eigen::Vector3d target_x_axis = target_pose.linear().col(0);
+  const double circle_offset = target_x_axis.dot(camera_point - target_point);
+  const double target_circle_offset = target_distance_ * std::sin(target.circle_angle);
   error.distance = std::abs(distance - target_distance_);
+  error.circle_offset = std::abs(circle_offset - target_circle_offset);
   error.gaze_angle = std::acos(std::clamp(
     camera_forward.dot(target_direction), -1.0, 1.0));
   error.valid = true;
@@ -572,10 +621,13 @@ double CameraAssistMoveJMode::cameraSlowStartDuration(
     std::max(camera_arm_sync_threshold_, 1e-6);
   const double normalized_distance_error = task_error.distance /
     std::max(camera_distance_sync_threshold_, 1e-6);
+  const double normalized_circle_error = task_error.circle_offset /
+    std::max(camera_distance_sync_threshold_, 1e-6);
   const double normalized_gaze_error = task_error.gaze_angle /
     std::max(camera_gaze_sync_threshold_, 1e-6);
   const double normalized_error = std::max(
-    {normalized_joint_error, normalized_distance_error, normalized_gaze_error});
+    {normalized_joint_error, normalized_distance_error,
+      normalized_circle_error, normalized_gaze_error});
   return std::max(std::max(dt, 1e-6), kAdaptiveWindow * normalized_error);
 }
 
@@ -633,6 +685,7 @@ void CameraAssistMoveJMode::updateSlowStartState(
     if (
       camera_error.valid && joint_error <= camera_arm_sync_threshold_ &&
       camera_error.distance <= camera_distance_sync_threshold_ &&
+      camera_error.circle_offset <= camera_distance_sync_threshold_ &&
       camera_error.gaze_angle <= camera_gaze_sync_threshold_)
     {
       camera_trajectory_.slow_start_complete = true;
@@ -640,9 +693,11 @@ void CameraAssistMoveJMode::updateSlowStartState(
       RCLCPP_INFO(
         logger_,
         "Camera arm %u slow start synchronized "
-        "(joint error %.4f rad, distance error %.4f m, gaze error %.4f rad)",
+        "(joint error %.4f rad, distance error %.4f m, "
+        "circle error %.4f m, gaze error %.4f rad)",
         static_cast<unsigned int>(camera_group), joint_error,
-        camera_error.distance, camera_error.gaze_angle);
+        camera_error.distance, camera_error.circle_offset,
+        camera_error.gaze_angle);
     }
   }
 
