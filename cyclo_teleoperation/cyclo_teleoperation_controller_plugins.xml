@@ -13,4 +13,18 @@
       <description>Robot-independent base-frame-relative pose teleoperation mode.</description>
     </class>
   </library>
+  <library path="cyclo_teleoperation_ai_worker_controller_plugins">
+    <class
+      name="cyclo_teleoperation/AiWorkerCameraAssistMoveJMode"
+      type="cyclo_teleoperation::robots::ai_worker::CameraAssistMoveJMode"
+      base_class_type="cyclo_teleoperation::TeleoperationMode">
+      <description>MoveJ teleoperation with opposite-arm camera assistance.</description>
+    </class>
+    <class
+      name="cyclo_teleoperation/AiWorkerElbowUpLeaderMode"
+      type="cyclo_teleoperation::robots::ai_worker::ElbowUpLeaderMode"
+      base_class_type="cyclo_teleoperation::TeleoperationMode">
+      <description>Relative leader-pose mode with an elbow-up null-space preference.</description>
+    </class>
+  </library>
 </class_libraries>

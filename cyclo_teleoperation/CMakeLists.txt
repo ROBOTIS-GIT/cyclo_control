@@ -44,6 +44,20 @@ target_link_libraries(cyclo_teleoperation_common_controller_plugins
 )
 ament_target_dependencies(cyclo_teleoperation_common_controller_plugins pluginlib rclcpp)
 
+add_library(cyclo_teleoperation_ai_worker_controller_plugins SHARED
+  src/robots/ai_worker/camera_assist_movej_mode.cpp
+  src/robots/ai_worker/elbow_up_leader_mode.cpp
+)
+target_include_directories(cyclo_teleoperation_ai_worker_controller_plugins PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(cyclo_teleoperation_ai_worker_controller_plugins
+  cyclo_motion_controller_core::cyclo_motion_controller_core
+  Eigen3::Eigen
+)
+ament_target_dependencies(cyclo_teleoperation_ai_worker_controller_plugins pluginlib rclcpp)
+
 add_library(cyclo_teleoperation_ai_worker_robot_plugin SHARED
   src/robots/ai_worker/ai_worker_control_interface.cpp
   src/robots/ai_worker/ai_worker_teleoperation.cpp
@@ -83,6 +97,7 @@ pluginlib_export_plugin_description_file(
 install(TARGETS
   cyclo_teleoperation_qp
   cyclo_teleoperation_common_controller_plugins
+  cyclo_teleoperation_ai_worker_controller_plugins
   cyclo_teleoperation_ai_worker_robot_plugin
   cyclo_teleoperation_node
   ARCHIVE DESTINATION lib
