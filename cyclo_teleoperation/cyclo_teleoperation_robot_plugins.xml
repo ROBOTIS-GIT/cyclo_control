@@ -1,8 +1,10 @@
-<library path="cyclo_teleoperation_robot_plugins">
-  <class
-    name="cyclo_teleoperation/AIWorkerTeleoperation"
-    type="cyclo_teleoperation::robots::ai_worker::AIWorkerTeleoperation"
-    base_class_type="cyclo_teleoperation::RobotTeleoperation">
-    <description>AI Worker model, ROS transport, command, and status integration.</description>
-  </class>
-</library>
+<class_libraries>
+  <library path="cyclo_teleoperation_ai_worker_robot_plugin">
+    <class
+      name="cyclo_teleoperation/AIWorkerTeleoperation"
+      type="cyclo_teleoperation::robots::ai_worker::AIWorkerTeleoperation"
+      base_class_type="cyclo_teleoperation::RobotTeleoperation">
+      <description>AI Worker model, ROS transport, command, and status integration.</description>
+    </class>
+  </library>
+</class_libraries>
