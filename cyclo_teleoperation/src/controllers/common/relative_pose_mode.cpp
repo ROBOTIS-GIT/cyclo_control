@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cyclo_teleoperation/robots/ai_worker/relative_pose_mode.hpp"
+#include "cyclo_teleoperation/controllers/common/relative_pose_mode.hpp"
 
 #include <pluginlib/class_list_macros.hpp>
 
 #include "common/type_define.hpp"
 
-namespace cyclo_teleoperation::robots::ai_worker
+namespace cyclo_teleoperation::controllers::common
 {
 bool RelativePoseMode::configure(
   rclcpp::Node & node,
@@ -26,6 +26,16 @@ bool RelativePoseMode::configure(
   const ModeConfiguration & configuration)
 {
   configuration_ = configuration;
+  anchors_.clear();
+  for (const auto & group : configuration_.control_groups) {
+    if (group.follower_eef.empty() || group.leader_eef.empty()) {
+      return false;
+    }
+    anchors_.emplace(group.id, Anchor{});
+  }
+  if (anchors_.empty()) {
+    return false;
+  }
   auto parameter = [&node](const std::string & name, const double default_value) {
       if (!node.has_parameter(name)) {
         return node.declare_parameter(name, default_value);
@@ -46,37 +56,33 @@ bool RelativePoseMode::activate(const ModeContext & context)
     context.leader_position, Eigen::VectorXd::Zero(context.leader_position.size()));
   configuration_.follower_kinematics->updateState(
     context.follower_position, context.follower_velocity);
-  left_anchor_valid_ = false;
-  right_anchor_valid_ = false;
-  captureAnchor(context.enabled_arms);
+  for (auto & anchor : anchors_) {
+    anchor.second = Anchor{};
+  }
+  captureAnchors(context.enabled_groups);
   return true;
 }
 
-void RelativePoseMode::onArmsEnabled(
-  const uint8_t arms, const ModeContext & context)
+void RelativePoseMode::onGroupsEnabled(
+  const ControlGroupMask groups, const ModeContext & context)
 {
   configuration_.leader_kinematics->updateState(
     context.leader_position, Eigen::VectorXd::Zero(context.leader_position.size()));
   configuration_.follower_kinematics->updateState(
     context.follower_position, context.follower_velocity);
-  captureAnchor(arms);
+  captureAnchors(groups);
 }
 
-void RelativePoseMode::captureAnchor(const uint8_t arms)
+void RelativePoseMode::captureAnchors(const ControlGroupMask groups)
 {
-  if ((arms & kLeftArm) != 0) {
-    left_leader_anchor_ =
-      configuration_.leader_kinematics->getPose(configuration_.leader_left_eef);
-    left_follower_anchor_ =
-      configuration_.follower_kinematics->getPose(configuration_.follower_left_eef);
-    left_anchor_valid_ = true;
-  }
-  if ((arms & kRightArm) != 0) {
-    right_leader_anchor_ =
-      configuration_.leader_kinematics->getPose(configuration_.leader_right_eef);
-    right_follower_anchor_ =
-      configuration_.follower_kinematics->getPose(configuration_.follower_right_eef);
-    right_anchor_valid_ = true;
+  for (const auto & group : configuration_.control_groups) {
+    if (!containsControlGroup(groups, group.id)) {
+      continue;
+    }
+    auto & anchor = anchors_.at(group.id);
+    anchor.leader = configuration_.leader_kinematics->getPose(group.leader_eef);
+    anchor.follower = configuration_.follower_kinematics->getPose(group.follower_eef);
+    anchor.valid = true;
   }
 }
 
@@ -95,50 +101,40 @@ Eigen::Matrix<double, 6, 1> RelativePoseMode::desiredVelocity(
 
 bool RelativePoseMode::update(const ModeContext & context, ModeOutput & output)
 {
-  if (
-    ((context.enabled_arms & kLeftArm) != 0 && !left_anchor_valid_) ||
-    ((context.enabled_arms & kRightArm) != 0 && !right_anchor_valid_))
-  {
-    return false;
-  }
-
-  auto add_task = [&](const std::string & follower_link,
-    const std::string & leader_link,
-    const Eigen::Affine3d & follower_anchor,
-    const Eigen::Affine3d & leader_anchor) {
+  auto add_task = [&](const ControlGroupConfiguration & group, const Anchor & anchor) {
       const Eigen::Affine3d current =
-        configuration_.follower_kinematics->getPose(follower_link);
+        configuration_.follower_kinematics->getPose(group.follower_eef);
       const Eigen::Affine3d leader_current =
-        configuration_.leader_kinematics->getPose(leader_link);
+        configuration_.leader_kinematics->getPose(group.leader_eef);
       // Apply relative leader motion in the shared base-link axes. Composing the complete
       // transforms on the right would express translation in the anchored end-effector frame.
-      Eigen::Affine3d goal = follower_anchor;
-      goal.translation() += leader_current.translation() - leader_anchor.translation();
+      Eigen::Affine3d goal = anchor.follower;
+      goal.translation() += leader_current.translation() - anchor.leader.translation();
       const Eigen::Matrix3d base_frame_rotation_delta =
-        leader_current.linear() * leader_anchor.linear().transpose();
-      goal.linear() = base_frame_rotation_delta * follower_anchor.linear();
+        leader_current.linear() * anchor.leader.linear().transpose();
+      goal.linear() = base_frame_rotation_delta * anchor.follower.linear();
       TaskObjective task;
-      task.link_name = follower_link;
+      task.link_name = group.follower_eef;
       task.desired_velocity = desiredVelocity(current, goal);
       task.weight.head<3>().setConstant(weight_position_);
       task.weight.tail<3>().setConstant(weight_orientation_);
       output.task_objectives.push_back(task);
     };
 
-  if ((context.enabled_arms & kLeftArm) != 0) {
-    add_task(
-      configuration_.follower_left_eef, configuration_.leader_left_eef,
-      left_follower_anchor_, left_leader_anchor_);
-  }
-  if ((context.enabled_arms & kRightArm) != 0) {
-    add_task(
-      configuration_.follower_right_eef, configuration_.leader_right_eef,
-      right_follower_anchor_, right_leader_anchor_);
+  for (const auto & group : configuration_.control_groups) {
+    if (!containsControlGroup(context.enabled_groups, group.id)) {
+      continue;
+    }
+    const auto anchor = anchors_.find(group.id);
+    if (anchor == anchors_.end() || !anchor->second.valid) {
+      return false;
+    }
+    add_task(group, anchor->second);
   }
   return true;
 }
-}  // namespace cyclo_teleoperation::robots::ai_worker
+}  // namespace cyclo_teleoperation::controllers::common
 
 PLUGINLIB_EXPORT_CLASS(
-  cyclo_teleoperation::robots::ai_worker::RelativePoseMode,
+  cyclo_teleoperation::controllers::common::RelativePoseMode,
   cyclo_teleoperation::TeleoperationMode)

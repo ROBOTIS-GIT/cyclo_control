@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include <cstdio>
+#include <exception>
 
-#include <Eigen/Dense>
+#include <rclcpp/rclcpp.hpp>
 
-#include <cstdint>
-#include <vector>
+#include "cyclo_teleoperation/core/teleoperation_node.hpp"
 
-#include "cyclo_teleoperation/core/types.hpp"
-
-namespace cyclo_teleoperation
+int main(int argc, char ** argv)
 {
-void applySoftHold(
-  ModeOutput & output,
-  const Eigen::VectorXd & command_position,
-  const Eigen::VectorXd & hold_target,
-  const std::vector<ControlGroupConfiguration> & control_groups,
-  ControlGroupMask controlled_groups,
-  double kp,
-  double max_correction_velocity,
-  double tracking_weight);
-}  // namespace cyclo_teleoperation
+  rclcpp::init(argc, argv);
+  try {
+    rclcpp::spin(cyclo_teleoperation::makeTeleoperationNode());
+  } catch (const std::exception & error) {
+    std::fprintf(stderr, "cyclo_teleoperation failed: %s\n", error.what());
+  }
+  rclcpp::shutdown();
+  return 0;
+}

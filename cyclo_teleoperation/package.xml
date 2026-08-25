@@ -8,7 +8,6 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>ament_index_cpp</depend>
   <depend>cyclo_motion_controller_core</depend>
   <depend>eigen3_cmake_module</depend>
   <depend>pluginlib</depend>
@@ -16,6 +15,8 @@
   <depend>robotis_interfaces</depend>
   <depend>sensor_msgs</depend>
   <depend>trajectory_msgs</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

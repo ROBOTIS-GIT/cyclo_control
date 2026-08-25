@@ -21,47 +21,64 @@
 #include <unordered_map>
 #include <vector>
 
-#include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
-#include "cyclo_teleoperation/core/types.hpp"
+#include "cyclo_teleoperation/core/robot_teleoperation.hpp"
+#include "cyclo_teleoperation/robots/ai_worker/ai_worker_groups.hpp"
+#include "cyclo_teleoperation/robots/ai_worker/ai_worker_control_interface.hpp"
 #include "kinematics/kinematics_solver.hpp"
 
 namespace cyclo_teleoperation::robots::ai_worker
 {
-class AIWorkerProfile
+class AIWorkerTeleoperation : public RobotTeleoperation
 {
 public:
-  explicit AIWorkerProfile(rclcpp::Node & node);
-  ~AIWorkerProfile();
+  AIWorkerTeleoperation() = default;
+  ~AIWorkerTeleoperation() override;
 
-  bool initialize();
-  bool updateFollowerState(const sensor_msgs::msg::JointState & message);
+  bool configure(
+    rclcpp::Node & node,
+    const std::string & parameter_prefix,
+    ControlInterface::RequestCallback request_callback) override;
+
+  std::string robotName() const override {return "ai_worker";}
+  int dof() const override {return static_cast<int>(follower_position_.size());}
+
+  const Eigen::VectorXd & followerPosition() const override {return follower_position_;}
+  const Eigen::VectorXd & followerVelocity() const override {return follower_velocity_;}
+  const Eigen::VectorXd & leaderReference() const override {return leader_reference_;}
+  const Eigen::VectorXd & leaderPosition() const override {return leader_position_;}
+  const std::vector<ControlGroupState> & controlGroupStates() const override
+  {
+    return control_group_states_;
+  }
+  const ModeConfiguration & modeConfiguration() const override {return mode_configuration_;}
+
+  std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
+  followerKinematics() const override {return follower_kinematics_;}
+  std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
+  leaderKinematics() const override {return leader_kinematics_;}
+
+  std::string followerJointStatesTopic() const override
+  {
+    return follower_joint_states_topic_;
+  }
+  const std::vector<LeaderInputChannel> & leaderInputChannels() const override
+  {
+    return leader_input_channels_;
+  }
+
+  bool updateFollowerState(const sensor_msgs::msg::JointState & message) override;
   bool updateLeaderReference(
     const trajectory_msgs::msg::JointTrajectory & message,
-    uint8_t target_arm);
-  void publish(const Eigen::VectorXd & command);
-
-  const Eigen::VectorXd & followerPosition() const {return follower_position_;}
-  const Eigen::VectorXd & followerVelocity() const {return follower_velocity_;}
-  const Eigen::VectorXd & leaderReference() const {return leader_reference_;}
-  const Eigen::VectorXd & leaderPosition() const {return leader_position_;}
-  double leftLeaderDuration() const {return left_leader_duration_;}
-  double rightLeaderDuration() const {return right_leader_duration_;}
-  uint64_t leftLeaderSequence() const {return left_leader_sequence_;}
-  uint64_t rightLeaderSequence() const {return right_leader_sequence_;}
-  const std::vector<int> & leftArmIndices() const {return left_arm_indices_;}
-  const std::vector<int> & rightArmIndices() const {return right_arm_indices_;}
-  const ModeConfiguration & modeConfiguration() const {return mode_configuration_;}
-  int dof() const {return static_cast<int>(follower_position_.size());}
-
-  std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
-  followerKinematics() const {return follower_kinematics_;}
-  std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
-  leaderKinematics() const {return leader_kinematics_;}
+    ControlGroupId target_group) override;
+  void publish(const Eigen::VectorXd & command) override;
+  void publishStatus(const ControlStatus & status) override;
 
 private:
+  bool initialize();
+  std::string parameterName(const std::string & name) const;
   trajectory_msgs::msg::JointTrajectory makeArmTrajectory(
     const std::vector<int> & indices,
     const std::vector<std::string> & names,
@@ -69,7 +86,8 @@ private:
     const std::string & gripper_name,
     double gripper_position) const;
 
-  rclcpp::Node & node_;
+  rclcpp::Node * node_ = nullptr;
+  std::string parameter_prefix_;
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> follower_kinematics_;
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> leader_kinematics_;
   ModeConfiguration mode_configuration_;
@@ -86,18 +104,18 @@ private:
   std::vector<int> right_arm_indices_;
   std::vector<std::string> left_arm_names_;
   std::vector<std::string> right_arm_names_;
+  std::vector<ControlGroupState> control_group_states_;
+  std::string follower_joint_states_topic_;
+  std::vector<LeaderInputChannel> leader_input_channels_;
 
   std::string right_gripper_joint_;
   std::string left_gripper_joint_;
   std::string temporary_leader_urdf_path_;
   double right_gripper_position_ = 0.0;
   double left_gripper_position_ = 0.0;
-  double right_leader_duration_ = 0.0;
-  double left_leader_duration_ = 0.0;
-  uint64_t right_leader_sequence_ = 0;
-  uint64_t left_leader_sequence_ = 0;
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_publisher_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_publisher_;
+  AIWorkerControlInterface control_interface_;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

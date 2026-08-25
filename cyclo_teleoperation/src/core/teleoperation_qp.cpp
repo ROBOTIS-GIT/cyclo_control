@@ -93,6 +93,23 @@ void TeleoperationQP::setCost()
       task.desired_velocity;
   }
 
+  for (const auto & task : output_.linear_task_objectives) {
+    if (
+      task.jacobian.cols() != index_.qdot_size ||
+      task.jacobian.rows() != task.desired_velocity.size() ||
+      task.jacobian.rows() != task.weight.size() ||
+      task.weight.size() == 0 || task.weight.minCoeff() < 0.0)
+    {
+      continue;
+    }
+    const Eigen::DiagonalMatrix<double, Eigen::Dynamic> weight =
+      task.weight.asDiagonal();
+    P_ds_.block(0, 0, index_.qdot_size, index_.qdot_size) +=
+      2.0 * task.jacobian.transpose() * weight * task.jacobian;
+    q_ds_.head(index_.qdot_size) +=
+      -2.0 * task.jacobian.transpose() * weight * task.desired_velocity;
+  }
+
   if (output_.damping_weight.size() == index_.qdot_size) {
     P_ds_.block(0, 0, index_.qdot_size, index_.qdot_size) +=
       2.0 * output_.damping_weight.asDiagonal();

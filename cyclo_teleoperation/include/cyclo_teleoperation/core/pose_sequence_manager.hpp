@@ -25,7 +25,7 @@
 
 #include "cyclo_teleoperation/core/types.hpp"
 
-namespace cyclo_teleoperation::robots::ai_worker
+namespace cyclo_teleoperation
 {
 class PoseSequenceManager
 {
@@ -37,41 +37,38 @@ public:
     const std::vector<int64_t> & available_presets);
 
   bool hasInitialPose(uint16_t mode) const;
-  uint8_t initialPoseArms(uint16_t mode) const;
+  ControlGroupMask initialPoseGroups(uint16_t mode) const;
   bool startInitialPose(uint16_t mode, const ModeContext & context);
   bool updateInitialPose(const ModeContext & context, ModeOutput & output);
   bool initialPoseMoving() const;
-  uint8_t activeInitialPoseArms() const;
+  ControlGroupMask activeInitialPoseGroups() const;
   void cancelInitialPose();
 
   bool startFinalInitialPose(
-    uint16_t mode, uint8_t arms, const ModeContext & context);
+    uint16_t mode, ControlGroupMask groups, const ModeContext & context);
   bool updateFinalInitialPoses(const ModeContext & context, ModeOutput & output);
-  void cancelFinalInitialPoses(uint8_t arms);
-  uint8_t activeFinalInitialPoseArms() const;
-  uint8_t movingFinalInitialPoseArms() const;
-  uint8_t leftFinalInitialPoseState() const;
-  uint8_t rightFinalInitialPoseState() const;
+  void cancelFinalInitialPoses(ControlGroupMask groups);
+  ControlGroupMask activeFinalInitialPoseGroups() const;
+  ControlGroupMask movingFinalInitialPoseGroups() const;
+  uint8_t finalInitialPoseState(ControlGroupId group) const;
 
   bool hasExitPose(uint16_t mode) const;
   bool startExitPose(uint16_t mode, const ModeContext & context);
   bool updateExitPose(const ModeContext & context, ModeOutput & output);
   bool exitPoseMoving() const;
-  uint8_t activeExitPoseArms() const;
+  ControlGroupMask activeExitPoseGroups() const;
   void cancelExitPose();
 
-  bool hasPreset(uint16_t preset, uint8_t arm) const;
+  bool hasPreset(uint16_t preset, ControlGroupId group) const;
   bool startPreset(
-    uint8_t arms,
-    uint16_t left_preset_id,
-    uint16_t right_preset_id,
+    ControlGroupMask groups,
+    const std::vector<uint16_t> & preset_ids,
     const ModeContext & context);
   bool updatePresets(const ModeContext & context, ModeOutput & output);
-  void cancelPresets(uint8_t arms);
-  uint8_t activePresetArms() const;
-  uint8_t movingPresetArms() const;
-  uint8_t leftPresetState() const;
-  uint8_t rightPresetState() const;
+  void cancelPresets(ControlGroupMask groups);
+  ControlGroupMask activePresetGroups() const;
+  ControlGroupMask movingPresetGroups() const;
+  uint8_t presetState(ControlGroupId group) const;
 
   const std::string & errorMessage() const {return error_message_;}
 
@@ -99,11 +96,7 @@ private:
     double timeout = 10.0;
   };
 
-  struct BimanualSequence
-  {
-    Sequence left;
-    Sequence right;
-  };
+  using GroupSequence = std::unordered_map<ControlGroupId, Sequence>;
 
   struct Runner
   {
@@ -117,7 +110,7 @@ private:
     uint8_t state = 0;
   };
 
-  BimanualSequence loadSequence(
+  GroupSequence loadSequence(
     rclcpp::Node & node,
     const std::string & prefix,
     const std::vector<std::string> & step_names) const;
@@ -125,27 +118,35 @@ private:
     Runner & runner,
     const Sequence & sequence,
     Purpose purpose,
-    const std::vector<int> & indices,
+    const ControlGroupConfiguration & group,
     const ModeContext & context,
     bool final_step_only = false);
   bool updateRunner(
     Runner & runner,
     Purpose purpose,
-    const std::vector<int> & indices,
+    const ControlGroupConfiguration & group,
     const ModeContext & context,
     ModeOutput & output);
+  bool startGroupSequence(
+    const GroupSequence & sequence,
+    Purpose purpose,
+    ControlGroupMask groups,
+    const ModeContext & context,
+    bool final_step_only = false);
+  bool updateRunners(Purpose purpose, const ModeContext & context, ModeOutput & output);
   static void cancelRunner(Runner & runner, Purpose purpose);
-  uint8_t activeArms(Purpose purpose, bool moving_only) const;
+  void cancelRunners(Purpose purpose, ControlGroupMask groups);
+  ControlGroupMask activeGroups(Purpose purpose, bool moving_only) const;
+  const ControlGroupConfiguration * group(ControlGroupId id) const;
+  uint8_t runnerState(ControlGroupId id, Purpose purpose) const;
 
-  std::vector<int> left_indices_;
-  std::vector<int> right_indices_;
-  std::unordered_map<uint16_t, BimanualSequence> initial_poses_;
-  std::unordered_map<uint16_t, BimanualSequence> exit_poses_;
-  std::unordered_map<uint16_t, BimanualSequence> presets_;
-  Runner left_runner_;
-  Runner right_runner_;
+  ModeConfiguration configuration_;
+  std::unordered_map<uint16_t, GroupSequence> initial_poses_;
+  std::unordered_map<uint16_t, GroupSequence> exit_poses_;
+  std::unordered_map<uint16_t, GroupSequence> presets_;
+  std::unordered_map<ControlGroupId, Runner> runners_;
   double kp_ = 30.0;
   double tracking_weight_ = 10.0;
   std::string error_message_;
 };
-}  // namespace cyclo_teleoperation::robots::ai_worker
+}  // namespace cyclo_teleoperation

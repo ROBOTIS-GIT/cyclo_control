@@ -23,9 +23,8 @@ void applySoftHold(
   ModeOutput & output,
   const Eigen::VectorXd & command_position,
   const Eigen::VectorXd & hold_target,
-  const std::vector<int> & left_arm_indices,
-  const std::vector<int> & right_arm_indices,
-  const uint8_t controlled_arms,
+  const std::vector<ControlGroupConfiguration> & control_groups,
+  const ControlGroupMask controlled_groups,
   const double kp,
   const double max_correction_velocity,
   const double tracking_weight)
@@ -43,19 +42,17 @@ void applySoftHold(
   }
 
   std::vector<bool> controlled_joint(dof, false);
-  auto mark_controlled = [&](const std::vector<int> & indices, const uint8_t arm) {
-      if ((controlled_arms & arm) == 0) {
-        return;
+  for (const auto & group : control_groups) {
+    if (!containsControlGroup(controlled_groups, group.id)) {
+      continue;
+    }
+    for (const int index : group.follower_joint_indices) {
+      if (index < 0 || index >= dof) {
+        throw std::out_of_range("Soft hold joint index is outside the follower DOF");
       }
-      for (const int index : indices) {
-        if (index < 0 || index >= dof) {
-          throw std::out_of_range("Soft hold joint index is outside the follower DOF");
-        }
-        controlled_joint[index] = true;
-      }
-    };
-  mark_controlled(left_arm_indices, kLeftArm);
-  mark_controlled(right_arm_indices, kRightArm);
+      controlled_joint[index] = true;
+    }
+  }
 
   for (int index = 0; index < dof; ++index) {
     if (controlled_joint[index]) {

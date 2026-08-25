@@ -26,14 +26,12 @@ Mode IDs map to plugins in the follower YAML:
 available_control_modes: [1, 2, 3]
 
 control_modes.3.name: movej_precise
-control_modes.3.plugin: cyclo_teleoperation/AiWorkerMoveJMode
+control_modes.3.plugin: cyclo_teleoperation/MoveJMode
 control_modes.3.kp_joint: 30.0
 control_modes.3.tracking_weight: 15.0
-control_modes.3.activation.duration: 2.0
 ```
 
-`activation.duration` controls only the quintic reference blend. Joint
-velocity limits are always enforced by the shared QP from the follower URDF.
+Joint velocity limits are always enforced by the shared QP from the follower URDF.
 
 Preset IDs are global to the AI Worker profile. Left and right definitions are
 independent, and each arm has its own duration. Joint velocity limits are
@@ -70,14 +68,14 @@ solved together against the coupled AI Worker model.
 
 For a new control law:
 
-1. Derive a class from `TeleoperationMode` under
-   `include/cyclo_teleoperation/robots/ai_worker`.
-2. Implement `configure`, `activate`, `onArmsEnabled`, and `update`.
+1. Derive a class from `TeleoperationMode` under `controllers/common` for a reusable
+   controller, or `robots/<robot>/controllers` for a robot-specific controller.
+2. Implement `configure`, `activate`, `onGroupsEnabled`, and `update`.
 3. Fill `ModeOutput`; do not publish commands or create another QP.
 4. Add and export the plugin, then map a free numeric ID starting at two in
-   the YAML.
+   a free positive numeric ID in the YAML.
 
-The default `controlledArms()` returns `context.enabled_arms`. The
+The default `controlledGroups()` returns `context.enabled_groups`. The
 runtime combines it with the active preset arms before applying soft hold,
 so a preset arm is controlled by the overlay while any other disabled arm uses
 the common soft-hold objective.

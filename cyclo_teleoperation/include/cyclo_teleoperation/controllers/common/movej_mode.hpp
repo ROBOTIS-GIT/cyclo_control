@@ -17,11 +17,11 @@
 #include <Eigen/Dense>
 
 #include <string>
-#include <vector>
+#include <unordered_map>
 
 #include "cyclo_teleoperation/core/teleoperation_mode.hpp"
 
-namespace cyclo_teleoperation::robots::ai_worker
+namespace cyclo_teleoperation::controllers::common
 {
 class MoveJMode : public TeleoperationMode
 {
@@ -31,9 +31,11 @@ public:
     const std::string & parameter_prefix,
     const ModeConfiguration & configuration) override;
   bool activate(const ModeContext & context) override;
-  void onArmsEnabled(uint8_t arms, const ModeContext & context) override;
+  void onGroupsEnabled(
+    ControlGroupMask groups, const ModeContext & context) override;
   bool update(const ModeContext & context, ModeOutput & output) override;
-  uint8_t timedCommandFeedbackSyncArms(const ModeContext & context) const override;
+  ControlGroupMask timedCommandFeedbackSyncGroups(
+    const ModeContext & context) const override;
 
 private:
   struct ArmTrajectory
@@ -49,24 +51,20 @@ private:
   };
 
   void beginSlowStart(
-    const std::vector<int> & indices,
+    const ControlGroupConfiguration & group,
     ArmTrajectory & trajectory,
     uint64_t command_sequence,
     const ModeContext & context);
   void updateArm(
-    const std::vector<int> & indices,
-    bool enabled,
-    double command_duration,
-    uint64_t command_sequence,
+    const ControlGroupConfiguration & group,
+    const ControlGroupState & state,
     ArmTrajectory & trajectory,
     const ModeContext & context,
     ModeOutput & output);
 
-  std::vector<int> left_indices_;
-  std::vector<int> right_indices_;
-  ArmTrajectory left_trajectory_;
-  ArmTrajectory right_trajectory_;
+  ModeConfiguration configuration_;
+  std::unordered_map<ControlGroupId, ArmTrajectory> trajectories_;
   double kp_joint_ = 50.0;
   double tracking_weight_ = 10.0;
 };
-}  // namespace cyclo_teleoperation::robots::ai_worker
+}  // namespace cyclo_teleoperation::controllers::common

@@ -12,22 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cyclo_teleoperation/robots/ai_worker/movej_mode.hpp"
+#include "cyclo_teleoperation/controllers/common/movej_mode.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 #include <pluginlib/class_list_macros.hpp>
 
-namespace cyclo_teleoperation::robots::ai_worker
+namespace cyclo_teleoperation::controllers::common
 {
 bool MoveJMode::configure(
   rclcpp::Node & node,
   const std::string & prefix,
   const ModeConfiguration & configuration)
 {
-  left_indices_ = configuration.left_arm_indices;
-  right_indices_ = configuration.right_arm_indices;
+  configuration_ = configuration;
+  trajectories_.clear();
+  for (const auto & group : configuration_.control_groups) {
+    trajectories_.emplace(group.id, ArmTrajectory{});
+  }
+  if (trajectories_.empty()) {
+    return false;
+  }
   auto parameter = [&node](const std::string & name, const double default_value) {
       if (!node.has_parameter(name)) {
         return node.declare_parameter(name, default_value);
@@ -41,14 +47,15 @@ bool MoveJMode::configure(
 
 bool MoveJMode::activate(const ModeContext & context)
 {
-  left_trajectory_ = ArmTrajectory{};
-  right_trajectory_ = ArmTrajectory{};
-  onArmsEnabled(context.enabled_arms, context);
+  for (auto & trajectory : trajectories_) {
+    trajectory.second = ArmTrajectory{};
+  }
+  onGroupsEnabled(context.enabled_groups, context);
   return true;
 }
 
 void MoveJMode::beginSlowStart(
-  const std::vector<int> & indices,
+  const ControlGroupConfiguration & group,
   ArmTrajectory & trajectory,
   const uint64_t command_sequence,
   const ModeContext & context)
@@ -58,40 +65,40 @@ void MoveJMode::beginSlowStart(
   trajectory.goal = context.leader_reference;
   trajectory.last_sequence = command_sequence;
   trajectory.waiting_for_command = true;
-  for (const int index : indices) {
+  for (const int index : group.follower_joint_indices) {
     trajectory.start[index] = context.follower_position[index];
     trajectory.goal[index] = context.leader_reference[index];
   }
 }
 
-void MoveJMode::onArmsEnabled(const uint8_t arms, const ModeContext & context)
+void MoveJMode::onGroupsEnabled(
+  const ControlGroupMask groups, const ModeContext & context)
 {
-  if ((arms & kLeftArm) != 0) {
+  for (const auto & group : configuration_.control_groups) {
+    if (!containsControlGroup(groups, group.id)) {
+      continue;
+    }
+    if (group.id >= context.group_states.size()) {
+      continue;
+    }
     beginSlowStart(
-      left_indices_, left_trajectory_, context.left_leader_sequence, context);
-  }
-  if ((arms & kRightArm) != 0) {
-    beginSlowStart(
-      right_indices_, right_trajectory_, context.right_leader_sequence, context);
+      group, trajectories_.at(group.id),
+      context.group_states[group.id].leader_sequence, context);
   }
 }
 
 void MoveJMode::updateArm(
-  const std::vector<int> & indices,
-  const bool enabled,
-  const double command_duration,
-  const uint64_t command_sequence,
+  const ControlGroupConfiguration & group,
+  const ControlGroupState & state,
   ArmTrajectory & trajectory,
   const ModeContext & context,
   ModeOutput & output)
 {
-  if (!enabled) {
-    return;
-  }
-
   constexpr double kTimedCommandEpsilon = 1e-6;
+  const double command_duration = state.leader_duration;
+  const uint64_t command_sequence = state.leader_sequence;
   if (trajectory.waiting_for_command && command_sequence == trajectory.last_sequence) {
-    for (const int index : indices) {
+    for (const int index : group.follower_joint_indices) {
       output.desired_joint_velocity[index] = 0.0;
       output.joint_tracking_weight[index] = tracking_weight_;
     }
@@ -123,7 +130,7 @@ void MoveJMode::updateArm(
     }
   }
 
-  for (const int index : indices) {
+  for (const int index : group.follower_joint_indices) {
     const double reference = trajectory.active ?
       trajectory.start[index] +
       interpolation_ratio * (trajectory.goal[index] - trajectory.start[index]) :
@@ -135,48 +142,51 @@ void MoveJMode::updateArm(
   }
 }
 
-uint8_t MoveJMode::timedCommandFeedbackSyncArms(const ModeContext & context) const
+ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
+  const ModeContext & context) const
 {
   constexpr double kTimedCommandEpsilon = 1e-6;
-  uint8_t arms = 0;
-  auto add_arm = [&](
-    const uint8_t arm,
-    const double duration,
-    const uint64_t sequence,
-    const ArmTrajectory & trajectory)
+  ControlGroupMask groups = 0;
+  for (const auto & group : configuration_.control_groups) {
+    if (
+      !containsControlGroup(context.enabled_groups, group.id) ||
+      group.id >= context.group_states.size())
     {
-      if (
-        (context.enabled_arms & arm) != 0 &&
-        sequence != trajectory.last_sequence &&
-        !trajectory.slow_start_complete &&
-        duration > kTimedCommandEpsilon)
-      {
-        arms |= arm;
-      }
-    };
-  add_arm(
-    kLeftArm, context.left_leader_duration,
-    context.left_leader_sequence, left_trajectory_);
-  add_arm(
-    kRightArm, context.right_leader_duration,
-    context.right_leader_sequence, right_trajectory_);
-  return arms;
+      continue;
+    }
+    const auto trajectory = trajectories_.find(group.id);
+    if (trajectory == trajectories_.end()) {
+      continue;
+    }
+    const auto & state = context.group_states[group.id];
+    if (
+      state.leader_sequence != trajectory->second.last_sequence &&
+      !trajectory->second.slow_start_complete &&
+      state.leader_duration > kTimedCommandEpsilon)
+    {
+      groups |= controlGroupBit(group.id);
+    }
+  }
+  return groups;
 }
 
 bool MoveJMode::update(const ModeContext & context, ModeOutput & output)
 {
-  updateArm(
-    left_indices_, (context.enabled_arms & kLeftArm) != 0,
-    context.left_leader_duration, context.left_leader_sequence,
-    left_trajectory_, context, output);
-  updateArm(
-    right_indices_, (context.enabled_arms & kRightArm) != 0,
-    context.right_leader_duration, context.right_leader_sequence,
-    right_trajectory_, context, output);
+  for (const auto & group : configuration_.control_groups) {
+    if (!containsControlGroup(context.enabled_groups, group.id)) {
+      continue;
+    }
+    if (group.id >= context.group_states.size()) {
+      return false;
+    }
+    updateArm(
+      group, context.group_states[group.id], trajectories_.at(group.id),
+      context, output);
+  }
   return true;
 }
-}  // namespace cyclo_teleoperation::robots::ai_worker
+}  // namespace cyclo_teleoperation::controllers::common
 
 PLUGINLIB_EXPORT_CLASS(
-  cyclo_teleoperation::robots::ai_worker::MoveJMode,
+  cyclo_teleoperation::controllers::common::MoveJMode,
   cyclo_teleoperation::TeleoperationMode)

@@ -18,6 +18,7 @@
 #include <Eigen/Geometry>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,9 +27,38 @@
 
 namespace cyclo_teleoperation
 {
-constexpr uint8_t kLeftArm = 1;
-constexpr uint8_t kRightArm = 2;
-constexpr uint8_t kBothArms = kLeftArm | kRightArm;
+using ControlGroupId = uint8_t;
+using ControlGroupMask = uint64_t;
+
+constexpr ControlGroupId kInvalidControlGroup =
+  std::numeric_limits<ControlGroupId>::max();
+
+inline constexpr ControlGroupMask controlGroupBit(const ControlGroupId id)
+{
+  return id < 64 ? ControlGroupMask{1} << id : ControlGroupMask{0};
+}
+
+inline constexpr bool containsControlGroup(
+  const ControlGroupMask mask, const ControlGroupId id)
+{
+  return (mask & controlGroupBit(id)) != 0;
+}
+
+struct ControlGroupConfiguration
+{
+  ControlGroupId id = kInvalidControlGroup;
+  std::string name;
+  std::vector<int> follower_joint_indices;
+  std::string follower_eef;
+  std::string leader_eef;
+};
+
+struct ControlGroupState
+{
+  double leader_duration = 0.0;
+  uint64_t leader_sequence = 0;
+  uint16_t selected_preset_id = 0;
+};
 
 struct TaskObjective
 {
@@ -37,6 +67,15 @@ struct TaskObjective
     Eigen::Matrix<double, 6, 1>::Zero();
   Eigen::Matrix<double, 6, 1> weight =
     Eigen::Matrix<double, 6, 1>::Ones();
+};
+
+// A controller-defined linear task in joint-velocity space. This supports relative-link
+// tasks whose Jacobian cannot be represented by one end-effector link name.
+struct LinearTaskObjective
+{
+  Eigen::MatrixXd jacobian;
+  Eigen::VectorXd desired_velocity;
+  Eigen::VectorXd weight;
 };
 
 struct ModeOutput
@@ -48,6 +87,7 @@ struct ModeOutput
   std::vector<bool> joint_position_limit_enabled;
   double preferred_joint_velocity_weight = 0.0;
   std::vector<TaskObjective> task_objectives;
+  std::vector<LinearTaskObjective> linear_task_objectives;
 
   void reset(const int dof, const double damping)
   {
@@ -58,6 +98,7 @@ struct ModeOutput
     joint_position_limit_enabled.assign(dof, true);
     preferred_joint_velocity_weight = 0.0;
     task_objectives.clear();
+    linear_task_objectives.clear();
   }
 };
 
@@ -68,14 +109,12 @@ struct ModeContext
   const Eigen::VectorXd & measured_follower_position;
   const Eigen::VectorXd & leader_reference;
   const Eigen::VectorXd & leader_position;
-  double left_leader_duration;
-  double right_leader_duration;
-  uint64_t left_leader_sequence;
-  uint64_t right_leader_sequence;
-  uint8_t requested_arms;
-  uint8_t enabled_arms;
-  uint16_t left_preset_id;
-  uint16_t right_preset_id;
+  const std::vector<ControlGroupState> & group_states;
+  ControlGroupMask requested_groups;
+  ControlGroupMask enabled_groups;
+  // Groups temporarily owned by a preset or final-initial-pose overlay. Modes can use
+  // this to avoid producing an objective for a group while an overlay controls it.
+  ControlGroupMask pose_sequence_groups;
   double now_seconds;
   double dt;
 };
@@ -84,13 +123,16 @@ struct ModeConfiguration
 {
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> follower_kinematics;
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver> leader_kinematics;
-  std::vector<int> left_arm_indices;
-  std::vector<int> right_arm_indices;
-  std::string follower_left_eef;
-  std::string follower_right_eef;
-  std::string follower_left_elbow;
-  std::string follower_right_elbow;
-  std::string leader_left_eef;
-  std::string leader_right_eef;
+  std::vector<ControlGroupConfiguration> control_groups;
+
+  const ControlGroupConfiguration * findGroup(const std::string & name) const
+  {
+    for (const auto & group : control_groups) {
+      if (group.name == name) {
+        return &group;
+      }
+    }
+    return nullptr;
+  }
 };
 }  // namespace cyclo_teleoperation

@@ -14,22 +14,13 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-
-#include <cstdint>
-#include <vector>
-
 #include "cyclo_teleoperation/core/types.hpp"
 
-namespace cyclo_teleoperation
+namespace cyclo_teleoperation::robots::ai_worker
 {
-void applySoftHold(
-  ModeOutput & output,
-  const Eigen::VectorXd & command_position,
-  const Eigen::VectorXd & hold_target,
-  const std::vector<ControlGroupConfiguration> & control_groups,
-  ControlGroupMask controlled_groups,
-  double kp,
-  double max_correction_velocity,
-  double tracking_weight);
-}  // namespace cyclo_teleoperation
+constexpr ControlGroupId kLeftGroupId = 0;
+constexpr ControlGroupId kRightGroupId = 1;
+constexpr ControlGroupMask kLeftGroup = controlGroupBit(kLeftGroupId);
+constexpr ControlGroupMask kRightGroup = controlGroupBit(kRightGroupId);
+constexpr ControlGroupMask kBothGroups = kLeftGroup | kRightGroup;
+}  // namespace cyclo_teleoperation::robots::ai_worker

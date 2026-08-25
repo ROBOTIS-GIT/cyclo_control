@@ -9,7 +9,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(ament_index_cpp REQUIRED)
 find_package(cyclo_motion_controller_core REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -31,53 +30,78 @@ target_link_libraries(cyclo_teleoperation_qp PUBLIC
   Eigen3::Eigen
 )
 
-add_library(cyclo_teleoperation_modes SHARED
-  src/robots/ai_worker/movej_mode.cpp
-  src/robots/ai_worker/pose_sequence_manager.cpp
-  src/robots/ai_worker/relative_pose_mode.cpp
+add_library(cyclo_teleoperation_controller_plugins SHARED
+  src/controllers/common/movej_mode.cpp
+  src/controllers/common/relative_pose_mode.cpp
 )
-target_include_directories(cyclo_teleoperation_modes PUBLIC
+target_include_directories(cyclo_teleoperation_controller_plugins PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(cyclo_teleoperation_modes
+target_link_libraries(cyclo_teleoperation_controller_plugins
   cyclo_motion_controller_core::cyclo_motion_controller_core
   Eigen3::Eigen
 )
-ament_target_dependencies(cyclo_teleoperation_modes pluginlib rclcpp)
+ament_target_dependencies(cyclo_teleoperation_controller_plugins pluginlib rclcpp)
+
+add_library(cyclo_teleoperation_robot_plugins SHARED
+  src/robots/ai_worker/ai_worker_control_interface.cpp
+  src/robots/ai_worker/ai_worker_teleoperation.cpp
+)
+target_include_directories(cyclo_teleoperation_robot_plugins PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(cyclo_teleoperation_robot_plugins
+  cyclo_motion_controller_core::cyclo_motion_controller_core
+  Eigen3::Eigen
+)
+ament_target_dependencies(cyclo_teleoperation_robot_plugins
+  pluginlib rclcpp robotis_interfaces sensor_msgs trajectory_msgs)
 
 add_executable(cyclo_teleoperation_node
-  src/cyclo_teleoperation_node.cpp
-  src/robots/ai_worker/ai_worker_profile.cpp
+  src/core/pose_sequence_manager.cpp
+  src/core/teleoperation_node.cpp
+  src/cyclo_teleoperation_main.cpp
 )
 target_include_directories(cyclo_teleoperation_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(cyclo_teleoperation_node
   cyclo_teleoperation_qp
-  cyclo_teleoperation_modes
   cyclo_motion_controller_core::cyclo_motion_controller_core
   Eigen3::Eigen
 )
 ament_target_dependencies(cyclo_teleoperation_node
-  ament_index_cpp pluginlib rclcpp robotis_interfaces sensor_msgs trajectory_msgs)
+  pluginlib rclcpp sensor_msgs trajectory_msgs)
 
 pluginlib_export_plugin_description_file(
-  cyclo_teleoperation cyclo_teleoperation_plugins.xml)
+  cyclo_teleoperation cyclo_teleoperation_controller_plugins.xml)
+pluginlib_export_plugin_description_file(
+  cyclo_teleoperation cyclo_teleoperation_robot_plugins.xml)
 
 install(TARGETS
   cyclo_teleoperation_qp
-  cyclo_teleoperation_modes
+  cyclo_teleoperation_controller_plugins
+  cyclo_teleoperation_robot_plugins
   cyclo_teleoperation_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY include/ DESTINATION include)
-install(FILES cyclo_teleoperation_plugins.xml
+install(FILES
+  cyclo_teleoperation_controller_plugins.xml
+  cyclo_teleoperation_robot_plugins.xml
   DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)
 ament_export_dependencies(cyclo_motion_controller_core Eigen3 pluginlib rclcpp)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_soft_hold test/test_soft_hold.cpp)
+  target_link_libraries(test_soft_hold cyclo_teleoperation_qp Eigen3::Eigen)
+endif()
 
 ament_package()

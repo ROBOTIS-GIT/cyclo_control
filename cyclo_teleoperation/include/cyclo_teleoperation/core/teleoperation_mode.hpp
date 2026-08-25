@@ -35,18 +35,20 @@ public:
 
   virtual bool activate(const ModeContext & context) = 0;
 
-  virtual void onArmsEnabled(uint8_t arms, const ModeContext & context) = 0;
+  virtual void onGroupsEnabled(
+    ControlGroupMask groups, const ModeContext & context) = 0;
 
   virtual bool update(const ModeContext & context, ModeOutput & output) = 0;
 
-  virtual uint8_t timedCommandFeedbackSyncArms(const ModeContext & /*context*/) const
+  virtual ControlGroupMask timedCommandFeedbackSyncGroups(
+    const ModeContext & /*context*/) const
   {
     return 0;
   }
 
-  virtual uint8_t controlledArms(const ModeContext & context) const
+  virtual ControlGroupMask controlledGroups(const ModeContext & context) const
   {
-    return context.enabled_arms;
+    return context.enabled_groups;
   }
 
   virtual void deactivate() {}

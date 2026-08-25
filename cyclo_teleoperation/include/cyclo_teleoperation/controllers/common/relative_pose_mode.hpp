@@ -18,11 +18,11 @@
 #include <Eigen/Geometry>
 
 #include <string>
-#include <vector>
+#include <unordered_map>
 
 #include "cyclo_teleoperation/core/teleoperation_mode.hpp"
 
-namespace cyclo_teleoperation::robots::ai_worker
+namespace cyclo_teleoperation::controllers::common
 {
 class RelativePoseMode : public TeleoperationMode
 {
@@ -32,26 +32,29 @@ public:
     const std::string & parameter_prefix,
     const ModeConfiguration & configuration) override;
   bool activate(const ModeContext & context) override;
-  void onArmsEnabled(uint8_t arms, const ModeContext & context) override;
+  void onGroupsEnabled(
+    ControlGroupMask groups, const ModeContext & context) override;
   bool update(const ModeContext & context, ModeOutput & output) override;
 
 private:
-  void captureAnchor(uint8_t arms);
+  struct Anchor
+  {
+    Eigen::Affine3d leader = Eigen::Affine3d::Identity();
+    Eigen::Affine3d follower = Eigen::Affine3d::Identity();
+    bool valid = false;
+  };
+
+  void captureAnchors(ControlGroupMask groups);
   Eigen::Matrix<double, 6, 1> desiredVelocity(
     const Eigen::Affine3d & current,
     const Eigen::Affine3d & goal) const;
 
   ModeConfiguration configuration_;
-  Eigen::Affine3d left_leader_anchor_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d right_leader_anchor_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d left_follower_anchor_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d right_follower_anchor_ = Eigen::Affine3d::Identity();
-  bool left_anchor_valid_ = false;
-  bool right_anchor_valid_ = false;
+  std::unordered_map<ControlGroupId, Anchor> anchors_;
 
   double kp_position_ = 50.0;
   double kp_orientation_ = 50.0;
   double weight_position_ = 10.0;
   double weight_orientation_ = 1.0;
 };
-}  // namespace cyclo_teleoperation::robots::ai_worker
+}  // namespace cyclo_teleoperation::controllers::common

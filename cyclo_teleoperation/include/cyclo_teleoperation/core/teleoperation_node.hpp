@@ -14,22 +14,11 @@
 
 #pragma once
 
-#include <Eigen/Dense>
+#include <memory>
 
-#include <cstdint>
-#include <vector>
-
-#include "cyclo_teleoperation/core/types.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 namespace cyclo_teleoperation
 {
-void applySoftHold(
-  ModeOutput & output,
-  const Eigen::VectorXd & command_position,
-  const Eigen::VectorXd & hold_target,
-  const std::vector<ControlGroupConfiguration> & control_groups,
-  ControlGroupMask controlled_groups,
-  double kp,
-  double max_correction_velocity,
-  double tracking_weight);
+std::shared_ptr<rclcpp::Node> makeTeleoperationNode();
 }  // namespace cyclo_teleoperation

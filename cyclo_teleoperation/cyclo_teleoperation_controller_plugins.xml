@@ -1,0 +1,14 @@
+<library path="cyclo_teleoperation_controller_plugins">
+  <class
+    name="cyclo_teleoperation/MoveJMode"
+    type="cyclo_teleoperation::controllers::common::MoveJMode"
+    base_class_type="cyclo_teleoperation::TeleoperationMode">
+    <description>Robot-independent absolute joint-space teleoperation mode.</description>
+  </class>
+  <class
+    name="cyclo_teleoperation/RelativePoseMode"
+    type="cyclo_teleoperation::controllers::common::RelativePoseMode"
+    base_class_type="cyclo_teleoperation::TeleoperationMode">
+    <description>Robot-independent base-frame-relative pose teleoperation mode.</description>
+  </class>
+</library>
