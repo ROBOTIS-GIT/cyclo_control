@@ -29,8 +29,8 @@ TEST(ControlGroupTest, BuildsIndependentMasks)
 TEST(SoftHoldTest, HoldsOnlyGroupsNotControlledByTheMode)
 {
   std::vector<ControlGroupConfiguration> groups{
-    ControlGroupConfiguration{0, "arm", {0, 2}, "", ""},
-    ControlGroupConfiguration{1, "auxiliary", {1}, "", ""}};
+    ControlGroupConfiguration{0, "arm", {0, 2}, "", "", {}},
+    ControlGroupConfiguration{1, "auxiliary", {1}, "", "", {}}};
   Eigen::VectorXd command = Eigen::VectorXd::Zero(3);
   Eigen::VectorXd hold_target(3);
   hold_target << 1.0, 2.0, 3.0;

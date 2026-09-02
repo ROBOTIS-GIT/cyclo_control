@@ -16,7 +16,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -60,6 +62,7 @@ public:
       throw std::runtime_error("Failed to initialize robot teleoperation: " + robot_plugin);
     }
     validateRobotConfiguration();
+    initializeAuxiliaryCommands();
     declarePoseGroupParameters();
     pose_sequences_ = std::make_unique<PoseSequenceManager>();
     if (!pose_sequences_->configure(
@@ -161,6 +164,7 @@ private:
     std::unordered_set<ControlGroupId> group_ids;
     std::unordered_set<std::string> group_names;
     std::unordered_set<int> assigned_joint_indices;
+    std::unordered_set<std::string> auxiliary_joint_names;
     ControlGroupId largest_group_id = 0;
     for (const auto & group : configuration.control_groups) {
       if (group.id >= 64 || !group_ids.insert(group.id).second) {
@@ -179,9 +183,38 @@ private:
                   "Control-group follower joint indices must be valid and non-overlapping");
         }
       }
+      for (const auto & auxiliary : group.auxiliary_joints) {
+        if (
+          auxiliary.joint_name.empty() || auxiliary.pose_parameter_name.empty() ||
+          !auxiliary_joint_names.insert(auxiliary.joint_name).second)
+        {
+          throw std::runtime_error(
+                  "Control-group auxiliary joints must have unique joint names and pose fields");
+        }
+      }
     }
     if (robot_teleoperation_->controlGroupStates().size() <= largest_group_id) {
       throw std::runtime_error("Robot profile does not provide state for every control group");
+    }
+    const auto & follower_auxiliary = robot_teleoperation_->followerAuxiliaryPosition();
+    const auto & leader_auxiliary = robot_teleoperation_->leaderAuxiliaryReference();
+    if (
+      follower_auxiliary.size() <= largest_group_id ||
+      leader_auxiliary.size() <= largest_group_id)
+    {
+      throw std::runtime_error(
+              "Robot profile does not provide auxiliary state for every control group");
+    }
+    for (const auto & group : configuration.control_groups) {
+      const auto expected = static_cast<Eigen::Index>(group.auxiliary_joints.size());
+      if (
+        follower_auxiliary[group.id].size() != expected ||
+        leader_auxiliary[group.id].size() != expected)
+      {
+        throw std::runtime_error(
+                "Robot profile auxiliary state does not match control group '" +
+                group.name + "'");
+      }
     }
 
     std::unordered_set<ControlGroupId> input_groups;
@@ -322,6 +355,12 @@ private:
             declare_parameter<std::vector<double>>(
               sequence_prefix + ".steps." + step_name + "." + group.name + ".positions",
               std::vector<double>{});
+            for (const auto & auxiliary : group.auxiliary_joints) {
+              declare_parameter<double>(
+                sequence_prefix + ".steps." + step_name + "." + group.name + "." +
+                auxiliary.pose_parameter_name,
+                std::numeric_limits<double>::quiet_NaN());
+            }
           }
         }
       }
@@ -336,6 +375,12 @@ private:
           declare_parameter<std::vector<double>>(
             prefix + ".steps." + step_name + "." + group.name + ".positions",
             std::vector<double>{});
+          for (const auto & auxiliary : group.auxiliary_joints) {
+            declare_parameter<double>(
+              prefix + ".steps." + step_name + "." + group.name + "." +
+              auxiliary.pose_parameter_name,
+              std::numeric_limits<double>::quiet_NaN());
+          }
         }
       }
     }
@@ -561,6 +606,51 @@ private:
     return result;
   }
 
+  void initializeAuxiliaryCommands()
+  {
+    auxiliary_command_ = robot_teleoperation_->followerAuxiliaryPosition();
+    auxiliary_hold_target_ = auxiliary_command_;
+  }
+
+  void publishCommand(const Eigen::VectorXd & command, const ModeOutput * output = nullptr)
+  {
+    const auto & leader_auxiliary = robot_teleoperation_->leaderAuxiliaryReference();
+    for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
+      if (containsControlGroup(active_groups_, group.id)) {
+        auxiliary_command_[group.id] = leader_auxiliary[group.id];
+      } else {
+        auxiliary_command_[group.id] = auxiliary_hold_target_[group.id];
+      }
+    }
+    if (output != nullptr) {
+      for (const auto & target : output->auxiliary_position_targets) {
+        if (target.first >= auxiliary_command_.size()) {
+          continue;
+        }
+        auto & command_target = auxiliary_command_[target.first];
+        if (command_target.size() != target.second.size()) {
+          continue;
+        }
+        for (Eigen::Index i = 0; i < target.second.size(); ++i) {
+          if (std::isfinite(target.second[i])) {
+            command_target[i] = target.second[i];
+            auxiliary_hold_target_[target.first][i] = target.second[i];
+          }
+        }
+      }
+    }
+    robot_teleoperation_->publish(command, auxiliary_command_);
+  }
+
+  void captureAuxiliaryCommandAsHold(const ControlGroupMask groups)
+  {
+    for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
+      if (containsControlGroup(groups, group.id)) {
+        auxiliary_hold_target_[group.id] = auxiliary_command_[group.id];
+      }
+    }
+  }
+
   ModeContext makeContext(const ControlGroupMask enabled_groups) const
   {
     context_group_states_ = robot_teleoperation_->controlGroupStates();
@@ -576,6 +666,7 @@ private:
       robot_teleoperation_->followerPosition(),
       robot_teleoperation_->leaderReference(),
       robot_teleoperation_->leaderPosition(),
+      robot_teleoperation_->followerAuxiliaryPosition(),
       context_group_states_,
       requested_groups_,
       enabled_groups,
@@ -593,6 +684,7 @@ private:
 
   void syncGroupCommandToFeedback(const ControlGroupMask groups)
   {
+    const auto & follower_auxiliary = robot_teleoperation_->followerAuxiliaryPosition();
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
       if (!containsControlGroup(groups, group.id)) {
         continue;
@@ -601,11 +693,13 @@ private:
           command_position_[index] = robot_teleoperation_->followerPosition()[index];
           command_velocity_[index] = 0.0;
       }
+      auxiliary_command_[group.id] = follower_auxiliary[group.id];
     }
   }
 
   void captureGroupHoldTarget(const ControlGroupMask groups)
   {
+    const auto & follower_auxiliary = robot_teleoperation_->followerAuxiliaryPosition();
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
       if (!containsControlGroup(groups, group.id)) {
         continue;
@@ -613,6 +707,7 @@ private:
       for (const int index : group.follower_joint_indices) {
           hold_target_[index] = robot_teleoperation_->followerPosition()[index];
       }
+      auxiliary_hold_target_[group.id] = follower_auxiliary[group.id];
     }
   }
 
@@ -631,6 +726,7 @@ private:
   {
     command_position_ = robot_teleoperation_->followerPosition();
     command_velocity_ = Eigen::VectorXd::Zero(robot_teleoperation_->dof());
+    initializeAuxiliaryCommands();
     command_initialized_ = true;
   }
 
@@ -685,8 +781,8 @@ private:
     hold_target_ = robot_teleoperation_->followerPosition();
     syncCommandToFeedback();
     previous_controlled_groups_ = 0;
-    robot_teleoperation_->publish(hold_target_);
     active_groups_ = 0;
+    publishCommand(hold_target_);
     if (mode_) {
       mode_->deactivate();
       mode_.reset();
@@ -881,7 +977,7 @@ private:
       Eigen::VectorXd optimal_velocity;
       if (!qp_->solve(optimal_velocity)) {
         command_velocity_.setZero();
-        robot_teleoperation_->publish(command_position_);
+        publishCommand(command_position_);
         RCLCPP_WARN_THROTTLE(
           get_logger(), *get_clock(), 1000,
           "%s pose QP failed; holding the last command and retrying",
@@ -890,12 +986,13 @@ private:
       }
       command_position_ += context.dt * optimal_velocity;
       command_velocity_ = optimal_velocity;
-      robot_teleoperation_->publish(command_position_);
+      publishCommand(command_position_, &output);
       const bool moving = exit_pose ?
         pose_sequences_->exitPoseMoving() :
         pose_sequences_->initialPoseMoving();
       if (!moving) {
         hold_target_ = command_position_;
+        captureAuxiliaryCommandAsHold(controlled_groups);
         command_velocity_.setZero();
         publishStatus(
           ControlStatus::kLoading,
@@ -917,7 +1014,7 @@ private:
         ControlStatus::kError,
         std::string(exit_pose ? "Exit" : "Initial") +
         " pose transition failed: " + error.what());
-      robot_teleoperation_->publish(hold_target_);
+      publishCommand(hold_target_);
       return false;
     }
   }
@@ -944,7 +1041,7 @@ private:
 
     if (transition_pending_ && hold_initialized_) {
       if (!mode_transition_started_ && !beginRequestedModeTransition()) {
-        robot_teleoperation_->publish(hold_target_);
+        publishCommand(hold_target_);
         return;
       }
       if (mode_transition_phase_ == ModeTransitionPhase::kExitPose) {
@@ -953,7 +1050,7 @@ private:
           return;
         }
         if (!startRequestedInitialPose()) {
-          robot_teleoperation_->publish(hold_target_);
+          publishCommand(hold_target_);
           return;
         }
       }
@@ -966,13 +1063,13 @@ private:
       }
       mode_transition_phase_ = ModeTransitionPhase::kActivate;
       if (!activateRequestedMode()) {
-        robot_teleoperation_->publish(hold_target_);
+        publishCommand(hold_target_);
         return;
       }
     }
     if (!mode_ready_ || !mode_) {
       if (hold_initialized_) {
-        robot_teleoperation_->publish(hold_target_);
+        publishCommand(hold_target_);
       }
       return;
     }
@@ -1011,7 +1108,7 @@ private:
         publishStatus(
           ControlStatus::kError,
           pose_sequences_->errorMessage());
-        robot_teleoperation_->publish(command_position_);
+        publishCommand(command_position_);
         return;
       }
       publishStatus(
@@ -1029,7 +1126,7 @@ private:
         publishStatus(
           ControlStatus::kError,
           "Preset update was rejected by the active mode");
-        robot_teleoperation_->publish(command_position_);
+        publishCommand(command_position_);
         return;
       }
     }
@@ -1048,7 +1145,7 @@ private:
     if (controlled_groups == 0) {
       command_position_ = hold_target_;
       command_velocity_.setZero();
-      robot_teleoperation_->publish(hold_target_);
+      publishCommand(hold_target_);
       return;
     }
 
@@ -1091,7 +1188,7 @@ private:
       Eigen::VectorXd optimal_velocity;
       if (!qp_->solve(optimal_velocity)) {
         command_velocity_.setZero();
-        robot_teleoperation_->publish(command_position_);
+        publishCommand(command_position_);
         RCLCPP_WARN_THROTTLE(
           get_logger(), *get_clock(), 1000,
           "Teleoperation QP failed; holding the last command and retrying");
@@ -1100,7 +1197,7 @@ private:
 
       command_position_ += context.dt * optimal_velocity;
       command_velocity_ = optimal_velocity;
-      robot_teleoperation_->publish(command_position_);
+      publishCommand(command_position_, &output);
 
       std::vector<uint8_t> preset_states(last_preset_states_.size(), 0);
       std::vector<uint8_t> initial_pose_states(last_initial_pose_states_.size(), 0);
@@ -1134,7 +1231,7 @@ private:
       publishStatus(
         ControlStatus::kError,
         std::string("Control update failed; holding all control groups: ") + error.what());
-      robot_teleoperation_->publish(hold_target_);
+      publishCommand(hold_target_);
     }
   }
 
@@ -1208,6 +1305,8 @@ private:
   Eigen::VectorXd hold_target_;
   Eigen::VectorXd command_position_;
   Eigen::VectorXd command_velocity_;
+  GroupAuxiliaryPositions auxiliary_hold_target_;
+  GroupAuxiliaryPositions auxiliary_command_;
   rclcpp::Time last_follower_time_{0, 0, RCL_ROS_TIME};
   std::vector<rclcpp::Time> last_leader_times_;
 

@@ -21,6 +21,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "kinematics/kinematics_solver.hpp"
@@ -51,7 +52,15 @@ struct ControlGroupConfiguration
   std::vector<int> follower_joint_indices;
   std::string follower_eef;
   std::string leader_eef;
+  struct AuxiliaryJoint
+  {
+    std::string joint_name;
+    std::string pose_parameter_name;
+  };
+  std::vector<AuxiliaryJoint> auxiliary_joints;
 };
+
+using GroupAuxiliaryPositions = std::vector<Eigen::VectorXd>;
 
 struct ControlGroupState
 {
@@ -88,6 +97,7 @@ struct ModeOutput
   double preferred_joint_velocity_weight = 0.0;
   std::vector<TaskObjective> task_objectives;
   std::vector<LinearTaskObjective> linear_task_objectives;
+  std::unordered_map<ControlGroupId, Eigen::VectorXd> auxiliary_position_targets;
 
   void reset(const int dof, const double damping)
   {
@@ -99,6 +109,7 @@ struct ModeOutput
     preferred_joint_velocity_weight = 0.0;
     task_objectives.clear();
     linear_task_objectives.clear();
+    auxiliary_position_targets.clear();
   }
 };
 
@@ -109,6 +120,7 @@ struct ModeContext
   const Eigen::VectorXd & measured_follower_position;
   const Eigen::VectorXd & leader_reference;
   const Eigen::VectorXd & leader_position;
+  const GroupAuxiliaryPositions & measured_auxiliary_position;
   const std::vector<ControlGroupState> & group_states;
   ControlGroupMask requested_groups;
   ControlGroupMask enabled_groups;
