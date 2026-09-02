@@ -177,12 +177,22 @@ bool AIWorkerTeleoperation::initialize()
     ControlGroupConfiguration{
       kLeftGroupId, "left", left_arm_indices_,
       node_->get_parameter(parameterName("follower_left_eef")).as_string(),
-      node_->get_parameter(parameterName("leader_left_eef")).as_string()},
+      node_->get_parameter(parameterName("leader_left_eef")).as_string(),
+      {{left_gripper_joint_, "gripper_position"}}},
     ControlGroupConfiguration{
       kRightGroupId, "right", right_arm_indices_,
       node_->get_parameter(parameterName("follower_right_eef")).as_string(),
-      node_->get_parameter(parameterName("leader_right_eef")).as_string()}};
+      node_->get_parameter(parameterName("leader_right_eef")).as_string(),
+      {{right_gripper_joint_, "gripper_position"}}}};
   control_group_states_.assign(mode_configuration_.control_groups.size(), ControlGroupState{});
+  follower_auxiliary_position_.resize(mode_configuration_.control_groups.size());
+  leader_auxiliary_reference_.resize(mode_configuration_.control_groups.size());
+  for (const auto & group : mode_configuration_.control_groups) {
+    follower_auxiliary_position_[group.id] =
+      Eigen::VectorXd::Zero(group.auxiliary_joints.size());
+    leader_auxiliary_reference_[group.id] =
+      Eigen::VectorXd::Zero(group.auxiliary_joints.size());
+  }
 
   right_publisher_ =
     node_->create_publisher<trajectory_msgs::msg::JointTrajectory>(
@@ -214,6 +224,17 @@ bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointSta
     follower_velocity_[i] =
       source < message.velocity.size() ? message.velocity[source] : 0.0;
   }
+  const auto left_gripper = message_index.find(left_gripper_joint_);
+  const auto right_gripper = message_index.find(right_gripper_joint_);
+  if (
+    left_gripper == message_index.end() || right_gripper == message_index.end() ||
+    left_gripper->second >= message.position.size() ||
+    right_gripper->second >= message.position.size())
+  {
+    return false;
+  }
+  follower_auxiliary_position_[kLeftGroupId][0] = message.position[left_gripper->second];
+  follower_auxiliary_position_[kRightGroupId][0] = message.position[right_gripper->second];
   return joint_count == follower_joint_names_.size();
 }
 
@@ -237,6 +258,7 @@ bool AIWorkerTeleoperation::updateLeaderReference(
     target_group == kLeftGroupId ? left_arm_indices_ : right_arm_indices_;
   std::vector<bool> received(follower_joint_names_.size(), false);
   size_t updated_arm_joints = 0;
+  bool updated_gripper = false;
   for (size_t i = 0; i < message.joint_names.size() && i < point.positions.size(); ++i) {
     const auto follower = follower_index_.find(message.joint_names[i]);
     if (follower != follower_index_.end()) {
@@ -256,13 +278,15 @@ bool AIWorkerTeleoperation::updateLeaderReference(
       leader_position_[leader->second] = point.positions[i];
     }
     if (message.joint_names[i] == right_gripper_joint_ && target_group == kRightGroupId) {
-      right_gripper_position_ = point.positions[i];
+      leader_auxiliary_reference_[kRightGroupId][0] = point.positions[i];
+      updated_gripper = true;
     }
     if (message.joint_names[i] == left_gripper_joint_ && target_group == kLeftGroupId) {
-      left_gripper_position_ = point.positions[i];
+      leader_auxiliary_reference_[kLeftGroupId][0] = point.positions[i];
+      updated_gripper = true;
     }
   }
-  if (updated_arm_joints != requested_indices.size()) {
+  if (updated_arm_joints != requested_indices.size() || !updated_gripper) {
     return false;
   }
   if (target_group == kLeftGroupId) {
@@ -298,14 +322,16 @@ trajectory_msgs::msg::JointTrajectory AIWorkerTeleoperation::makeArmTrajectory(
   return message;
 }
 
-void AIWorkerTeleoperation::publish(const Eigen::VectorXd & command)
+void AIWorkerTeleoperation::publish(
+  const Eigen::VectorXd & command,
+  const GroupAuxiliaryPositions & auxiliary_command)
 {
   left_publisher_->publish(makeArmTrajectory(
     left_arm_indices_, left_arm_names_, command,
-    left_gripper_joint_, left_gripper_position_));
+    left_gripper_joint_, auxiliary_command.at(kLeftGroupId)[0]));
   right_publisher_->publish(makeArmTrajectory(
     right_arm_indices_, right_arm_names_, command,
-    right_gripper_joint_, right_gripper_position_));
+    right_gripper_joint_, auxiliary_command.at(kRightGroupId)[0]));
 }
 
 void AIWorkerTeleoperation::publishStatus(const ControlStatus & status)

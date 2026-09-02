@@ -54,6 +54,8 @@ public:
   virtual const Eigen::VectorXd & followerVelocity() const = 0;
   virtual const Eigen::VectorXd & leaderReference() const = 0;
   virtual const Eigen::VectorXd & leaderPosition() const = 0;
+  virtual const GroupAuxiliaryPositions & followerAuxiliaryPosition() const = 0;
+  virtual const GroupAuxiliaryPositions & leaderAuxiliaryReference() const = 0;
   virtual const std::vector<ControlGroupState> & controlGroupStates() const = 0;
 
   virtual const ModeConfiguration & modeConfiguration() const = 0;
@@ -70,7 +72,9 @@ public:
   virtual bool updateLeaderReference(
     const trajectory_msgs::msg::JointTrajectory & message,
     ControlGroupId target_group) = 0;
-  virtual void publish(const Eigen::VectorXd & command) = 0;
+  virtual void publish(
+    const Eigen::VectorXd & command,
+    const GroupAuxiliaryPositions & auxiliary_command) = 0;
   virtual void publishStatus(const ControlStatus & status) = 0;
 };
 }  // namespace cyclo_teleoperation

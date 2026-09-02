@@ -86,6 +86,7 @@ private:
   {
     std::string name;
     Eigen::VectorXd target;
+    Eigen::VectorXd auxiliary_target;
   };
 
   struct Sequence
@@ -102,6 +103,7 @@ private:
   {
     const Sequence * sequence = nullptr;
     Eigen::VectorXd start;
+    Eigen::VectorXd auxiliary_start;
     size_t step_index = 0;
     double start_time = 0.0;
     Purpose purpose = Purpose::kNone;

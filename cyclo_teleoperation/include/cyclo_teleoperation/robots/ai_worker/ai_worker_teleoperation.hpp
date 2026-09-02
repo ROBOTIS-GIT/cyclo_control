@@ -49,6 +49,14 @@ public:
   const Eigen::VectorXd & followerVelocity() const override {return follower_velocity_;}
   const Eigen::VectorXd & leaderReference() const override {return leader_reference_;}
   const Eigen::VectorXd & leaderPosition() const override {return leader_position_;}
+  const GroupAuxiliaryPositions & followerAuxiliaryPosition() const override
+  {
+    return follower_auxiliary_position_;
+  }
+  const GroupAuxiliaryPositions & leaderAuxiliaryReference() const override
+  {
+    return leader_auxiliary_reference_;
+  }
   const std::vector<ControlGroupState> & controlGroupStates() const override
   {
     return control_group_states_;
@@ -73,7 +81,9 @@ public:
   bool updateLeaderReference(
     const trajectory_msgs::msg::JointTrajectory & message,
     ControlGroupId target_group) override;
-  void publish(const Eigen::VectorXd & command) override;
+  void publish(
+    const Eigen::VectorXd & command,
+    const GroupAuxiliaryPositions & auxiliary_command) override;
   void publishStatus(const ControlStatus & status) override;
 
 private:
@@ -111,8 +121,8 @@ private:
   std::string right_gripper_joint_;
   std::string left_gripper_joint_;
   std::string temporary_leader_urdf_path_;
-  double right_gripper_position_ = 0.0;
-  double left_gripper_position_ = 0.0;
+  GroupAuxiliaryPositions follower_auxiliary_position_;
+  GroupAuxiliaryPositions leader_auxiliary_reference_;
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_publisher_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_publisher_;

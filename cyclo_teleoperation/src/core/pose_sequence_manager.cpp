@@ -44,6 +44,17 @@ PoseSequenceManager::GroupSequence PoseSequenceManager::loadSequence(
       Step step;
       step.name = step_name;
       step.target = Eigen::Map<const Eigen::VectorXd>(values.data(), values.size());
+      step.auxiliary_target.setConstant(
+        group.auxiliary_joints.size(), std::numeric_limits<double>::quiet_NaN());
+      for (size_t i = 0; i < group.auxiliary_joints.size(); ++i) {
+        const std::string auxiliary_parameter =
+          prefix + ".steps." + step_name + "." + group.name + "." +
+          group.auxiliary_joints[i].pose_parameter_name;
+        const double value = node.get_parameter(auxiliary_parameter).as_double();
+        if (std::isfinite(value)) {
+          step.auxiliary_target[i] = value;
+        }
+      }
       sequence.steps.push_back(std::move(step));
     }
     sequence.duration = node.get_parameter(prefix + ".duration").as_double();
@@ -180,6 +191,18 @@ bool PoseSequenceManager::startRunner(
   for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
     runner.start[i] = context.follower_position[group_config.follower_joint_indices[i]];
   }
+  runner.auxiliary_start.resize(group_config.auxiliary_joints.size());
+  if (!group_config.auxiliary_joints.empty()) {
+    if (group_config.id >= context.measured_auxiliary_position.size()) {
+      return false;
+    }
+    runner.auxiliary_start = context.measured_auxiliary_position[group_config.id];
+    if (runner.auxiliary_start.size() !=
+      static_cast<Eigen::Index>(group_config.auxiliary_joints.size()))
+    {
+      return false;
+    }
+  }
   runner.step_index = final_step_only ? sequence.steps.size() - 1 : 0;
   runner.start_time = context.now_seconds;
   runner.purpose = purpose;
@@ -261,6 +284,19 @@ bool PoseSequenceManager::updateRunner(
     output.joint_tracking_weight[index] = tracking_weight_;
     output.joint_position_limit_enabled[index] = false;
   }
+  if (!group_config.auxiliary_joints.empty()) {
+    Eigen::VectorXd auxiliary_target =
+      Eigen::VectorXd::Constant(
+      group_config.auxiliary_joints.size(), std::numeric_limits<double>::quiet_NaN());
+    for (Eigen::Index i = 0; i < step.auxiliary_target.size(); ++i) {
+      if (!std::isfinite(step.auxiliary_target[i])) {
+        continue;
+      }
+      auxiliary_target[i] = runner.auxiliary_start[i] +
+        alpha * (step.auxiliary_target[i] - runner.auxiliary_start[i]);
+    }
+    output.auxiliary_position_targets[group_config.id] = std::move(auxiliary_target);
+  }
 
   if (!runner.moving) {
     return true;
@@ -273,6 +309,25 @@ bool PoseSequenceManager::updateRunner(
         step.target[i] -
         context.measured_follower_position[group_config.follower_joint_indices[i]]));
   }
+  if (!group_config.auxiliary_joints.empty()) {
+    if (group_config.id >= context.measured_auxiliary_position.size()) {
+      error_message_ = "Auxiliary feedback is unavailable for control group '" +
+        group_config.name + "'";
+      return false;
+    }
+    const auto & measured_auxiliary = context.measured_auxiliary_position[group_config.id];
+    if (measured_auxiliary.size() != step.auxiliary_target.size()) {
+      error_message_ = "Auxiliary feedback size does not match control group '" +
+        group_config.name + "'";
+      return false;
+    }
+    for (Eigen::Index i = 0; i < step.auxiliary_target.size(); ++i) {
+      if (std::isfinite(step.auxiliary_target[i])) {
+        maximum_error = std::max(
+          maximum_error, std::abs(step.auxiliary_target[i] - measured_auxiliary[i]));
+      }
+    }
+  }
   if (
     elapsed >= runner.sequence->duration &&
     maximum_error <= runner.sequence->completion_tolerance)
@@ -281,6 +336,9 @@ bool PoseSequenceManager::updateRunner(
       ++runner.step_index;
       for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
         runner.start[i] = context.follower_position[group_config.follower_joint_indices[i]];
+      }
+      if (!group_config.auxiliary_joints.empty()) {
+        runner.auxiliary_start = context.measured_auxiliary_position[group_config.id];
       }
       runner.start_time = context.now_seconds;
     } else {
