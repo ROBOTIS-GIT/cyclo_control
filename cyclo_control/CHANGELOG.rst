@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.0 (2026-09-17)
+------------------
+* Added a plugin-based teleoperation runtime with configurable controller modes and robot-specific interfaces
+* Added timed arm and gripper trajectory handling, pose-sequence transitions, and safe control-group release behavior
+* Contributors: Yeonguk Kim
+
 0.3.2 (2026-08-20)
 ------------------
 * Unified arm and gripper trajectory commands across AI Worker motion controllers
