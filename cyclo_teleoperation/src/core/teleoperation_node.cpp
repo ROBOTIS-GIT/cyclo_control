@@ -80,8 +80,9 @@ public:
       get_parameter("constraints.collision_buffer").as_double(),
       get_parameter("constraints.collision_safe_distance").as_double());
 
+    const auto follower_qos = rclcpp::SensorDataQoS().keep_last(1);
     follower_subscription_ = create_subscription<sensor_msgs::msg::JointState>(
-      robot_teleoperation_->followerJointStatesTopic(), 10,
+      robot_teleoperation_->followerJointStatesTopic(), follower_qos,
       std::bind(&TeleoperationNode::followerCallback, this, std::placeholders::_1));
     size_t group_state_count = 0;
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
