@@ -42,6 +42,12 @@ bool MoveJMode::configure(
     };
   kp_joint_ = parameter(prefix + ".kp_joint", 50.0);
   tracking_weight_ = parameter(prefix + ".tracking_weight", 10.0);
+  const auto slow_start_parameter = prefix + ".slow_start.enabled";
+  if (!node.has_parameter(slow_start_parameter)) {
+    slow_start_enabled_ = node.declare_parameter(slow_start_parameter, true);
+  } else {
+    slow_start_enabled_ = node.get_parameter(slow_start_parameter).as_bool();
+  }
   return kp_joint_ > 0.0 && tracking_weight_ > 0.0;
 }
 
@@ -65,6 +71,7 @@ void MoveJMode::beginSlowStart(
   trajectory.goal = context.leader_reference;
   trajectory.last_sequence = command_sequence;
   trajectory.waiting_for_command = true;
+  trajectory.slow_start_complete = !slow_start_enabled_;
   for (const int index : group.follower_joint_indices) {
     trajectory.start[index] = context.follower_position[index];
     trajectory.goal[index] = context.leader_reference[index];
@@ -145,6 +152,9 @@ void MoveJMode::updateArm(
 ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
   const ModeContext & context) const
 {
+  if (!slow_start_enabled_) {
+    return 0;
+  }
   constexpr double kTimedCommandEpsilon = 1e-6;
   ControlGroupMask groups = 0;
   for (const auto & group : configuration_.control_groups) {

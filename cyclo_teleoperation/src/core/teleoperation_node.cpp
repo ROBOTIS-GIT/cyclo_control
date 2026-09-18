@@ -93,10 +93,11 @@ public:
     context_group_states_.assign(group_state_count, ControlGroupState{});
     last_preset_states_.assign(group_state_count, 0);
     last_initial_pose_states_.assign(group_state_count, 0);
+    const auto latest_command_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     for (const auto & channel : robot_teleoperation_->leaderInputChannels()) {
       leader_subscriptions_.push_back(
         create_subscription<trajectory_msgs::msg::JointTrajectory>(
-          channel.topic, 10,
+          channel.topic, latest_command_qos,
           [this, group = channel.group_id](
             const trajectory_msgs::msg::JointTrajectory::SharedPtr message)
           {
