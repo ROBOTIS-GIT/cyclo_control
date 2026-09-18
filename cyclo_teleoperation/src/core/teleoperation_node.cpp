@@ -1038,6 +1038,7 @@ private:
     }
     feedback_error_reported_ = false;
     if (!command_initialized_) {
+      hold_target_ = robot_teleoperation_->followerPosition();
       syncCommandToFeedback();
     }
 
