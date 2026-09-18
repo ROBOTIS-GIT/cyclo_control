@@ -1040,6 +1040,7 @@ private:
     if (!command_initialized_) {
       hold_target_ = robot_teleoperation_->followerPosition();
       syncCommandToFeedback();
+      pose_sequences_->rebaseActiveSequences(makeContext(0));
     }
 
     if (transition_pending_ && hold_initialized_) {

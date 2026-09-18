@@ -35,6 +35,7 @@ public:
     const ModeConfiguration & configuration,
     const std::vector<int64_t> & available_modes,
     const std::vector<int64_t> & available_presets);
+  void rebaseActiveSequences(const ModeContext & context);
 
   bool hasInitialPose(uint16_t mode) const;
   ControlGroupMask initialPoseGroups(uint16_t mode) const;
