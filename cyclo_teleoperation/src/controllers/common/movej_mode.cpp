@@ -182,7 +182,6 @@ ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
 
 bool MoveJMode::update(const ModeContext & context, ModeOutput & output)
 {
-
   // MoveJ directly tracks joint-space references, so joint position constraints are disabled for
   // every configured control group, including groups currently owned by soft hold.
   for (const auto & group : configuration_.control_groups) {

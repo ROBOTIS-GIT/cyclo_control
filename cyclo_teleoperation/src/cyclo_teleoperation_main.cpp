@@ -26,6 +26,8 @@ int main(int argc, char ** argv)
     rclcpp::spin(cyclo_teleoperation::makeTeleoperationNode());
   } catch (const std::exception & error) {
     std::fprintf(stderr, "cyclo_teleoperation failed: %s\n", error.what());
+    rclcpp::shutdown();
+    return 1;
   }
   rclcpp::shutdown();
   return 0;

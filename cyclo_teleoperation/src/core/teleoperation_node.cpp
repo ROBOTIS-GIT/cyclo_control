@@ -692,8 +692,8 @@ private:
         continue;
       }
       for (const int index : group.follower_joint_indices) {
-          command_position_[index] = robot_teleoperation_->followerPosition()[index];
-          command_velocity_[index] = 0.0;
+        command_position_[index] = robot_teleoperation_->followerPosition()[index];
+        command_velocity_[index] = 0.0;
       }
       auxiliary_command_[group.id] = follower_auxiliary[group.id];
     }
@@ -707,7 +707,7 @@ private:
         continue;
       }
       for (const int index : group.follower_joint_indices) {
-          hold_target_[index] = robot_teleoperation_->followerPosition()[index];
+        hold_target_[index] = robot_teleoperation_->followerPosition()[index];
       }
       auxiliary_hold_target_[group.id] = follower_auxiliary[group.id];
     }
