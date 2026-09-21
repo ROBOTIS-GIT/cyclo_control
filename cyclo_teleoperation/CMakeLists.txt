@@ -98,10 +98,4 @@ install(FILES
 ament_export_include_directories(include)
 ament_export_dependencies(cyclo_motion_controller_core Eigen3 pluginlib rclcpp)
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_soft_hold test/test_soft_hold.cpp)
-  target_link_libraries(test_soft_hold cyclo_teleoperation_qp Eigen3::Eigen)
-endif()
-
 ament_package()

@@ -53,8 +53,8 @@ private:
   ControlStatus last_status_;
 
   rclcpp::Subscription<robotis_interfaces::msg::ControlModeCommand>::SharedPtr
-  command_subscription_;
+    command_subscription_;
   rclcpp::Publisher<robotis_interfaces::msg::ControlModeStatus>::SharedPtr
-  status_publisher_;
+    status_publisher_;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

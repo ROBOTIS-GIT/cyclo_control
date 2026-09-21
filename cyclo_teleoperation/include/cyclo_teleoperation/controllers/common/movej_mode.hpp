@@ -66,5 +66,6 @@ private:
   std::unordered_map<ControlGroupId, ArmTrajectory> trajectories_;
   double kp_joint_ = 50.0;
   double tracking_weight_ = 10.0;
+  bool slow_start_enabled_ = true;
 };
 }  // namespace cyclo_teleoperation::controllers::common

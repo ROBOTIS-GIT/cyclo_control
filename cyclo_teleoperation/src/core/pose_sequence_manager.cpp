@@ -157,6 +157,57 @@ const ControlGroupConfiguration * PoseSequenceManager::group(const ControlGroupI
   return nullptr;
 }
 
+void PoseSequenceManager::rebaseActiveSequences(const ModeContext & context)
+{
+  for (const auto & group_config : configuration_.control_groups) {
+    auto & runner = runners_.at(group_config.id);
+    if (!runner.active || runner.sequence == nullptr) {
+      continue;
+    }
+
+    const bool was_moving = runner.moving;
+    runner.start.resize(group_config.follower_joint_indices.size());
+    for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
+      runner.start[i] =
+        context.measured_follower_position[group_config.follower_joint_indices[i]];
+    }
+    if (!group_config.auxiliary_joints.empty()) {
+      runner.auxiliary_start = context.measured_auxiliary_position.at(group_config.id);
+    }
+    runner.start_time = context.now_seconds;
+
+    // A completed preset or final-initial pose remains an active hold objective. If the follower
+    // restarted at a different position, resume it through the normal linear interpolation instead
+    // of applying its old target immediately. A sequence that was already moving always restarts
+    // its current step so multi-step progression is preserved.
+    bool target_changed = false;
+    const auto & step = runner.sequence->steps.at(runner.step_index);
+    for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
+      if (
+        std::abs(step.target[i] - runner.start[i]) >
+        runner.sequence->completion_tolerance)
+      {
+        target_changed = true;
+        break;
+      }
+    }
+    if (!target_changed) {
+      for (Eigen::Index i = 0; i < step.auxiliary_target.size(); ++i) {
+        if (
+          std::isfinite(step.auxiliary_target[i]) &&
+          std::abs(step.auxiliary_target[i] - runner.auxiliary_start[i]) >
+          runner.sequence->completion_tolerance)
+        {
+          target_changed = true;
+          break;
+        }
+      }
+    }
+    runner.moving = was_moving || target_changed;
+    runner.state = runner.moving ? 2 : 3;
+  }
+}
+
 bool PoseSequenceManager::hasInitialPose(const uint16_t mode) const
 {
   return initial_poses_.count(mode) != 0;

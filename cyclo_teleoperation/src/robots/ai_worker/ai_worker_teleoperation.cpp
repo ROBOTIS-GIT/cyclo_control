@@ -20,6 +20,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <unordered_set>
 #include <utility>
 
 #include <pluginlib/class_list_macros.hpp>
@@ -194,48 +195,70 @@ bool AIWorkerTeleoperation::initialize()
       Eigen::VectorXd::Zero(group.auxiliary_joints.size());
   }
 
+  const auto command_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
   right_publisher_ =
     node_->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-    node_->get_parameter(parameterName("right_command_topic")).as_string(), 10);
+    node_->get_parameter(parameterName("right_command_topic")).as_string(), command_qos);
   left_publisher_ =
     node_->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-    node_->get_parameter(parameterName("left_command_topic")).as_string(), 10);
+    node_->get_parameter(parameterName("left_command_topic")).as_string(), command_qos);
   return true;
 }
 
 bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointState & message)
 {
-  std::unordered_map<std::string, size_t> message_index;
-  for (size_t i = 0; i < message.name.size(); ++i) {
-    message_index[message.name[i]] = i;
+  if (
+    message.position.size() != message.name.size() ||
+    (!message.velocity.empty() && message.velocity.size() != message.name.size()))
+  {
+    return false;
   }
 
-  size_t joint_count = 0;
+  std::unordered_map<std::string, size_t> message_index;
+  for (size_t i = 0; i < message.name.size(); ++i) {
+    if (!message_index.emplace(message.name[i], i).second) {
+      return false;
+    }
+  }
+
+  Eigen::VectorXd follower_position = follower_position_;
+  Eigen::VectorXd follower_velocity = follower_velocity_;
+  GroupAuxiliaryPositions follower_auxiliary_position = follower_auxiliary_position_;
   for (size_t i = 0; i < follower_joint_names_.size(); ++i) {
     const auto iter = message_index.find(follower_joint_names_[i]);
     if (iter == message_index.end()) {
-      continue;
+      return false;
     }
     const size_t source = iter->second;
-    if (source < message.position.size()) {
-      follower_position_[i] = message.position[source];
-      ++joint_count;
+    if (!std::isfinite(message.position[source])) {
+      return false;
     }
-    follower_velocity_[i] =
-      source < message.velocity.size() ? message.velocity[source] : 0.0;
+    follower_position[i] = message.position[source];
+    if (!message.velocity.empty()) {
+      if (!std::isfinite(message.velocity[source])) {
+        return false;
+      }
+      follower_velocity[i] = message.velocity[source];
+    } else {
+      follower_velocity[i] = 0.0;
+    }
   }
   const auto left_gripper = message_index.find(left_gripper_joint_);
   const auto right_gripper = message_index.find(right_gripper_joint_);
   if (
     left_gripper == message_index.end() || right_gripper == message_index.end() ||
-    left_gripper->second >= message.position.size() ||
-    right_gripper->second >= message.position.size())
+    !std::isfinite(message.position[left_gripper->second]) ||
+    !std::isfinite(message.position[right_gripper->second]))
   {
     return false;
   }
-  follower_auxiliary_position_[kLeftGroupId][0] = message.position[left_gripper->second];
-  follower_auxiliary_position_[kRightGroupId][0] = message.position[right_gripper->second];
-  return joint_count == follower_joint_names_.size();
+  follower_auxiliary_position[kLeftGroupId][0] = message.position[left_gripper->second];
+  follower_auxiliary_position[kRightGroupId][0] = message.position[right_gripper->second];
+
+  follower_position_ = std::move(follower_position);
+  follower_velocity_ = std::move(follower_velocity);
+  follower_auxiliary_position_ = std::move(follower_auxiliary_position);
+  return true;
 }
 
 bool AIWorkerTeleoperation::updateLeaderReference(
@@ -245,50 +268,72 @@ bool AIWorkerTeleoperation::updateLeaderReference(
   if (target_group != kLeftGroupId && target_group != kRightGroupId) {
     return false;
   }
-  if (message.points.empty() || message.points.front().positions.empty()) {
+  if (message.points.empty()) {
     return false;
   }
   const auto & point = message.points.front();
+  if (
+    point.positions.empty() ||
+    point.positions.size() != message.joint_names.size())
+  {
+    return false;
+  }
   const double duration = rclcpp::Duration(point.time_from_start).seconds();
-  if (duration < 0.0) {
+  if (!std::isfinite(duration) || duration < 0.0) {
     RCLCPP_WARN(node_->get_logger(), "Leader trajectory ignored: time_from_start must be >= 0");
     return false;
   }
   const auto & requested_indices =
     target_group == kLeftGroupId ? left_arm_indices_ : right_arm_indices_;
-  std::vector<bool> received(follower_joint_names_.size(), false);
+  const auto & requested_names =
+    target_group == kLeftGroupId ? left_arm_names_ : right_arm_names_;
+  const auto & requested_gripper =
+    target_group == kLeftGroupId ? left_gripper_joint_ : right_gripper_joint_;
+  if (message.joint_names.size() != requested_names.size() + 1) {
+    return false;
+  }
+
+  Eigen::VectorXd leader_reference = leader_reference_;
+  Eigen::VectorXd leader_position = leader_position_;
+  GroupAuxiliaryPositions leader_auxiliary_reference = leader_auxiliary_reference_;
+  std::unordered_set<std::string> received;
   size_t updated_arm_joints = 0;
   bool updated_gripper = false;
-  for (size_t i = 0; i < message.joint_names.size() && i < point.positions.size(); ++i) {
-    const auto follower = follower_index_.find(message.joint_names[i]);
-    if (follower != follower_index_.end()) {
-      const int index = follower->second;
-      leader_reference_[index] = point.positions[i];
-      if (
-        !received[index] &&
-        std::find(requested_indices.begin(), requested_indices.end(), index) !=
-        requested_indices.end())
-      {
-        received[index] = true;
-        ++updated_arm_joints;
-      }
+  for (size_t i = 0; i < message.joint_names.size(); ++i) {
+    const auto & joint_name = message.joint_names[i];
+    const double position = point.positions[i];
+    if (!received.insert(joint_name).second || !std::isfinite(position)) {
+      return false;
     }
-    const auto leader = leader_index_.find(message.joint_names[i]);
-    if (leader != leader_index_.end()) {
-      leader_position_[leader->second] = point.positions[i];
-    }
-    if (message.joint_names[i] == right_gripper_joint_ && target_group == kRightGroupId) {
-      leader_auxiliary_reference_[kRightGroupId][0] = point.positions[i];
+
+    if (joint_name == requested_gripper) {
+      leader_auxiliary_reference[target_group][0] = position;
       updated_gripper = true;
+      continue;
     }
-    if (message.joint_names[i] == left_gripper_joint_ && target_group == kLeftGroupId) {
-      leader_auxiliary_reference_[kLeftGroupId][0] = point.positions[i];
-      updated_gripper = true;
+
+    if (std::find(requested_names.begin(), requested_names.end(), joint_name) ==
+      requested_names.end())
+    {
+      return false;
     }
+
+    const auto follower = follower_index_.find(joint_name);
+    const auto leader = leader_index_.find(joint_name);
+    if (follower == follower_index_.end() || leader == leader_index_.end()) {
+      return false;
+    }
+    leader_reference[follower->second] = position;
+    leader_position[leader->second] = position;
+    ++updated_arm_joints;
   }
   if (updated_arm_joints != requested_indices.size() || !updated_gripper) {
     return false;
   }
+
+  leader_reference_ = std::move(leader_reference);
+  leader_position_ = std::move(leader_position);
+  leader_auxiliary_reference_ = std::move(leader_auxiliary_reference);
   if (target_group == kLeftGroupId) {
     control_group_states_[kLeftGroupId].leader_duration = duration;
     ++control_group_states_[kLeftGroupId].leader_sequence;

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>cyclo_control</name>
-  <version>0.4.0</version>
+  <version>0.4.1</version>
   <description>
     Meta package for Cyclo Control
   </description>
@@ -17,6 +17,7 @@
   <exec_depend>cyclo_motion_controller_models</exec_depend>
   <exec_depend>cyclo_motion_controller_ros</exec_depend>
   <exec_depend>cyclo_motion_controller_ros_py</exec_depend>
+  <exec_depend>cyclo_teleoperation</exec_depend>
   <exec_depend>osqp_eigen_vendor</exec_depend>
   <exec_depend>python3-nlopt</exec_depend>
   <export>
