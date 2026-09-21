@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.4.1 (2026-09-21)
+------------------
+* Hardened teleoperation input and follower-feedback recovery handling
+* Preserved safe slow-start and pose-sequence behavior across follower restarts
+* Contributors: Yeonguk Kim
+
 0.4.0 (2026-09-17)
 ------------------
 * Added a plugin-based teleoperation runtime with configurable controller modes and robot-specific interfaces
