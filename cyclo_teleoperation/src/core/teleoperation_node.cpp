@@ -80,8 +80,9 @@ public:
       get_parameter("constraints.collision_buffer").as_double(),
       get_parameter("constraints.collision_safe_distance").as_double());
 
+    const auto follower_qos = rclcpp::SensorDataQoS().keep_last(1);
     follower_subscription_ = create_subscription<sensor_msgs::msg::JointState>(
-      robot_teleoperation_->followerJointStatesTopic(), 10,
+      robot_teleoperation_->followerJointStatesTopic(), follower_qos,
       std::bind(&TeleoperationNode::followerCallback, this, std::placeholders::_1));
     size_t group_state_count = 0;
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
@@ -93,10 +94,11 @@ public:
     context_group_states_.assign(group_state_count, ControlGroupState{});
     last_preset_states_.assign(group_state_count, 0);
     last_initial_pose_states_.assign(group_state_count, 0);
+    const auto latest_command_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     for (const auto & channel : robot_teleoperation_->leaderInputChannels()) {
       leader_subscriptions_.push_back(
         create_subscription<trajectory_msgs::msg::JointTrajectory>(
-          channel.topic, 10,
+          channel.topic, latest_command_qos,
           [this, group = channel.group_id](
             const trajectory_msgs::msg::JointTrajectory::SharedPtr message)
           {
@@ -690,8 +692,8 @@ private:
         continue;
       }
       for (const int index : group.follower_joint_indices) {
-          command_position_[index] = robot_teleoperation_->followerPosition()[index];
-          command_velocity_[index] = 0.0;
+        command_position_[index] = robot_teleoperation_->followerPosition()[index];
+        command_velocity_[index] = 0.0;
       }
       auxiliary_command_[group.id] = follower_auxiliary[group.id];
     }
@@ -705,7 +707,7 @@ private:
         continue;
       }
       for (const int index : group.follower_joint_indices) {
-          hold_target_[index] = robot_teleoperation_->followerPosition()[index];
+        hold_target_[index] = robot_teleoperation_->followerPosition()[index];
       }
       auxiliary_hold_target_[group.id] = follower_auxiliary[group.id];
     }
@@ -1036,7 +1038,9 @@ private:
     }
     feedback_error_reported_ = false;
     if (!command_initialized_) {
+      hold_target_ = robot_teleoperation_->followerPosition();
       syncCommandToFeedback();
+      pose_sequences_->rebaseActiveSequences(makeContext(0));
     }
 
     if (transition_pending_ && hold_initialized_) {
