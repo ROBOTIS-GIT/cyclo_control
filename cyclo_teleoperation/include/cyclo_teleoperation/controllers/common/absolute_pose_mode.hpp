@@ -15,17 +15,16 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include <string>
-#include <unordered_map>
 
 #include "cyclo_teleoperation/core/controller_constraints.hpp"
-#include "cyclo_teleoperation/core/joint_trajectory_interpolator.hpp"
 #include "cyclo_teleoperation/core/teleoperation_mode.hpp"
 
 namespace cyclo_teleoperation::controllers::common
 {
-class MoveJMode : public TeleoperationMode
+class AbsolutePoseMode : public TeleoperationMode
 {
 public:
   bool configure(
@@ -36,32 +35,17 @@ public:
   void onGroupsEnabled(
     ControlGroupMask groups, const ModeContext & context) override;
   bool update(const ModeContext & context, ModeOutput & output) override;
-  ControlGroupMask timedCommandFeedbackSyncGroups(
-    const ModeContext & context) const override;
 
 private:
-  struct ArmTrajectory
-  {
-    JointTrajectoryInterpolator interpolator;
-    uint64_t last_sequence = 0;
-    bool waiting_for_command = false;
-    bool timed_transition_complete = false;
-  };
-
-  void beginSlowStart(
-    ArmTrajectory & trajectory,
-    uint64_t command_sequence);
-  void updateArm(
-    const ControlGroupConfiguration & group,
-    const ControlGroupState & state,
-    ArmTrajectory & trajectory,
-    const ModeContext & context,
-    ModeOutput & output);
+  Eigen::Matrix<double, 6, 1> desiredVelocity(
+    const Eigen::Affine3d & current,
+    const Eigen::Affine3d & goal) const;
 
   ModeConfiguration configuration_;
-  std::unordered_map<ControlGroupId, ArmTrajectory> trajectories_;
   ControllerConstraints constraints_;
-  double kp_joint_ = 50.0;
-  double tracking_weight_ = 10.0;
+  double kp_position_ = 50.0;
+  double kp_orientation_ = 50.0;
+  double weight_position_ = 10.0;
+  double weight_orientation_ = 1.0;
 };
 }  // namespace cyclo_teleoperation::controllers::common

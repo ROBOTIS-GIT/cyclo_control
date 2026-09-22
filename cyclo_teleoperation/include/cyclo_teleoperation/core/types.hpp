@@ -62,6 +62,15 @@ struct ControlGroupConfiguration
 
 using GroupAuxiliaryPositions = std::vector<Eigen::VectorXd>;
 
+struct CartesianReference
+{
+  Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+  uint64_t sequence = 0;
+  bool valid = false;
+};
+
+using GroupCartesianReferences = std::vector<CartesianReference>;
+
 struct ControlGroupState
 {
   double leader_duration = 0.0;
@@ -94,6 +103,8 @@ struct ModeOutput
   Eigen::VectorXd damping_weight;
   Eigen::VectorXd preferred_joint_velocity;
   std::vector<bool> joint_position_limit_enabled;
+  bool self_collision_constraint_enabled = true;
+  bool self_collision_policy_set = false;
   double preferred_joint_velocity_weight = 0.0;
   std::vector<TaskObjective> task_objectives;
   std::vector<LinearTaskObjective> linear_task_objectives;
@@ -106,10 +117,24 @@ struct ModeOutput
     damping_weight.setConstant(dof, damping);
     preferred_joint_velocity.setZero(dof);
     joint_position_limit_enabled.assign(dof, true);
+    self_collision_constraint_enabled = true;
+    self_collision_policy_set = false;
     preferred_joint_velocity_weight = 0.0;
     task_objectives.clear();
     linear_task_objectives.clear();
     auxiliary_position_targets.clear();
+  }
+
+  void mergeSelfCollisionConstraint(const bool enabled)
+  {
+    if (!self_collision_policy_set) {
+      self_collision_constraint_enabled = enabled;
+      self_collision_policy_set = true;
+      return;
+    }
+    // Self-collision is a whole-robot constraint. If multiple active owners
+    // contribute to one QP, keep it enabled whenever any owner requests it.
+    self_collision_constraint_enabled = self_collision_constraint_enabled || enabled;
   }
 };
 
@@ -120,6 +145,7 @@ struct ModeContext
   const Eigen::VectorXd & measured_follower_position;
   const Eigen::VectorXd & leader_reference;
   const Eigen::VectorXd & leader_position;
+  const GroupCartesianReferences & cartesian_references;
   const GroupAuxiliaryPositions & measured_auxiliary_position;
   const std::vector<ControlGroupState> & group_states;
   ControlGroupMask requested_groups;

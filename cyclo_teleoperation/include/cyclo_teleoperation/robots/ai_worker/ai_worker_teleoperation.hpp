@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "cyclo_teleoperation/core/robot_teleoperation.hpp"
@@ -95,6 +96,7 @@ private:
     const Eigen::VectorXd & command,
     const std::string & gripper_name,
     double gripper_position) const;
+  void publishFollowerEefPoses(const std_msgs::msg::Header & source_header);
 
   rclcpp::Node * node_ = nullptr;
   std::string parameter_prefix_;
@@ -117,15 +119,19 @@ private:
   std::vector<ControlGroupState> control_group_states_;
   std::string follower_joint_states_topic_;
   std::vector<LeaderInputChannel> leader_input_channels_;
+  bool enable_leader_interface_ = true;
 
   std::string right_gripper_joint_;
   std::string left_gripper_joint_;
+  std::string follower_base_frame_;
   std::string temporary_leader_urdf_path_;
   GroupAuxiliaryPositions follower_auxiliary_position_;
   GroupAuxiliaryPositions leader_auxiliary_reference_;
 
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr right_publisher_;
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr right_eef_pose_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr left_eef_pose_publisher_;
   AIWorkerControlInterface control_interface_;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

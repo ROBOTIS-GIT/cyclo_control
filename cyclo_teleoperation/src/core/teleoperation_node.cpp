@@ -92,6 +92,7 @@ public:
     last_leader_times_.assign(group_state_count, rclcpp::Time(0, 0, RCL_ROS_TIME));
     selected_preset_ids_.assign(group_state_count, 1);
     context_group_states_.assign(group_state_count, ControlGroupState{});
+    cartesian_references_.assign(group_state_count, CartesianReference{});
     last_preset_states_.assign(group_state_count, 0);
     last_initial_pose_states_.assign(group_state_count, 0);
     const auto latest_command_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
@@ -668,6 +669,7 @@ private:
       robot_teleoperation_->followerPosition(),
       robot_teleoperation_->leaderReference(),
       robot_teleoperation_->leaderPosition(),
+      cartesian_references_,
       robot_teleoperation_->followerAuxiliaryPosition(),
       context_group_states_,
       requested_groups_,
@@ -737,7 +739,7 @@ private:
     try {
       const ModeContext context = makeContext(0);
       pose_sequences_->cancelExitPose();
-      if (pose_sequences_->hasInitialPose(transition_target_mode_)) {
+      if (pose_sequences_->automaticInitialPoseEnabled(transition_target_mode_)) {
         if (!pose_sequences_->startInitialPose(transition_target_mode_, context)) {
           throw std::runtime_error("initial pose transition was rejected");
         }
@@ -1285,6 +1287,7 @@ private:
   uint16_t transition_source_mode_ = 0;
   std::vector<uint16_t> selected_preset_ids_;
   mutable std::vector<ControlGroupState> context_group_states_;
+  GroupCartesianReferences cartesian_references_;
   ControlGroupMask requested_groups_ = 0;
   ControlGroupMask active_groups_ = 0;
   ControlGroupMask previous_controlled_groups_ = 0;

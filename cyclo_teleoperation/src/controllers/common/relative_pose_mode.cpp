@@ -46,6 +46,7 @@ bool RelativePoseMode::configure(
   kp_orientation_ = parameter(prefix + ".kp_orientation", 50.0);
   weight_position_ = parameter(prefix + ".weight_position", 10.0);
   weight_orientation_ = parameter(prefix + ".weight_orientation", 1.0);
+  constraints_ = ControllerConstraints::declareAndLoad(node, prefix + ".constraints");
   return kp_position_ > 0.0 && kp_orientation_ > 0.0 &&
          weight_position_ > 0.0 && weight_orientation_ > 0.0;
 }
@@ -101,6 +102,7 @@ Eigen::Matrix<double, 6, 1> RelativePoseMode::desiredVelocity(
 
 bool RelativePoseMode::update(const ModeContext & context, ModeOutput & output)
 {
+  constraints_.apply(configuration_, configuredControlGroups(configuration_), output);
   auto add_task = [&](const ControlGroupConfiguration & group, const Anchor & anchor) {
       const Eigen::Affine3d current =
         configuration_.follower_kinematics->getPose(group.follower_eef);

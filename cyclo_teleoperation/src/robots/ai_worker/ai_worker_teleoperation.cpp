@@ -68,8 +68,17 @@ bool AIWorkerTeleoperation::configure(
   declare_string("left_gripper_joint", "gripper_l_joint1");
   declare_string("follower_right_eef", "arm_r_link7");
   declare_string("follower_left_eef", "arm_l_link7");
+  declare_string("follower_base_frame", "base_link");
+  declare_string("follower_right_eef_pose_topic", "~/follower/right/eef_pose");
+  declare_string("follower_left_eef_pose_topic", "~/follower/left/eef_pose");
   declare_string("leader_right_eef", "arm_r_link7");
   declare_string("leader_left_eef", "arm_l_link7");
+  const auto enable_leader_interface_parameter = parameterName("enable_leader_interface");
+  if (!node_->has_parameter(enable_leader_interface_parameter)) {
+    node_->declare_parameter(enable_leader_interface_parameter, true);
+  }
+  enable_leader_interface_ =
+    node_->get_parameter(enable_leader_interface_parameter).as_bool();
 
   follower_joint_states_topic_ =
     node_->get_parameter(parameterName("follower_joint_states_topic")).as_string();
@@ -80,6 +89,9 @@ bool AIWorkerTeleoperation::configure(
       kRightGroupId, node_->get_parameter(parameterName("right_leader_topic")).as_string()}};
   if (!initialize()) {
     return false;
+  }
+  if (!enable_leader_interface_) {
+    return true;
   }
   return control_interface_.configure(
     node, parameter_prefix, mode_configuration_.control_groups,
@@ -122,7 +134,7 @@ bool AIWorkerTeleoperation::initialize()
     }
     leader_urdf = temporary_leader_urdf_path_;
   }
-  if (follower_urdf.empty() || leader_urdf.empty()) {
+  if (follower_urdf.empty() || (enable_leader_interface_ && leader_urdf.empty())) {
     RCLCPP_ERROR(
       node_->get_logger(),
       "Follower URDF path and either leader URDF path or XML are required");
@@ -132,17 +144,22 @@ bool AIWorkerTeleoperation::initialize()
   follower_kinematics_ =
     std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(
     follower_urdf, follower_srdf);
-  leader_kinematics_ =
-    std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(
-    leader_urdf, leader_srdf);
 
   follower_joint_names_ = follower_kinematics_->getJointNames();
-  leader_joint_names_ = leader_kinematics_->getJointNames();
   for (size_t i = 0; i < follower_joint_names_.size(); ++i) {
     follower_index_[follower_joint_names_[i]] = static_cast<int>(i);
   }
-  for (size_t i = 0; i < leader_joint_names_.size(); ++i) {
-    leader_index_[leader_joint_names_[i]] = static_cast<int>(i);
+  if (enable_leader_interface_) {
+    leader_kinematics_ =
+      std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(
+      leader_urdf, leader_srdf);
+    leader_joint_names_ = leader_kinematics_->getJointNames();
+    for (size_t i = 0; i < leader_joint_names_.size(); ++i) {
+      leader_index_[leader_joint_names_[i]] = static_cast<int>(i);
+    }
+  } else {
+    leader_joint_names_ = follower_joint_names_;
+    leader_index_ = follower_index_;
   }
 
   for (const auto & name : follower_joint_names_) {
@@ -165,12 +182,15 @@ bool AIWorkerTeleoperation::initialize()
   follower_position_.setZero(follower_dof);
   follower_velocity_.setZero(follower_dof);
   leader_reference_.setZero(follower_dof);
-  leader_position_.setZero(leader_kinematics_->getDof());
+  leader_position_.setZero(
+    enable_leader_interface_ ? leader_kinematics_->getDof() : follower_dof);
 
   right_gripper_joint_ =
     node_->get_parameter(parameterName("right_gripper_joint")).as_string();
   left_gripper_joint_ =
     node_->get_parameter(parameterName("left_gripper_joint")).as_string();
+  follower_base_frame_ =
+    node_->get_parameter(parameterName("follower_base_frame")).as_string();
 
   mode_configuration_.follower_kinematics = follower_kinematics_;
   mode_configuration_.leader_kinematics = leader_kinematics_;
@@ -202,6 +222,14 @@ bool AIWorkerTeleoperation::initialize()
   left_publisher_ =
     node_->create_publisher<trajectory_msgs::msg::JointTrajectory>(
     node_->get_parameter(parameterName("left_command_topic")).as_string(), command_qos);
+  right_eef_pose_publisher_ =
+    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+    node_->get_parameter(parameterName("follower_right_eef_pose_topic")).as_string(),
+    rclcpp::SensorDataQoS().keep_last(1));
+  left_eef_pose_publisher_ =
+    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+    node_->get_parameter(parameterName("follower_left_eef_pose_topic")).as_string(),
+    rclcpp::SensorDataQoS().keep_last(1));
   return true;
 }
 
@@ -258,7 +286,37 @@ bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointSta
   follower_position_ = std::move(follower_position);
   follower_velocity_ = std::move(follower_velocity);
   follower_auxiliary_position_ = std::move(follower_auxiliary_position);
+  publishFollowerEefPoses(message.header);
   return true;
+}
+
+void AIWorkerTeleoperation::publishFollowerEefPoses(
+  const std_msgs::msg::Header & source_header)
+{
+  follower_kinematics_->updateState(follower_position_, follower_velocity_);
+  auto make_message = [this, &source_header](const Eigen::Affine3d & pose) {
+      geometry_msgs::msg::PoseStamped message;
+      message.header = source_header;
+      if (rclcpp::Time(message.header.stamp).nanoseconds() == 0) {
+        message.header.stamp = node_->now();
+      }
+      message.header.frame_id = follower_base_frame_;
+      message.pose.position.x = pose.translation().x();
+      message.pose.position.y = pose.translation().y();
+      message.pose.position.z = pose.translation().z();
+      const Eigen::Quaterniond orientation(pose.linear());
+      message.pose.orientation.x = orientation.x();
+      message.pose.orientation.y = orientation.y();
+      message.pose.orientation.z = orientation.z();
+      message.pose.orientation.w = orientation.w();
+      return message;
+    };
+  left_eef_pose_publisher_->publish(make_message(
+    follower_kinematics_->getPose(mode_configuration_.control_groups.at(
+      kLeftGroupId).follower_eef)));
+  right_eef_pose_publisher_->publish(make_message(
+    follower_kinematics_->getPose(
+      mode_configuration_.control_groups.at(kRightGroupId).follower_eef)));
 }
 
 bool AIWorkerTeleoperation::updateLeaderReference(

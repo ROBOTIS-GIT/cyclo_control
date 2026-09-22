@@ -174,18 +174,20 @@ void TeleoperationQP::setIneqConstraint()
     l_ineq_ds_(maximum_row) = -cbf_alpha_ * (limits.second[i] - q[i]);
   }
 
-  const auto distances = robot_->getCollisionPairDistances(true, false, false);
-  const int count = std::min<int>(index_.collision_size, distances.size());
-  for (int i = 0; i < count; ++i) {
-    A_ineq_ds_.block(
-      index_.con_collision_start + i, 0, 1, index_.qdot_size) =
-      distances[i].grad.transpose();
-    A_ineq_ds_(
-      index_.con_collision_start + i,
-      index_.slack_collision_start + i) = 1.0;
-    if (distances[i].distance <= collision_buffer_) {
-      l_ineq_ds_(index_.con_collision_start + i) =
-        -cbf_alpha_ * (distances[i].distance - collision_safe_distance_);
+  if (output_.self_collision_constraint_enabled) {
+    const auto distances = robot_->getCollisionPairDistances(true, false, false);
+    const int count = std::min<int>(index_.collision_size, distances.size());
+    for (int i = 0; i < count; ++i) {
+      A_ineq_ds_.block(
+        index_.con_collision_start + i, 0, 1, index_.qdot_size) =
+        distances[i].grad.transpose();
+      A_ineq_ds_(
+        index_.con_collision_start + i,
+        index_.slack_collision_start + i) = 1.0;
+      if (distances[i].distance <= collision_buffer_) {
+        l_ineq_ds_(index_.con_collision_start + i) =
+          -cbf_alpha_ * (distances[i].distance - collision_safe_distance_);
+      }
     }
   }
 }

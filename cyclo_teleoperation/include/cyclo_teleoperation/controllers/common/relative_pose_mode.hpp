@@ -20,6 +20,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "cyclo_teleoperation/core/controller_constraints.hpp"
 #include "cyclo_teleoperation/core/teleoperation_mode.hpp"
 
 namespace cyclo_teleoperation::controllers::common
@@ -50,6 +51,7 @@ private:
     const Eigen::Affine3d & goal) const;
 
   ModeConfiguration configuration_;
+  ControllerConstraints constraints_;
   std::unordered_map<ControlGroupId, Anchor> anchors_;
 
   double kp_position_ = 50.0;

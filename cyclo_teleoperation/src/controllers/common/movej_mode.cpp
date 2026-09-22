@@ -14,9 +14,6 @@
 
 #include "cyclo_teleoperation/controllers/common/movej_mode.hpp"
 
-#include <algorithm>
-#include <cmath>
-
 #include <pluginlib/class_list_macros.hpp>
 
 namespace cyclo_teleoperation::controllers::common
@@ -42,12 +39,7 @@ bool MoveJMode::configure(
     };
   kp_joint_ = parameter(prefix + ".kp_joint", 50.0);
   tracking_weight_ = parameter(prefix + ".tracking_weight", 10.0);
-  const auto slow_start_parameter = prefix + ".slow_start.enabled";
-  if (!node.has_parameter(slow_start_parameter)) {
-    slow_start_enabled_ = node.declare_parameter(slow_start_parameter, true);
-  } else {
-    slow_start_enabled_ = node.get_parameter(slow_start_parameter).as_bool();
-  }
+  constraints_ = ControllerConstraints::declareAndLoad(node, prefix + ".constraints");
   return kp_joint_ > 0.0 && tracking_weight_ > 0.0;
 }
 
@@ -61,21 +53,13 @@ bool MoveJMode::activate(const ModeContext & context)
 }
 
 void MoveJMode::beginSlowStart(
-  const ControlGroupConfiguration & group,
   ArmTrajectory & trajectory,
-  const uint64_t command_sequence,
-  const ModeContext & context)
+  const uint64_t command_sequence)
 {
   trajectory = ArmTrajectory{};
-  trajectory.start = context.follower_position;
-  trajectory.goal = context.leader_reference;
   trajectory.last_sequence = command_sequence;
   trajectory.waiting_for_command = true;
-  trajectory.slow_start_complete = !slow_start_enabled_;
-  for (const int index : group.follower_joint_indices) {
-    trajectory.start[index] = context.follower_position[index];
-    trajectory.goal[index] = context.leader_reference[index];
-  }
+  trajectory.timed_transition_complete = false;
 }
 
 void MoveJMode::onGroupsEnabled(
@@ -89,8 +73,8 @@ void MoveJMode::onGroupsEnabled(
       continue;
     }
     beginSlowStart(
-      group, trajectories_.at(group.id),
-      context.group_states[group.id].leader_sequence, context);
+      trajectories_.at(group.id),
+      context.group_states[group.id].leader_sequence);
   }
 }
 
@@ -114,47 +98,43 @@ void MoveJMode::updateArm(
   if (command_sequence != trajectory.last_sequence) {
     trajectory.last_sequence = command_sequence;
     trajectory.waiting_for_command = false;
-    if (!trajectory.slow_start_complete && command_duration > kTimedCommandEpsilon) {
-      trajectory.start = context.follower_position;
-      trajectory.goal = context.leader_reference;
-      trajectory.start_time = context.now_seconds;
-      trajectory.duration = command_duration;
-      trajectory.active = true;
+    if (!trajectory.timed_transition_complete && command_duration > kTimedCommandEpsilon) {
+      Eigen::VectorXd start(group.follower_joint_indices.size());
+      Eigen::VectorXd goal(group.follower_joint_indices.size());
+      for (size_t i = 0; i < group.follower_joint_indices.size(); ++i) {
+        const int index = group.follower_joint_indices[i];
+        start[i] = context.follower_position[index];
+        goal[i] = context.leader_reference[index];
+      }
+      if (!trajectory.interpolator.start(
+          start, goal, context.now_seconds, command_duration))
+      {
+        trajectory.timed_transition_complete = true;
+      }
     } else {
-      trajectory.active = false;
-      trajectory.slow_start_complete = true;
+      trajectory.interpolator.reset();
+      trajectory.timed_transition_complete = true;
     }
   }
 
-  double interpolation_ratio = 1.0;
-  Eigen::VectorXd feedforward = Eigen::VectorXd::Zero(context.follower_position.size());
-  if (trajectory.active) {
-    const double elapsed = context.now_seconds - trajectory.start_time;
-    interpolation_ratio = std::clamp(elapsed / trajectory.duration, 0.0, 1.0);
-    feedforward = (trajectory.goal - trajectory.start) / trajectory.duration;
-    if (interpolation_ratio >= 1.0) {
-      trajectory.active = false;
+  JointTrajectorySample sample = trajectory.interpolator.sample(context.now_seconds);
+  if (sample.complete) {
+    trajectory.interpolator.reset();
+  }
+  if (sample.position.size() == 0 || sample.complete) {
+    sample.position.resize(group.follower_joint_indices.size());
+    sample.velocity.setZero(group.follower_joint_indices.size());
+    for (size_t i = 0; i < group.follower_joint_indices.size(); ++i) {
+      sample.position[i] = context.leader_reference[group.follower_joint_indices[i]];
     }
   }
-
-  for (const int index : group.follower_joint_indices) {
-    const double reference = trajectory.active ?
-      trajectory.start[index] +
-      interpolation_ratio * (trajectory.goal[index] - trajectory.start[index]) :
-      context.leader_reference[index];
-    const double reference_velocity = trajectory.active ? feedforward[index] : 0.0;
-    output.desired_joint_velocity[index] = reference_velocity +
-      kp_joint_ * (reference - context.follower_position[index]);
-    output.joint_tracking_weight[index] = tracking_weight_;
-  }
+  applyJointTrajectoryTracking(
+    group, sample, context.follower_position, kp_joint_, tracking_weight_, output);
 }
 
 ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
   const ModeContext & context) const
 {
-  if (!slow_start_enabled_) {
-    return 0;
-  }
   constexpr double kTimedCommandEpsilon = 1e-6;
   ControlGroupMask groups = 0;
   for (const auto & group : configuration_.control_groups) {
@@ -171,7 +151,7 @@ ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
     const auto & state = context.group_states[group.id];
     if (
       state.leader_sequence != trajectory->second.last_sequence &&
-      !trajectory->second.slow_start_complete &&
+      !trajectory->second.timed_transition_complete &&
       state.leader_duration > kTimedCommandEpsilon)
     {
       groups |= controlGroupBit(group.id);
@@ -182,13 +162,7 @@ ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
 
 bool MoveJMode::update(const ModeContext & context, ModeOutput & output)
 {
-  // MoveJ directly tracks joint-space references, so joint position constraints are disabled for
-  // every configured control group, including groups currently owned by soft hold.
-  for (const auto & group : configuration_.control_groups) {
-    for (const int index : group.follower_joint_indices) {
-      output.joint_position_limit_enabled[index] = false;
-    }
-  }
+  constraints_.apply(configuration_, configuredControlGroups(configuration_), output);
 
   for (const auto & group : configuration_.control_groups) {
     if (!containsControlGroup(context.enabled_groups, group.id)) {

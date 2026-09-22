@@ -97,6 +97,7 @@ bool PoseSequenceManager::configure(
 
   kp_ = node.get_parameter("pose_sequence.kp_joint").as_double();
   tracking_weight_ = node.get_parameter("pose_sequence.tracking_weight").as_double();
+  constraints_ = ControllerConstraints::declareAndLoad(node, "pose_sequence.constraints");
   if (kp_ <= 0.0 || tracking_weight_ <= 0.0) {
     return false;
   }
@@ -106,26 +107,36 @@ bool PoseSequenceManager::configure(
       continue;
     }
     const auto mode = static_cast<uint16_t>(raw_mode);
-    auto load_mode_sequence = [&](const std::string & name, auto & sequences) {
+    auto load_mode_sequence = [
+      this, &node, mode](const std::string & name, auto & sequences, const bool load_when_disabled)
+      {
         const std::string prefix =
           "control_modes." + std::to_string(mode) + "." + name;
-        if (!node.get_parameter(prefix + ".enabled").as_bool()) {
-          return;
-        }
+        const bool enabled = node.get_parameter(prefix + ".enabled").as_bool();
         const auto step_names =
           node.get_parameter(prefix + ".step_names").as_string_array();
         if (step_names.empty()) {
-          throw std::runtime_error(prefix + ".enabled is true, but step_names is empty");
+          if (enabled) {
+            throw std::runtime_error(prefix + ".enabled is true, but step_names is empty");
+          }
+          return;
+        }
+        if (!enabled && !load_when_disabled) {
+          return;
         }
         auto sequence = loadSequence(node, prefix, step_names);
         if (sequence.empty()) {
           throw std::runtime_error(
-                  prefix + ".enabled is true, but no control group positions are configured");
+                  prefix + " defines step_names, but no control group positions are configured");
         }
         sequences[mode] = std::move(sequence);
       };
-    load_mode_sequence("initial_pose", initial_poses_);
-    load_mode_sequence("exit_pose", exit_poses_);
+    const std::string initial_pose_prefix =
+      "control_modes." + std::to_string(mode) + ".initial_pose";
+    automatic_initial_pose_enabled_[mode] =
+      node.get_parameter(initial_pose_prefix + ".enabled").as_bool();
+    load_mode_sequence("initial_pose", initial_poses_, true);
+    load_mode_sequence("exit_pose", exit_poses_, false);
   }
 
   for (const int64_t raw_preset : available_presets) {
@@ -182,6 +193,8 @@ void PoseSequenceManager::rebaseActiveSequences(const ModeContext & context)
     // its current step so multi-step progression is preserved.
     bool target_changed = false;
     const auto & step = runner.sequence->steps.at(runner.step_index);
+    runner.interpolator.start(
+      runner.start, step.target, runner.start_time, runner.sequence->duration);
     for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
       if (
         std::abs(step.target[i] - runner.start[i]) >
@@ -211,6 +224,12 @@ void PoseSequenceManager::rebaseActiveSequences(const ModeContext & context)
 bool PoseSequenceManager::hasInitialPose(const uint16_t mode) const
 {
   return initial_poses_.count(mode) != 0;
+}
+
+bool PoseSequenceManager::automaticInitialPoseEnabled(const uint16_t mode) const
+{
+  const auto enabled = automatic_initial_pose_enabled_.find(mode);
+  return enabled != automatic_initial_pose_enabled_.end() && enabled->second;
 }
 
 ControlGroupMask PoseSequenceManager::initialPoseGroups(const uint16_t mode) const
@@ -256,6 +275,12 @@ bool PoseSequenceManager::startRunner(
   }
   runner.step_index = final_step_only ? sequence.steps.size() - 1 : 0;
   runner.start_time = context.now_seconds;
+  if (!runner.interpolator.start(
+      runner.start, sequence.steps.at(runner.step_index).target,
+      runner.start_time, sequence.duration))
+  {
+    return false;
+  }
   runner.purpose = purpose;
   runner.active = true;
   runner.moving = true;
@@ -321,20 +346,20 @@ bool PoseSequenceManager::updateRunner(
   }
   const Step & step = runner.sequence->steps.at(runner.step_index);
   const double elapsed = context.now_seconds - runner.start_time;
-  const bool interpolating = runner.moving && elapsed < runner.sequence->duration;
+  JointTrajectorySample sample;
+  if (runner.moving) {
+    sample = runner.interpolator.sample(context.now_seconds);
+  }
+  if (sample.position.size() == 0 || !runner.moving) {
+    sample.position = step.target;
+    sample.velocity.setZero(step.target.size());
+  }
+  applyJointTrajectoryTracking(
+    group_config, sample, context.follower_position, kp_, tracking_weight_, output);
+  constraints_.apply(
+    configuration_, controlGroupBit(group_config.id), output);
   const double alpha = runner.moving ?
     std::clamp(elapsed / runner.sequence->duration, 0.0, 1.0) : 1.0;
-  for (size_t i = 0; i < group_config.follower_joint_indices.size(); ++i) {
-    const int index = group_config.follower_joint_indices[i];
-    const double displacement = step.target[i] - runner.start[i];
-    const double reference = runner.start[i] + alpha * displacement;
-    const double reference_velocity = interpolating ?
-      displacement / runner.sequence->duration : 0.0;
-    output.desired_joint_velocity[index] =
-      reference_velocity + kp_ * (reference - context.follower_position[index]);
-    output.joint_tracking_weight[index] = tracking_weight_;
-    output.joint_position_limit_enabled[index] = false;
-  }
   if (!group_config.auxiliary_joints.empty()) {
     Eigen::VectorXd auxiliary_target =
       Eigen::VectorXd::Constant(
@@ -392,6 +417,13 @@ bool PoseSequenceManager::updateRunner(
         runner.auxiliary_start = context.measured_auxiliary_position[group_config.id];
       }
       runner.start_time = context.now_seconds;
+      if (!runner.interpolator.start(
+          runner.start, runner.sequence->steps.at(runner.step_index).target,
+          runner.start_time, runner.sequence->duration))
+      {
+        error_message_ = "Failed to start pose sequence interpolation";
+        return false;
+      }
     } else {
       runner.moving = false;
       runner.state = 3;

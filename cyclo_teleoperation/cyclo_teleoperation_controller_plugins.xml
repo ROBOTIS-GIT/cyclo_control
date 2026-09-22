@@ -12,5 +12,11 @@
       base_class_type="cyclo_teleoperation::TeleoperationMode">
       <description>Robot-independent base-frame-relative pose teleoperation mode.</description>
     </class>
+    <class
+      name="cyclo_teleoperation/AbsolutePoseMode"
+      type="cyclo_teleoperation::controllers::common::AbsolutePoseMode"
+      base_class_type="cyclo_teleoperation::TeleoperationMode">
+      <description>Robot-independent absolute follower end-effector pose mode.</description>
+    </class>
   </library>
 </class_libraries>
