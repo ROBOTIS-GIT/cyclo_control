@@ -16,6 +16,8 @@
 
 #include <pluginlib/class_list_macros.hpp>
 
+#include "cyclo_teleoperation/core/joint_trajectory_interpolator.hpp"
+
 namespace cyclo_teleoperation::controllers::common
 {
 bool MoveJMode::configure(
@@ -52,16 +54,6 @@ bool MoveJMode::activate(const ModeContext & context)
   return true;
 }
 
-void MoveJMode::beginSlowStart(
-  ArmTrajectory & trajectory,
-  const uint64_t command_sequence)
-{
-  trajectory = ArmTrajectory{};
-  trajectory.last_sequence = command_sequence;
-  trajectory.waiting_for_command = true;
-  trajectory.timed_transition_complete = false;
-}
-
 void MoveJMode::onGroupsEnabled(
   const ControlGroupMask groups, const ModeContext & context)
 {
@@ -72,8 +64,7 @@ void MoveJMode::onGroupsEnabled(
     if (group.id >= context.group_states.size()) {
       continue;
     }
-    beginSlowStart(
-      trajectories_.at(group.id),
+    trajectories_.at(group.id).slow_start.restart(
       context.group_states[group.id].leader_sequence);
   }
 }
@@ -85,79 +76,23 @@ void MoveJMode::updateArm(
   const ModeContext & context,
   ModeOutput & output)
 {
-  constexpr double kTimedCommandEpsilon = 1e-6;
-  const double command_duration = state.leader_duration;
-  const uint64_t command_sequence = state.leader_sequence;
-  if (trajectory.waiting_for_command && command_sequence == trajectory.last_sequence) {
-    for (const int index : group.follower_joint_indices) {
-      output.desired_joint_velocity[index] = 0.0;
-      output.joint_tracking_weight[index] = tracking_weight_;
-    }
-    return;
+  Eigen::VectorXd start(group.follower_joint_indices.size());
+  Eigen::VectorXd reference(group.follower_joint_indices.size());
+  for (size_t i = 0; i < group.follower_joint_indices.size(); ++i) {
+    const int index = group.follower_joint_indices[i];
+    start[i] = context.follower_position[index];
+    reference[i] = context.leader_reference[index];
   }
-  if (command_sequence != trajectory.last_sequence) {
-    trajectory.last_sequence = command_sequence;
-    trajectory.waiting_for_command = false;
-    if (!trajectory.timed_transition_complete && command_duration > kTimedCommandEpsilon) {
-      Eigen::VectorXd start(group.follower_joint_indices.size());
-      Eigen::VectorXd goal(group.follower_joint_indices.size());
-      for (size_t i = 0; i < group.follower_joint_indices.size(); ++i) {
-        const int index = group.follower_joint_indices[i];
-        start[i] = context.follower_position[index];
-        goal[i] = context.leader_reference[index];
-      }
-      if (!trajectory.interpolator.start(
-          start, goal, context.now_seconds, command_duration))
-      {
-        trajectory.timed_transition_complete = true;
-      }
-    } else {
-      trajectory.interpolator.reset();
-      trajectory.timed_transition_complete = true;
-    }
-  }
-
-  JointTrajectorySample sample = trajectory.interpolator.sample(context.now_seconds);
-  if (sample.complete) {
-    trajectory.interpolator.reset();
-  }
-  if (sample.position.size() == 0 || sample.complete) {
-    sample.position.resize(group.follower_joint_indices.size());
-    sample.velocity.setZero(group.follower_joint_indices.size());
-    for (size_t i = 0; i < group.follower_joint_indices.size(); ++i) {
-      sample.position[i] = context.leader_reference[group.follower_joint_indices[i]];
-    }
-  }
+  const FixedDurationSlowStartSample slow_start_sample = trajectory.slow_start.update(
+    start, reference, state.leader_sequence, state.leader_duration,
+    context.now_seconds);
+  JointTrajectorySample sample;
+  sample.position = slow_start_sample.position;
+  sample.velocity = slow_start_sample.velocity;
+  sample.active = slow_start_sample.active;
+  sample.complete = slow_start_sample.complete;
   applyJointTrajectoryTracking(
     group, sample, context.follower_position, kp_joint_, tracking_weight_, output);
-}
-
-ControlGroupMask MoveJMode::timedCommandFeedbackSyncGroups(
-  const ModeContext & context) const
-{
-  constexpr double kTimedCommandEpsilon = 1e-6;
-  ControlGroupMask groups = 0;
-  for (const auto & group : configuration_.control_groups) {
-    if (
-      !containsControlGroup(context.enabled_groups, group.id) ||
-      group.id >= context.group_states.size())
-    {
-      continue;
-    }
-    const auto trajectory = trajectories_.find(group.id);
-    if (trajectory == trajectories_.end()) {
-      continue;
-    }
-    const auto & state = context.group_states[group.id];
-    if (
-      state.leader_sequence != trajectory->second.last_sequence &&
-      !trajectory->second.timed_transition_complete &&
-      state.leader_duration > kTimedCommandEpsilon)
-    {
-      groups |= controlGroupBit(group.id);
-    }
-  }
-  return groups;
 }
 
 bool MoveJMode::update(const ModeContext & context, ModeOutput & output)

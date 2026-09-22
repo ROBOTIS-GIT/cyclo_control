@@ -40,12 +40,6 @@ public:
 
   virtual bool update(const ModeContext & context, ModeOutput & output) = 0;
 
-  virtual ControlGroupMask timedCommandFeedbackSyncGroups(
-    const ModeContext & /*context*/) const
-  {
-    return 0;
-  }
-
   virtual ControlGroupMask controlledGroups(const ModeContext & context) const
   {
     return context.enabled_groups;

@@ -20,6 +20,7 @@ find_package(trajectory_msgs REQUIRED)
 
 add_library(cyclo_teleoperation_runtime SHARED
   src/core/controller_constraints.cpp
+  src/core/fixed_duration_slow_start.cpp
   src/core/joint_trajectory_interpolator.cpp
 )
 target_include_directories(cyclo_teleoperation_runtime PUBLIC

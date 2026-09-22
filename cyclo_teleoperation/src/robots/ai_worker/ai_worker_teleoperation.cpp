@@ -419,8 +419,7 @@ trajectory_msgs::msg::JointTrajectory AIWorkerTeleoperation::makeArmTrajectory(
     point.positions.push_back(command[index]);
   }
   point.positions.push_back(gripper_position);
-  point.time_from_start =
-    rclcpp::Duration::from_seconds(node_->get_parameter("trajectory_time").as_double());
+  point.time_from_start = rclcpp::Duration(0, 0);
   message.points.push_back(std::move(point));
   return message;
 }

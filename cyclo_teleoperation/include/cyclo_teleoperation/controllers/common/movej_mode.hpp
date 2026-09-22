@@ -20,7 +20,7 @@
 #include <unordered_map>
 
 #include "cyclo_teleoperation/core/controller_constraints.hpp"
-#include "cyclo_teleoperation/core/joint_trajectory_interpolator.hpp"
+#include "cyclo_teleoperation/core/fixed_duration_slow_start.hpp"
 #include "cyclo_teleoperation/core/teleoperation_mode.hpp"
 
 namespace cyclo_teleoperation::controllers::common
@@ -36,21 +36,13 @@ public:
   void onGroupsEnabled(
     ControlGroupMask groups, const ModeContext & context) override;
   bool update(const ModeContext & context, ModeOutput & output) override;
-  ControlGroupMask timedCommandFeedbackSyncGroups(
-    const ModeContext & context) const override;
 
 private:
   struct ArmTrajectory
   {
-    JointTrajectoryInterpolator interpolator;
-    uint64_t last_sequence = 0;
-    bool waiting_for_command = false;
-    bool timed_transition_complete = false;
+    FixedDurationSlowStart slow_start;
   };
 
-  void beginSlowStart(
-    ArmTrajectory & trajectory,
-    uint64_t command_sequence);
   void updateArm(
     const ControlGroupConfiguration & group,
     const ControlGroupState & state,

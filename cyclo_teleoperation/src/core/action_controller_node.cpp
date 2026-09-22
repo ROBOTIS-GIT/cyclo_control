@@ -112,7 +112,6 @@ private:
     declare_parameter("robot.plugin", "");
     declare_parameter("robot.parameter_prefix", "");
     declare_parameter("control_frequency", 100.0);
-    declare_parameter("trajectory_time", 0.0);
     declare_parameter("joint_state_timeout", 0.5);
     declare_parameter("action_timeout", 0.5);
     declare_parameter("action_reference_frame", "base_link");

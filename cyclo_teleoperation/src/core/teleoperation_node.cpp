@@ -243,7 +243,6 @@ private:
     declare_parameter("robot.plugin", "");
     declare_parameter("robot.parameter_prefix", "");
     declare_parameter("control_frequency", 100.0);
-    declare_parameter("trajectory_time", 0.0);
     declare_parameter("joint_state_timeout", 0.5);
     declare_parameter("leader_command_timeout", 0.5);
 
@@ -1137,11 +1136,6 @@ private:
       }
     }
 
-    const ControlGroupMask timed_command_sync_groups =
-      mode_->timedCommandFeedbackSyncGroups(makeContext(active_groups_));
-    if (timed_command_sync_groups != 0) {
-      syncGroupCommandToFeedback(timed_command_sync_groups);
-    }
     const ModeContext context = makeContext(active_groups_);
     const ControlGroupMask controlled_groups =
       mode_->controlledGroups(context) |
