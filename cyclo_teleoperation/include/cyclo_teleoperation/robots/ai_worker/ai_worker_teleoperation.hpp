@@ -82,6 +82,9 @@ public:
   bool updateLeaderReference(
     const trajectory_msgs::msg::JointTrajectory & message,
     ControlGroupId target_group) override;
+  bool updateGripperReference(
+    const trajectory_msgs::msg::JointTrajectory & message,
+    ControlGroupId target_group) override;
   void publish(
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) override;

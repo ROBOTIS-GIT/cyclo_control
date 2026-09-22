@@ -72,6 +72,9 @@ public:
   virtual bool updateLeaderReference(
     const trajectory_msgs::msg::JointTrajectory & message,
     ControlGroupId target_group) = 0;
+  virtual bool updateGripperReference(
+    const trajectory_msgs::msg::JointTrajectory & message,
+    ControlGroupId target_group) = 0;
   virtual void publish(
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) = 0;

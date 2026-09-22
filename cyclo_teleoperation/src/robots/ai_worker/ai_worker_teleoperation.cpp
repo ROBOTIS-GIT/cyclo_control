@@ -402,6 +402,44 @@ bool AIWorkerTeleoperation::updateLeaderReference(
   return true;
 }
 
+bool AIWorkerTeleoperation::updateGripperReference(
+  const trajectory_msgs::msg::JointTrajectory & message,
+  const ControlGroupId target_group)
+{
+  if (
+    (target_group != kLeftGroupId && target_group != kRightGroupId) ||
+    message.joint_names.size() != 1 || message.points.empty())
+  {
+    return false;
+  }
+
+  const auto & point = message.points.front();
+  if (point.positions.size() != 1) {
+    return false;
+  }
+  const double duration = rclcpp::Duration(point.time_from_start).seconds();
+  const std::string & expected_gripper =
+    target_group == kLeftGroupId ? left_gripper_joint_ : right_gripper_joint_;
+  if (
+    message.joint_names.front() != expected_gripper ||
+    !std::isfinite(point.positions.front()) ||
+    !std::isfinite(duration) || duration < 0.0)
+  {
+    return false;
+  }
+  if (
+    target_group >= leader_auxiliary_reference_.size() ||
+    leader_auxiliary_reference_[target_group].size() != 1)
+  {
+    return false;
+  }
+
+  GroupAuxiliaryPositions gripper_reference = leader_auxiliary_reference_;
+  gripper_reference[target_group][0] = point.positions.front();
+  leader_auxiliary_reference_ = std::move(gripper_reference);
+  return true;
+}
+
 trajectory_msgs::msg::JointTrajectory AIWorkerTeleoperation::makeArmTrajectory(
   const std::vector<int> & indices,
   const std::vector<std::string> & names,

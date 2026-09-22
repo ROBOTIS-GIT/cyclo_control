@@ -73,11 +73,11 @@ public:
     cartesian_references_.assign(group_count, CartesianReference{});
     joint_action_received_.assign(group_count, false);
     pose_action_received_.assign(group_count, false);
-    auxiliary_received_.assign(group_count, false);
+    gripper_received_.assign(group_count, false);
     last_joint_action_times_.assign(group_count, rclcpp::Time(0, 0, RCL_ROS_TIME));
     last_pose_action_times_.assign(group_count, rclcpp::Time(0, 0, RCL_ROS_TIME));
-    auxiliary_command_ = robot_->followerAuxiliaryPosition();
-    auxiliary_hold_target_ = auxiliary_command_;
+    gripper_command_ = robot_->followerAuxiliaryPosition();
+    gripper_hold_target_ = gripper_command_;
 
     qp_ = std::make_unique<TeleoperationQP>(robot_->followerKinematics());
     qp_->setControllerParameters(
@@ -196,17 +196,27 @@ private:
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     auto joint_callback = [this](const ControlGroupId group_id) {
         return [this, group_id](const trajectory_msgs::msg::JointTrajectory::SharedPtr message) {
-                 if (!robot_->updateLeaderReference(*message, group_id)) {
-                   RCLCPP_WARN_THROTTLE(
-                     get_logger(), *get_clock(), 2000,
-                     "Invalid raw joint action rejected for group %u",
-                     static_cast<unsigned int>(group_id));
-                   return;
-                 }
-                 auxiliary_received_.at(group_id) = true;
-                 if (activeReferenceType() == kJointReference) {
+                 const std::string reference_type = activeReferenceType();
+                 if (reference_type == kJointReference) {
+                   if (!robot_->updateLeaderReference(*message, group_id)) {
+                     RCLCPP_WARN_THROTTLE(
+                       get_logger(), *get_clock(), 2000,
+                       "Invalid raw joint action rejected for group %u",
+                       static_cast<unsigned int>(group_id));
+                     return;
+                   }
+                   gripper_received_.at(group_id) = true;
                    joint_action_received_.at(group_id) = true;
                    last_joint_action_times_.at(group_id) = now();
+                 } else if (reference_type == kPoseReference) {
+                   if (!robot_->updateGripperReference(*message, group_id)) {
+                     RCLCPP_WARN_THROTTLE(
+                       get_logger(), *get_clock(), 2000,
+                       "Invalid gripper action rejected for group %u",
+                       static_cast<unsigned int>(group_id));
+                     return;
+                   }
+                   gripper_received_.at(group_id) = true;
                  }
                };
       };
@@ -329,8 +339,8 @@ private:
     command_position_ = robot_->followerPosition();
     command_velocity_ = Eigen::VectorXd::Zero(robot_->dof());
     hold_target_ = command_position_;
-    auxiliary_command_ = robot_->followerAuxiliaryPosition();
-    auxiliary_hold_target_ = auxiliary_command_;
+    gripper_command_ = robot_->followerAuxiliaryPosition();
+    gripper_hold_target_ = gripper_command_;
     command_initialized_ = true;
     active_groups_ = 0;
   }
@@ -339,7 +349,7 @@ private:
   {
     std::fill(joint_action_received_.begin(), joint_action_received_.end(), false);
     std::fill(pose_action_received_.begin(), pose_action_received_.end(), false);
-    std::fill(auxiliary_received_.begin(), auxiliary_received_.end(), false);
+    std::fill(gripper_received_.begin(), gripper_received_.end(), false);
     for (auto & reference : cartesian_references_) {
       reference.valid = false;
     }
@@ -356,8 +366,8 @@ private:
         command_velocity_[index] = 0.0;
         hold_target_[index] = robot_->followerPosition()[index];
       }
-      auxiliary_command_[group.id] = robot_->followerAuxiliaryPosition()[group.id];
-      auxiliary_hold_target_[group.id] = auxiliary_command_[group.id];
+      gripper_command_[group.id] = robot_->followerAuxiliaryPosition()[group.id];
+      gripper_hold_target_[group.id] = gripper_command_[group.id];
     }
   }
 
@@ -400,15 +410,15 @@ private:
     }
   }
 
-  void updateAuxiliaryCommand()
+  void updateGripperCommand()
   {
     const auto & reference = robot_->leaderAuxiliaryReference();
     for (const auto & group : robot_->modeConfiguration().control_groups) {
-      if (group.id < auxiliary_received_.size() && auxiliary_received_[group.id]) {
-        auxiliary_command_[group.id] = reference[group.id];
-        auxiliary_hold_target_[group.id] = reference[group.id];
+      if (group.id < gripper_received_.size() && gripper_received_[group.id]) {
+        gripper_command_[group.id] = reference[group.id];
+        gripper_hold_target_[group.id] = reference[group.id];
       } else {
-        auxiliary_command_[group.id] = auxiliary_hold_target_[group.id];
+        gripper_command_[group.id] = gripper_hold_target_[group.id];
       }
     }
   }
@@ -433,11 +443,11 @@ private:
     }
 
     updateActiveGroups(freshActionGroups());
-    updateAuxiliaryCommand();
+    updateGripperCommand();
     if (active_groups_ == 0) {
       command_position_ = hold_target_;
       command_velocity_.setZero();
-      robot_->publish(command_position_, auxiliary_command_);
+      robot_->publish(command_position_, gripper_command_);
       return;
     }
 
@@ -449,7 +459,7 @@ private:
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 1000,
         "Action controller mode rejected the current reference; holding last command");
-      robot_->publish(command_position_, auxiliary_command_);
+      robot_->publish(command_position_, gripper_command_);
       return;
     }
     const ControlGroupMask controlled_groups = mode_->controlledGroups(context);
@@ -468,7 +478,7 @@ private:
     Eigen::VectorXd optimal_velocity;
     if (!qp_->solve(optimal_velocity)) {
       command_velocity_.setZero();
-      robot_->publish(command_position_, auxiliary_command_);
+      robot_->publish(command_position_, gripper_command_);
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 1000,
         "Action controller QP failed; holding the last command and retrying");
@@ -476,7 +486,7 @@ private:
     }
     command_position_ += context.dt * optimal_velocity;
     command_velocity_ = optimal_velocity;
-    robot_->publish(command_position_, auxiliary_command_);
+    robot_->publish(command_position_, gripper_command_);
   }
 
   void setModeCallback(
@@ -517,12 +527,12 @@ private:
   Eigen::VectorXd command_position_;
   Eigen::VectorXd command_velocity_;
   Eigen::VectorXd hold_target_;
-  GroupAuxiliaryPositions auxiliary_command_;
-  GroupAuxiliaryPositions auxiliary_hold_target_;
+  GroupAuxiliaryPositions gripper_command_;
+  GroupAuxiliaryPositions gripper_hold_target_;
   GroupCartesianReferences cartesian_references_;
   std::vector<bool> joint_action_received_;
   std::vector<bool> pose_action_received_;
-  std::vector<bool> auxiliary_received_;
+  std::vector<bool> gripper_received_;
   std::vector<rclcpp::Time> last_joint_action_times_;
   std::vector<rclcpp::Time> last_pose_action_times_;
   rclcpp::Time last_follower_time_{0, 0, RCL_ROS_TIME};
