@@ -29,6 +29,7 @@
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "cyclo_teleoperation/core/robot_teleoperation.hpp"
@@ -84,6 +85,18 @@ public:
     follower_subscription_ = create_subscription<sensor_msgs::msg::JointState>(
       robot_teleoperation_->followerJointStatesTopic(), follower_qos,
       std::bind(&TeleoperationNode::followerCallback, this, std::placeholders::_1));
+    const auto source_state_topic =
+      get_parameter("command_source_state_topic").as_string();
+    leader_action_enabled_ = source_state_topic.empty();
+    if (!source_state_topic.empty()) {
+      const auto source_state_qos =
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+      source_state_subscription_ = create_subscription<std_msgs::msg::Bool>(
+        source_state_topic, source_state_qos,
+        [this](const std_msgs::msg::Bool::SharedPtr message) {
+          setLeaderActionEnabled(message->data);
+        });
+    }
     size_t group_state_count = 0;
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
       group_state_count = std::max(group_state_count, static_cast<size_t>(group.id) + 1);
@@ -245,6 +258,7 @@ private:
     declare_parameter("control_frequency", 100.0);
     declare_parameter("joint_state_timeout", 0.5);
     declare_parameter("leader_command_timeout", 0.5);
+    declare_parameter("command_source_state_topic", "");
 
     declare_parameter("hold.kp", 20.0);
     declare_parameter("hold.max_correction_velocity", 0.2);
@@ -427,12 +441,56 @@ private:
     }
     last_follower_time_ = now();
     follower_received_ = true;
+    if (!leader_action_enabled_) {
+      hold_target_ = robot_teleoperation_->followerPosition();
+      syncCommandToFeedback();
+      hold_initialized_ = true;
+      return;
+    }
     if (!hold_initialized_) {
       hold_target_ = robot_teleoperation_->followerPosition();
       syncCommandToFeedback();
       hold_initialized_ = true;
       transition_pending_ = true;
     }
+  }
+
+  void setLeaderActionEnabled(const bool enabled)
+  {
+    if (enabled == leader_action_enabled_) {
+      return;
+    }
+
+    leader_action_enabled_ = enabled;
+    requested_groups_ = 0;
+    active_groups_ = 0;
+    previous_controlled_groups_ = 0;
+    groups_pending_ = false;
+    preset_update_pending_groups_ = 0;
+    preset_cancel_pending_groups_ = 0;
+    final_initial_pose_update_pending_groups_ = 0;
+    final_initial_pose_cancel_pending_groups_ = 0;
+    paused_preset_groups_ = 0;
+    if (pose_sequences_) {
+      pose_sequences_->cancelPresets(allGroups());
+      pose_sequences_->cancelFinalInitialPoses(allGroups());
+      pose_sequences_->cancelInitialPose();
+      pose_sequences_->cancelExitPose();
+    }
+    mode_transition_phase_ = ModeTransitionPhase::kIdle;
+    mode_transition_started_ = false;
+    if (follower_received_) {
+      hold_target_ = robot_teleoperation_->followerPosition();
+      syncCommandToFeedback();
+      hold_initialized_ = true;
+    }
+    transition_pending_ = enabled &&
+      (!mode_ready_ || active_control_mode_ != requested_control_mode_);
+    publishStatus(
+      ControlStatus::kHolding,
+      enabled ?
+      "Leader action output enabled; all control groups remain stopped" :
+      "Leader action output disabled; model control may take ownership");
   }
 
   void commandCallback(const ControlRequest & request)
@@ -447,6 +505,16 @@ private:
     }
     const ControlGroupMask preset_target = request.preset_target_groups;
     const ControlGroupMask initial_pose_target = request.initial_pose_target_groups;
+    if (
+      !leader_action_enabled_ &&
+      (request.enabled_groups != 0 || preset_target != 0 || initial_pose_target != 0))
+    {
+      transition_id_ = request.transition_id;
+      publishStatus(
+        ControlStatus::kHolding,
+        "Leader control request ignored while model control owns the follower command");
+      return;
+    }
     if (
       ((request.enabled_groups | preset_target | initial_pose_target) & ~allGroups()) != 0)
     {
@@ -616,6 +684,9 @@ private:
 
   void publishCommand(const Eigen::VectorXd & command, const ModeOutput * output = nullptr)
   {
+    if (!leader_action_enabled_) {
+      return;
+    }
     const auto & leader_auxiliary = robot_teleoperation_->leaderAuxiliaryReference();
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
       if (containsControlGroup(active_groups_, group.id)) {
@@ -642,6 +713,9 @@ private:
       }
     }
     robot_teleoperation_->publish(command, auxiliary_command_);
+    static const std::vector<EefPoseReference> empty_references;
+    robot_teleoperation_->publishEefPoseReferences(
+      command, output == nullptr ? empty_references : output->eef_pose_references);
   }
 
   void captureAuxiliaryCommandAsHold(const ControlGroupMask groups)
@@ -980,7 +1054,7 @@ private:
       Eigen::VectorXd optimal_velocity;
       if (!qp_->solve(optimal_velocity)) {
         command_velocity_.setZero();
-        publishCommand(command_position_);
+        publishCommand(command_position_, &output);
         RCLCPP_WARN_THROTTLE(
           get_logger(), *get_clock(), 1000,
           "%s pose QP failed; holding the last command and retrying",
@@ -1042,6 +1116,9 @@ private:
       hold_target_ = robot_teleoperation_->followerPosition();
       syncCommandToFeedback();
       pose_sequences_->rebaseActiveSequences(makeContext(0));
+    }
+    if (!leader_action_enabled_) {
+      return;
     }
 
     if (transition_pending_ && hold_initialized_) {
@@ -1179,7 +1256,6 @@ private:
         robot_teleoperation_->modeConfiguration().control_groups,
         controlled_groups, hold_kp, max_hold_velocity, hold_weight);
 
-      robot_teleoperation_->publishEefPoseReferences(output.eef_pose_references);
       qp_->setModeOutput(output);
       qp_->setControllerParameters(
         get_parameter("constraints.slack_penalty").as_double(),
@@ -1189,7 +1265,7 @@ private:
       Eigen::VectorXd optimal_velocity;
       if (!qp_->solve(optimal_velocity)) {
         command_velocity_.setZero();
-        publishCommand(command_position_);
+        publishCommand(command_position_, &output);
         RCLCPP_WARN_THROTTLE(
           get_logger(), *get_clock(), 1000,
           "Teleoperation QP failed; holding the last command and retrying");
@@ -1302,6 +1378,7 @@ private:
   std::vector<bool> leader_received_;
   bool feedback_error_reported_ = false;
   bool command_initialized_ = false;
+  bool leader_action_enabled_ = true;
   std::vector<uint8_t> last_preset_states_;
   std::vector<uint8_t> last_initial_pose_states_;
   Eigen::VectorXd hold_target_;
@@ -1313,6 +1390,7 @@ private:
   std::vector<rclcpp::Time> last_leader_times_;
 
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr follower_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr source_state_subscription_;
   std::vector<rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr>
   leader_subscriptions_;
   rclcpp::TimerBase::SharedPtr timer_;

@@ -19,6 +19,7 @@
   <depend>rclcpp</depend>
   <depend>robotis_interfaces</depend>
   <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>trajectory_msgs</depend>
 
   <export>

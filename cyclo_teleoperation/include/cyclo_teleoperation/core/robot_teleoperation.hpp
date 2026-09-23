@@ -79,6 +79,7 @@ public:
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) = 0;
   virtual void publishEefPoseReferences(
+    const Eigen::VectorXd &,
     const std::vector<EefPoseReference> &) {}
   virtual void publishStatus(const ControlStatus & status) = 0;
 };

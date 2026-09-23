@@ -89,6 +89,7 @@ public:
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) override;
   void publishEefPoseReferences(
+    const Eigen::VectorXd & command,
     const std::vector<EefPoseReference> & references) override;
   void publishStatus(const ControlStatus & status) override;
 
@@ -125,6 +126,8 @@ private:
   std::string follower_joint_states_topic_;
   std::vector<LeaderInputChannel> leader_input_channels_;
   bool enable_leader_interface_ = true;
+  bool publish_follower_eef_state_ = true;
+  bool publish_eef_pose_references_ = true;
 
   std::string right_gripper_joint_;
   std::string left_gripper_joint_;

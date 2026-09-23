@@ -33,6 +33,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <robotis_interfaces/srv/set_control_mode.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 #include "cyclo_teleoperation/core/robot_teleoperation.hpp"
@@ -90,6 +91,17 @@ public:
     follower_subscription_ = create_subscription<sensor_msgs::msg::JointState>(
       robot_->followerJointStatesTopic(), follower_qos,
       std::bind(&ActionControllerNode::followerCallback, this, std::placeholders::_1));
+    const auto source_state_topic =
+      get_parameter("command_source_state_topic").as_string();
+    if (!source_state_topic.empty()) {
+      const auto source_state_qos =
+        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+      source_state_subscription_ = create_subscription<std_msgs::msg::Bool>(
+        source_state_topic, source_state_qos,
+        [this](const std_msgs::msg::Bool::SharedPtr message) {
+          setModelOutputEnabled(!message->data);
+        });
+    }
     createActionSubscriptions();
     set_mode_service_ = create_service<robotis_interfaces::srv::SetControlMode>(
       "~/set_control_mode",
@@ -115,6 +127,7 @@ private:
     declare_parameter("joint_state_timeout", 0.5);
     declare_parameter("action_timeout", 0.5);
     declare_parameter("action_reference_frame", "base_link");
+    declare_parameter("command_source_state_topic", "");
     declare_parameter("left_joint_action_topic", "~/left/raw_joint_trajectory");
     declare_parameter("right_joint_action_topic", "~/right/raw_joint_trajectory");
     declare_parameter("left_eef_action_topic", "~/left/eef_pose");
@@ -196,6 +209,9 @@ private:
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable();
     auto joint_callback = [this](const ControlGroupId group_id) {
         return [this, group_id](const trajectory_msgs::msg::JointTrajectory::SharedPtr message) {
+                 if (!model_output_enabled_) {
+                   return;
+                 }
                  const std::string reference_type = activeReferenceType();
                  if (reference_type == kJointReference) {
                    if (!robot_->updateLeaderReference(*message, group_id)) {
@@ -222,6 +238,9 @@ private:
       };
     auto pose_callback = [this](const ControlGroupId group_id) {
         return [this, group_id](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
+                 if (!model_output_enabled_) {
+                   return;
+                 }
                  if (!updatePoseReference(*message, group_id)) {
                    RCLCPP_WARN_THROTTLE(
                      get_logger(), *get_clock(), 2000,
@@ -293,11 +312,35 @@ private:
     }
     last_follower_time_ = now();
     follower_received_ = true;
+    if (!model_output_enabled_) {
+      syncAllToFeedback();
+      clearActionFreshness();
+      follower_timeout_active_ = false;
+      return;
+    }
     if (!command_initialized_ || follower_timeout_active_) {
       syncAllToFeedback();
       clearActionFreshness();
       follower_timeout_active_ = false;
     }
+  }
+
+  void setModelOutputEnabled(const bool enabled)
+  {
+    if (enabled == model_output_enabled_) {
+      return;
+    }
+    model_output_enabled_ = enabled;
+    if (follower_received_) {
+      syncAllToFeedback();
+    } else {
+      command_initialized_ = false;
+      active_groups_ = 0;
+    }
+    clearActionFreshness();
+    RCLCPP_INFO(
+      get_logger(), "Model action output %s; cached actions were cleared",
+      enabled ? "enabled" : "disabled");
   }
 
   bool feedbackFresh() const
@@ -438,6 +481,9 @@ private:
       syncAllToFeedback();
       clearActionFreshness();
     }
+    if (!model_output_enabled_) {
+      return;
+    }
     if (!mode_ && !loadRequestedMode()) {
       return;
     }
@@ -524,6 +570,7 @@ private:
   bool follower_received_ = false;
   bool follower_timeout_active_ = false;
   bool command_initialized_ = false;
+  bool model_output_enabled_ = true;
   Eigen::VectorXd command_position_;
   Eigen::VectorXd command_velocity_;
   Eigen::VectorXd hold_target_;
@@ -537,6 +584,7 @@ private:
   std::vector<rclcpp::Time> last_pose_action_times_;
   rclcpp::Time last_follower_time_{0, 0, RCL_ROS_TIME};
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr follower_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr source_state_subscription_;
   std::vector<rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr>
   joint_action_subscriptions_;
   std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr>

@@ -16,6 +16,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(robotis_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 
 add_library(cyclo_teleoperation_runtime SHARED
@@ -92,7 +93,7 @@ target_link_libraries(cyclo_teleoperation_node
   Eigen3::Eigen
 )
 ament_target_dependencies(cyclo_teleoperation_node
-  pluginlib rclcpp sensor_msgs trajectory_msgs)
+  pluginlib rclcpp sensor_msgs std_msgs trajectory_msgs)
 
 add_executable(cyclo_action_controller_node
   src/core/action_controller_node.cpp
@@ -108,7 +109,17 @@ target_link_libraries(cyclo_action_controller_node
   Eigen3::Eigen
 )
 ament_target_dependencies(cyclo_action_controller_node
-  geometry_msgs pluginlib rclcpp robotis_interfaces sensor_msgs trajectory_msgs)
+  geometry_msgs pluginlib rclcpp robotis_interfaces sensor_msgs std_msgs trajectory_msgs)
+
+add_executable(joint_trajectory_source_mux
+  src/core/joint_trajectory_source_mux.cpp
+  src/joint_trajectory_source_mux_main.cpp
+)
+target_include_directories(joint_trajectory_source_mux PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+ament_target_dependencies(joint_trajectory_source_mux
+  rclcpp std_msgs trajectory_msgs)
 
 pluginlib_export_plugin_description_file(
   cyclo_teleoperation cyclo_teleoperation_controller_plugins.xml)
@@ -122,6 +133,7 @@ install(TARGETS
   cyclo_teleoperation_ai_worker_robot_plugin
   cyclo_teleoperation_node
   cyclo_action_controller_node
+  joint_trajectory_source_mux
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -133,6 +145,6 @@ install(FILES
   DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)
-ament_export_dependencies(cyclo_motion_controller_core Eigen3 pluginlib rclcpp)
+ament_export_dependencies(cyclo_motion_controller_core Eigen3 pluginlib rclcpp std_msgs)
 
 ament_package()

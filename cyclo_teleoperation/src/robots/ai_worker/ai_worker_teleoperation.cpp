@@ -81,8 +81,22 @@ bool AIWorkerTeleoperation::configure(
   if (!node_->has_parameter(enable_leader_interface_parameter)) {
     node_->declare_parameter(enable_leader_interface_parameter, true);
   }
+  const auto publish_follower_eef_state_parameter =
+    parameterName("publish_follower_eef_state");
+  if (!node_->has_parameter(publish_follower_eef_state_parameter)) {
+    node_->declare_parameter(publish_follower_eef_state_parameter, true);
+  }
+  const auto publish_eef_pose_references_parameter =
+    parameterName("publish_eef_pose_references");
+  if (!node_->has_parameter(publish_eef_pose_references_parameter)) {
+    node_->declare_parameter(publish_eef_pose_references_parameter, true);
+  }
   enable_leader_interface_ =
     node_->get_parameter(enable_leader_interface_parameter).as_bool();
+  publish_follower_eef_state_ =
+    node_->get_parameter(publish_follower_eef_state_parameter).as_bool();
+  publish_eef_pose_references_ =
+    node_->get_parameter(publish_eef_pose_references_parameter).as_bool();
 
   follower_joint_states_topic_ =
     node_->get_parameter(parameterName("follower_joint_states_topic")).as_string();
@@ -226,22 +240,26 @@ bool AIWorkerTeleoperation::initialize()
   left_publisher_ =
     node_->create_publisher<trajectory_msgs::msg::JointTrajectory>(
     node_->get_parameter(parameterName("left_command_topic")).as_string(), command_qos);
-  right_eef_pose_publisher_ =
-    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
-    node_->get_parameter(parameterName("follower_right_eef_pose_topic")).as_string(),
-    rclcpp::SensorDataQoS().keep_last(1));
-  left_eef_pose_publisher_ =
-    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
-    node_->get_parameter(parameterName("follower_left_eef_pose_topic")).as_string(),
-    rclcpp::SensorDataQoS().keep_last(1));
-  right_eef_reference_publisher_ =
-    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
-    node_->get_parameter(parameterName("follower_right_eef_reference_topic")).as_string(),
-    rclcpp::SensorDataQoS().keep_last(1));
-  left_eef_reference_publisher_ =
-    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
-    node_->get_parameter(parameterName("follower_left_eef_reference_topic")).as_string(),
-    rclcpp::SensorDataQoS().keep_last(1));
+  if (publish_follower_eef_state_) {
+    right_eef_pose_publisher_ =
+      node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+      node_->get_parameter(parameterName("follower_right_eef_pose_topic")).as_string(),
+      rclcpp::SensorDataQoS().keep_last(1));
+    left_eef_pose_publisher_ =
+      node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+      node_->get_parameter(parameterName("follower_left_eef_pose_topic")).as_string(),
+      rclcpp::SensorDataQoS().keep_last(1));
+  }
+  if (publish_eef_pose_references_) {
+    right_eef_reference_publisher_ =
+      node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+      node_->get_parameter(parameterName("follower_right_eef_reference_topic")).as_string(),
+      rclcpp::SensorDataQoS().keep_last(1));
+    left_eef_reference_publisher_ =
+      node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+      node_->get_parameter(parameterName("follower_left_eef_reference_topic")).as_string(),
+      rclcpp::SensorDataQoS().keep_last(1));
+  }
   return true;
 }
 
@@ -298,7 +316,9 @@ bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointSta
   follower_position_ = std::move(follower_position);
   follower_velocity_ = std::move(follower_velocity);
   follower_auxiliary_position_ = std::move(follower_auxiliary_position);
-  publishFollowerEefPoses(message.header);
+  if (publish_follower_eef_state_) {
+    publishFollowerEefPoses(message.header);
+  }
   return true;
 }
 
@@ -487,28 +507,48 @@ void AIWorkerTeleoperation::publish(
 }
 
 void AIWorkerTeleoperation::publishEefPoseReferences(
+  const Eigen::VectorXd & command,
   const std::vector<EefPoseReference> & references)
 {
+  if (!publish_eef_pose_references_ || command.size() != follower_position_.size()) {
+    return;
+  }
+
+  std::unordered_map<ControlGroupId, Eigen::Affine3d> explicit_references;
   for (const auto & reference : references) {
+    if (reference.pose.matrix().allFinite()) {
+      explicit_references[reference.group_id] = reference.pose;
+    }
+  }
+
+  follower_kinematics_->updateState(
+    command, Eigen::VectorXd::Zero(command.size()));
+  for (const auto & group : mode_configuration_.control_groups) {
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher;
-    if (reference.group_id == kLeftGroupId) {
+    if (group.id == kLeftGroupId) {
       publisher = left_eef_reference_publisher_;
-    } else if (reference.group_id == kRightGroupId) {
+    } else if (group.id == kRightGroupId) {
       publisher = right_eef_reference_publisher_;
     } else {
       continue;
     }
-    if (!reference.pose.matrix().allFinite()) {
+    if (!publisher) {
+      continue;
+    }
+    const auto reference = explicit_references.find(group.id);
+    const Eigen::Affine3d pose = reference == explicit_references.end() ?
+      follower_kinematics_->getPose(group.follower_eef) : reference->second;
+    if (!pose.matrix().allFinite()) {
       continue;
     }
 
     geometry_msgs::msg::PoseStamped message;
     message.header.stamp = node_->now();
     message.header.frame_id = follower_base_frame_;
-    message.pose.position.x = reference.pose.translation().x();
-    message.pose.position.y = reference.pose.translation().y();
-    message.pose.position.z = reference.pose.translation().z();
-    const Eigen::Quaterniond orientation(reference.pose.linear());
+    message.pose.position.x = pose.translation().x();
+    message.pose.position.y = pose.translation().y();
+    message.pose.position.z = pose.translation().z();
+    const Eigen::Quaterniond orientation(pose.linear());
     message.pose.orientation.x = orientation.x();
     message.pose.orientation.y = orientation.y();
     message.pose.orientation.z = orientation.z();
