@@ -115,6 +115,7 @@ bool RelativePoseMode::update(const ModeContext & context, ModeOutput & output)
       const Eigen::Matrix3d base_frame_rotation_delta =
         leader_current.linear() * anchor.leader.linear().transpose();
       goal.linear() = base_frame_rotation_delta * anchor.follower.linear();
+      output.eef_pose_references.push_back(EefPoseReference{group.id, goal});
       TaskObjective task;
       task.link_name = group.follower_eef;
       task.desired_velocity = desiredVelocity(current, goal);

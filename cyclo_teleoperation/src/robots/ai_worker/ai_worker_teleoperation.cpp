@@ -71,6 +71,10 @@ bool AIWorkerTeleoperation::configure(
   declare_string("follower_base_frame", "base_link");
   declare_string("follower_right_eef_pose_topic", "~/follower/right/eef_pose");
   declare_string("follower_left_eef_pose_topic", "~/follower/left/eef_pose");
+  declare_string(
+    "follower_right_eef_reference_topic", "~/follower/right/reference_eef_pose");
+  declare_string(
+    "follower_left_eef_reference_topic", "~/follower/left/reference_eef_pose");
   declare_string("leader_right_eef", "arm_r_link7");
   declare_string("leader_left_eef", "arm_l_link7");
   const auto enable_leader_interface_parameter = parameterName("enable_leader_interface");
@@ -229,6 +233,14 @@ bool AIWorkerTeleoperation::initialize()
   left_eef_pose_publisher_ =
     node_->create_publisher<geometry_msgs::msg::PoseStamped>(
     node_->get_parameter(parameterName("follower_left_eef_pose_topic")).as_string(),
+    rclcpp::SensorDataQoS().keep_last(1));
+  right_eef_reference_publisher_ =
+    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+    node_->get_parameter(parameterName("follower_right_eef_reference_topic")).as_string(),
+    rclcpp::SensorDataQoS().keep_last(1));
+  left_eef_reference_publisher_ =
+    node_->create_publisher<geometry_msgs::msg::PoseStamped>(
+    node_->get_parameter(parameterName("follower_left_eef_reference_topic")).as_string(),
     rclcpp::SensorDataQoS().keep_last(1));
   return true;
 }
@@ -472,6 +484,37 @@ void AIWorkerTeleoperation::publish(
   right_publisher_->publish(makeArmTrajectory(
     right_arm_indices_, right_arm_names_, command,
     right_gripper_joint_, auxiliary_command.at(kRightGroupId)[0]));
+}
+
+void AIWorkerTeleoperation::publishEefPoseReferences(
+  const std::vector<EefPoseReference> & references)
+{
+  for (const auto & reference : references) {
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher;
+    if (reference.group_id == kLeftGroupId) {
+      publisher = left_eef_reference_publisher_;
+    } else if (reference.group_id == kRightGroupId) {
+      publisher = right_eef_reference_publisher_;
+    } else {
+      continue;
+    }
+    if (!reference.pose.matrix().allFinite()) {
+      continue;
+    }
+
+    geometry_msgs::msg::PoseStamped message;
+    message.header.stamp = node_->now();
+    message.header.frame_id = follower_base_frame_;
+    message.pose.position.x = reference.pose.translation().x();
+    message.pose.position.y = reference.pose.translation().y();
+    message.pose.position.z = reference.pose.translation().z();
+    const Eigen::Quaterniond orientation(reference.pose.linear());
+    message.pose.orientation.x = orientation.x();
+    message.pose.orientation.y = orientation.y();
+    message.pose.orientation.z = orientation.z();
+    message.pose.orientation.w = orientation.w();
+    publisher->publish(message);
+  }
 }
 
 void AIWorkerTeleoperation::publishStatus(const ControlStatus & status)

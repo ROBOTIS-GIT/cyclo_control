@@ -78,6 +78,8 @@ public:
   virtual void publish(
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) = 0;
+  virtual void publishEefPoseReferences(
+    const std::vector<EefPoseReference> &) {}
   virtual void publishStatus(const ControlStatus & status) = 0;
 };
 }  // namespace cyclo_teleoperation

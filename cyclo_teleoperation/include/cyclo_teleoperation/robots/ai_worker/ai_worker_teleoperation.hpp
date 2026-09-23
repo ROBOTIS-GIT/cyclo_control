@@ -88,6 +88,8 @@ public:
   void publish(
     const Eigen::VectorXd & command,
     const GroupAuxiliaryPositions & auxiliary_command) override;
+  void publishEefPoseReferences(
+    const std::vector<EefPoseReference> & references) override;
   void publishStatus(const ControlStatus & status) override;
 
 private:
@@ -135,6 +137,10 @@ private:
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr left_publisher_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr right_eef_pose_publisher_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr left_eef_pose_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+    right_eef_reference_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr
+    left_eef_reference_publisher_;
   AIWorkerControlInterface control_interface_;
 };
 }  // namespace cyclo_teleoperation::robots::ai_worker

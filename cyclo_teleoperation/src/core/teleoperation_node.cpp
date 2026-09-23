@@ -1179,6 +1179,7 @@ private:
         robot_teleoperation_->modeConfiguration().control_groups,
         controlled_groups, hold_kp, max_hold_velocity, hold_weight);
 
+      robot_teleoperation_->publishEefPoseReferences(output.eef_pose_references);
       qp_->setModeOutput(output);
       qp_->setControllerParameters(
         get_parameter("constraints.slack_penalty").as_double(),

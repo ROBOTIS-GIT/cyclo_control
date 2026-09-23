@@ -87,6 +87,12 @@ struct TaskObjective
     Eigen::Matrix<double, 6, 1>::Ones();
 };
 
+struct EefPoseReference
+{
+  ControlGroupId group_id = kInvalidControlGroup;
+  Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+};
+
 // A controller-defined linear task in joint-velocity space. This supports relative-link
 // tasks whose Jacobian cannot be represented by one end-effector link name.
 struct LinearTaskObjective
@@ -108,6 +114,7 @@ struct ModeOutput
   double preferred_joint_velocity_weight = 0.0;
   std::vector<TaskObjective> task_objectives;
   std::vector<LinearTaskObjective> linear_task_objectives;
+  std::vector<EefPoseReference> eef_pose_references;
   std::unordered_map<ControlGroupId, Eigen::VectorXd> auxiliary_position_targets;
 
   void reset(const int dof, const double damping)
@@ -122,6 +129,7 @@ struct ModeOutput
     preferred_joint_velocity_weight = 0.0;
     task_objectives.clear();
     linear_task_objectives.clear();
+    eef_pose_references.clear();
     auxiliary_position_targets.clear();
   }
 
