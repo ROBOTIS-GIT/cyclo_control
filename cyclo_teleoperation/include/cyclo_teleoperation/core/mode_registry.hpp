@@ -26,6 +26,7 @@ struct ModeEntry
   std::string plugin;
   std::string parameter_prefix;
   std::string reference_type;
+  bool directJoint() const {return reference_type == "absolute_joint_position";}
 };
 
 class ModeRegistry
@@ -34,7 +35,7 @@ public:
   void configure(
     rclcpp::Node & node, pluginlib::ClassLoader<TeleoperationMode> & loader,
     const std::string & list_parameter, const std::string & prefix,
-    const std::string & default_parameter, bool action_inputs);
+    const std::string & default_parameter, bool model_action_inputs);
   const ModeEntry & at(uint16_t mode) const {return entries_.at(mode);}
   bool contains(uint16_t mode) const {return entries_.count(mode) != 0;}
   uint16_t defaultMode() const {return default_;}

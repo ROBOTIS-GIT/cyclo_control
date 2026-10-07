@@ -19,7 +19,7 @@ namespace cyclo_teleoperation
 void ModeRegistry::configure(
   rclcpp::Node & node,
   pluginlib::ClassLoader<TeleoperationMode> & loader, const std::string & list_parameter,
-  const std::string & prefix, const std::string & default_parameter, bool action_inputs)
+  const std::string & prefix, const std::string & default_parameter, bool model_action_inputs)
 {
   auto parameter = [&node](const std::string & key, const auto & value) {
       if (!node.has_parameter(key)) {node.declare_parameter(key, value);}
@@ -32,11 +32,7 @@ void ModeRegistry::configure(
     }
     ModeEntry entry;
     entry.parameter_prefix = prefix + "." + std::to_string(id);
-    entry.plugin = parameter(entry.parameter_prefix + ".plugin", std::string{}).as_string();
-    if (entry.plugin.empty() || !loader.isClassAvailable(entry.plugin)) {
-      throw std::runtime_error(entry.parameter_prefix + ": unavailable plugin " + entry.plugin);
-    }
-    if (action_inputs) {
+    if (model_action_inputs) {
       entry.reference_type = parameter(
         entry.parameter_prefix + ".reference_type", std::string{}).as_string();
       if (entry.reference_type != "absolute_joint_position" &&
@@ -44,6 +40,15 @@ void ModeRegistry::configure(
       {
         throw std::runtime_error(entry.parameter_prefix + ": unsupported reference_type");
       }
+    }
+    entry.plugin = parameter(entry.parameter_prefix + ".plugin", std::string{}).as_string();
+    if (entry.directJoint()) {
+      if (!entry.plugin.empty()) {
+        throw std::runtime_error(entry.parameter_prefix +
+                ": absolute_joint_position is always direct; remove plugin and QP settings");
+      }
+    } else if (entry.plugin.empty() || !loader.isClassAvailable(entry.plugin)) {
+      throw std::runtime_error(entry.parameter_prefix + ": unavailable plugin " + entry.plugin);
     }
     entries_.emplace(static_cast<uint16_t>(id), std::move(entry));
   }

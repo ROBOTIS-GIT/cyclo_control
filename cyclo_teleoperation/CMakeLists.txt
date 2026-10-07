@@ -80,7 +80,8 @@ ament_target_dependencies(cyclo_teleoperation_ai_worker_robot_plugin
   geometry_msgs pluginlib rclcpp robotis_interfaces sensor_msgs trajectory_msgs)
 
 add_library(cyclo_teleoperation_node_runtime SHARED
-  src/core/action_input.cpp
+  src/core/model_action_input.cpp
+  src/core/model_action_session.cpp
   src/core/mode_registry.cpp
   src/core/command_source_manager.cpp
   src/core/runtime_ownership.cpp
@@ -101,7 +102,7 @@ ament_target_dependencies(cyclo_teleoperation_node_runtime
 
 # Compatibility executable names share exactly the same runtime. Select the
 # input source with the standard service, not with a second control process.
-foreach(executable cyclo_teleoperation_node cyclo_control_node cyclo_action_controller_node)
+foreach(executable cyclo_teleoperation_node cyclo_control_node cyclo_model_action_controller_node)
   add_executable(${executable} src/cyclo_teleoperation_main.cpp)
   target_include_directories(${executable} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(${executable} cyclo_teleoperation_node_runtime)
@@ -120,7 +121,7 @@ install(TARGETS
   cyclo_teleoperation_common_controller_plugins
   cyclo_teleoperation_ai_worker_robot_plugin
   cyclo_teleoperation_node
-  cyclo_action_controller_node
+  cyclo_model_action_controller_node
   cyclo_control_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

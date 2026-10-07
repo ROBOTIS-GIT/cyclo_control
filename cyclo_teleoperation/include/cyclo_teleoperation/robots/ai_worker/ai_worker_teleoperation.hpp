@@ -69,11 +69,12 @@ public:
   std::shared_ptr<cyclo_motion_controller::kinematics::KinematicsSolver>
   leaderKinematics() const override {return leader_kinematics_;}
 
+  std::vector<JointTrajectoryChannel> followerCommandChannels() const override;
   std::string followerJointStatesTopic() const override
   {
     return follower_joint_states_topic_;
   }
-  const std::vector<LeaderInputChannel> & leaderInputChannels() const override
+  const std::vector<JointTrajectoryChannel> & leaderInputChannels() const override
   {
     return leader_input_channels_;
   }
@@ -127,7 +128,7 @@ private:
   std::vector<std::string> right_arm_names_;
   std::vector<ControlGroupState> control_group_states_;
   std::string follower_joint_states_topic_;
-  std::vector<LeaderInputChannel> leader_input_channels_;
+  std::vector<JointTrajectoryChannel> leader_input_channels_;
   bool enable_leader_interface_ = true;
   bool publish_follower_eef_state_ = true;
   bool publish_eef_pose_references_ = true;

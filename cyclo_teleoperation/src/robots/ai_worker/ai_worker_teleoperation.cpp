@@ -48,7 +48,7 @@ bool AIWorkerTeleoperation::configure(
     };
   declare_string("follower_urdf_path", "");
   declare_string("follower_srdf_path", "");
-  declare_string("action_follower_srdf_path", "");
+  declare_string("model_action_follower_srdf_path", "");
   declare_string("leader_urdf_path", "");
   declare_string("leader_urdf_xml", "");
   declare_string("leader_srdf_path", "");
@@ -61,10 +61,10 @@ bool AIWorkerTeleoperation::configure(
     "/reference/left/joint");
   declare_string(
     "right_command_topic",
-    "/action/right/joint");
+    "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory");
   declare_string(
     "left_command_topic",
-    "/action/left/joint");
+    "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory");
   declare_string("right_gripper_joint", "gripper_r_joint1");
   declare_string("left_gripper_joint", "gripper_l_joint1");
   declare_string("follower_right_eef", "arm_r_link7");
@@ -102,9 +102,9 @@ bool AIWorkerTeleoperation::configure(
   follower_joint_states_topic_ =
     node_->get_parameter(parameterName("follower_joint_states_topic")).as_string();
   leader_input_channels_ = {
-    LeaderInputChannel{
+    JointTrajectoryChannel{
       kLeftGroupId, node_->get_parameter(parameterName("left_leader_topic")).as_string()},
-    LeaderInputChannel{
+    JointTrajectoryChannel{
       kRightGroupId, node_->get_parameter(parameterName("right_leader_topic")).as_string()}};
   if (!initialize()) {
     return false;
@@ -250,14 +250,15 @@ bool AIWorkerTeleoperation::initialize()
       rclcpp::SensorDataQoS().keep_last(1));
   }
   if (publish_eef_pose_references_) {
+    // The shared action channel uses the same QoS for teleop output and model input.
     right_eef_reference_publisher_ =
       node_->create_publisher<geometry_msgs::msg::PoseStamped>(
       node_->get_parameter(parameterName("follower_right_eef_reference_topic")).as_string(),
-      rclcpp::SensorDataQoS().keep_last(1));
+      command_qos);
     left_eef_reference_publisher_ =
       node_->create_publisher<geometry_msgs::msg::PoseStamped>(
       node_->get_parameter(parameterName("follower_left_eef_reference_topic")).as_string(),
-      rclcpp::SensorDataQoS().keep_last(1));
+      command_qos);
   }
   return true;
 }
@@ -321,6 +322,13 @@ bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointSta
   return true;
 }
 
+std::vector<JointTrajectoryChannel> AIWorkerTeleoperation::followerCommandChannels() const
+{
+  return {
+    {kLeftGroupId, node_->get_parameter(parameterName("left_command_topic")).as_string()},
+    {kRightGroupId, node_->get_parameter(parameterName("right_command_topic")).as_string()}};
+}
+
 void AIWorkerTeleoperation::publishFollowerEefState(const std_msgs::msg::Header & header)
 {
   if (publish_follower_eef_state_) {publishFollowerEefPoses(header);}
@@ -329,7 +337,8 @@ void AIWorkerTeleoperation::publishFollowerEefState(const std_msgs::msg::Header 
 bool AIWorkerTeleoperation::selectControlSource(const std::string & source)
 {
   auto srdf = node_->get_parameter(parameterName(
-    source == "action" ? "action_follower_srdf_path" : "follower_srdf_path")).as_string();
+    source ==
+      "model_action" ? "model_action_follower_srdf_path" : "follower_srdf_path")).as_string();
   if (srdf.empty()) {
     srdf = node_->get_parameter(parameterName("follower_srdf_path")).as_string();
   }

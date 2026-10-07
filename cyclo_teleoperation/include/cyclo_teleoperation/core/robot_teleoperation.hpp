@@ -29,7 +29,7 @@
 
 namespace cyclo_teleoperation
 {
-struct LeaderInputChannel
+struct JointTrajectoryChannel
 {
   ControlGroupId group_id = kInvalidControlGroup;
   std::string topic;
@@ -65,7 +65,9 @@ public:
   leaderKinematics() const = 0;
 
   virtual std::string followerJointStatesTopic() const = 0;
-  virtual const std::vector<LeaderInputChannel> & leaderInputChannels() const = 0;
+  virtual const std::vector<JointTrajectoryChannel> & leaderInputChannels() const = 0;
+  // Final follower topics are observed, never relayed, in direct model joint mode.
+  virtual std::vector<JointTrajectoryChannel> followerCommandChannels() const {return {};}
 
   virtual bool updateFollowerState(
     const sensor_msgs::msg::JointState & message) = 0;

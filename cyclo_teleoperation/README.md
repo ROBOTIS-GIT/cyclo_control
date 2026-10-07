@@ -1,8 +1,9 @@
 # cyclo_teleoperation
 
-This package contains teleoperation and action-input applications grouped by follower robot.
-The common `cyclo_teleoperation_node` loads exactly one numeric control-mode plugin and owns safe
-transitions, the shared full-model QP, joint limits, and collision constraints.
+This package contains teleoperation and model-action applications grouped by follower robot.
+The common `cyclo_teleoperation_node` owns source transitions and loads the selected controller
+plugin for teleoperation or model EEF control. Model absolute joint control bypasses the
+runtime entirely: the model publishes directly to the follower's joint trajectory topics.
 
 The AI Worker example YAML uses these teleoperation mode IDs (IDs are configurable):
 
@@ -29,10 +30,10 @@ The follower bringup is the launch entry point. The intermediate
 `ffw_control.launch.py`, `ffw_teleoperation.launch.py`, and
 `ffw_follower_action_controller.launch.py` entry points have been removed.
 
-`cyclo_control_node` and `cyclo_action_controller_node` remain compatibility executable
+`cyclo_control_node` and `cyclo_model_action_controller_node` remain compatibility executable
 names for the same runtime, not additional controllers. Do not run them together.
 
-## Shared teleoperation / action runtime
+## Shared teleoperation / model_action runtime
 
 With AI Worker, launch the follower with `enable_control:=true` and start the A2
 hardware bringup normally. The follower launch starts the common runtime once,
@@ -44,32 +45,90 @@ ros2 launch ffw_bringup ffw_sg2_follower_ai.launch.py enable_control:=true
 ros2 launch ffw_bringup ffw_a2_leader_ai.launch.py
 ```
 
-Both input paths are available; only the selected source can command the robot.
-The default `initial_source:=action` waits for model commands. Holding both A2
+Both input paths are available. An external model publisher must cooperate with source
+ownership as described below. The default `initial_source:=model_action` waits for model commands. Holding both A2
 buttons toggles the source with both arms initially stopped; individual long
 presses enable/pause each arm in teleop. Both short presses switch head/swerve
-joystick mode. Joystick motion output is disabled in action source.
+joystick mode. Joystick motion output is disabled in `model_action` source.
 
 | Purpose | Topic / service |
 | --- | --- |
 | Raw hardware reference | `/reference/{left,right}/joint` |
-| Model joint / absolute EEF input | `/command/{left,right}/{joint,pose}` |
-| Applied joint action / EEF reference | `/action/{left,right}/{joint,pose}` |
+| Model absolute joint input / final follower command | `/leader/joint_trajectory_command_broadcaster_{left,right}/joint_trajectory` |
+| Desired EEF action (Cyclo output in teleop, model input in model_action) | `/action/{left,right}/pose` |
+| Gripper-only input in model EEF mode | `/command/{left,right}/joint` |
 | Measured EEF state | `/state/{left,right}/pose` |
 | Hardware joint state | `/joint_states` |
 | Selected source + heartbeat | `/source` (`std_msgs/msg/String`) |
 | Select source | `/set_source` (`std_srvs/srv/SetBool`: true=teleop) |
 | Toggle source | `/toggle_source` (`std_srvs/srv/Trigger`) |
+| External model publication handshake | `/model_action/set_enabled` (`std_srvs/srv/SetBool`, provided by the model) |
 | Select mode of the active source | `/set_mode` (`robotis_interfaces/srv/SetControlMode`) |
 
-Modes are registered independently in `control_modes` and `action_modes`; action
+Modes are registered independently in `control_modes` and `model_action_modes`; model
 modes also declare `reference_type: absolute_joint_position|absolute_eef_pose`.
 EEF inputs are `PoseStamped` in the configured reference frame (`base_link` by
-default). Gripper-only `JointTrajectory` input uses the same per-arm joint command
-topic in EEF mode. Joint output always contains the arm and gripper and uses
-`time_from_start=0`; interpolation happens inside the runtime.
+default), using reliable, volatile, KeepLast(1) QoS on the shared action topic.
+Gripper-only `JointTrajectory` input uses the same per-arm joint command
+topic in EEF mode. Cyclo's joint output contains the arm and gripper and uses
+`time_from_start=0`; interpolation happens inside the runtime. Direct model joint
+messages are not altered, including their timestamps, durations and points.
 
-Source switches discard old input, stop all groups and rebase the command on fresh
+`/action/{left,right}/pose` always represents a desired EEF target, while
+`/state/{left,right}/pose` is computed from actual follower feedback. In teleop,
+Cyclo publishes the controller's explicit EEF target, or FK of its joint command
+when there is no explicit target. Both joint actions and EEF actions continue
+while arms are paused, representing the hold target; measured states continue
+while valid follower feedback is received. Publication requires source setup to
+complete and fresh feedback, not an enabled teleop arm.
+
+In `model_action`, only the model publishes EEF actions. Cyclo consumes them in
+absolute EEF mode without echoing them, including during input timeout/hold. In
+direct joint mode Cyclo no longer publishes a derived FK action pose; measured
+EEF states remain available. Model pose subscriptions reject local publications,
+ignore inputs outside model EEF control and discard old references at handoff.
+The former `/command/{left,right}/pose` input is replaced by the shared action
+topic. The separate gripper-only joint input is unchanged.
+
+Every `absolute_joint_position` mode is direct, regardless of its numeric ID. Do not
+specify a `plugin` or controller tuning for that mode. No plugin or QP is instantiated,
+and Cyclo publishes no joint commands, including holds, while direct mode is active.
+The old `/action/{left,right}/joint` output layer is removed. Follower arm, head and
+lift input topics remain compatible with legacy bringups whether `enable_control` is
+true or false.
+
+Direct commands bypass **all Cyclo filtering, interpolation, velocity limits and
+collision constraints**. The model/follower integration must supply any required
+validation, velocity limits, startup interpolation and input watchdog. A silent arm
+retains the follower controller's previous trajectory; Cyclo does not soft-hold it.
+Stopping publication does not cancel an already scheduled multi-point trajectory.
+
+### External model publisher contract
+
+For automatic model/teleop handoff, implement `/model_action/set_enabled`:
+
+- `data: false`: stop publication and discard pending model actions before returning
+  `success: true`. Do not acknowledge while another publishing thread can still send.
+- `data: true`: allow only newly generated actions for the selected `/control/status`
+  mode, and only while `/source` is `model_action` with a recent heartbeat.
+- Stop on `starting`, `switching`, `none`, `teleop`, missing source heartbeat or missing
+  follower feedback. Never resume cached actions after reconnecting.
+
+Cyclo waits for the stop acknowledgment before taking joint-output ownership. Refusal
+or a two-second timeout leaves both Cyclo output and Leader output disabled (`none`).
+If a direct publisher has been observed, or an external joint/pose action publisher
+is present in the ROS graph, a missing
+service blocks handoff. An idle system with no external publisher needs no service.
+After an acknowledged departure from direct mode, Cyclo sends one measured hold to
+replace a pending follower trajectory before starting teleop or EEF control.
+Follower timeout requests model publication stop; valid feedback permits a new session.
+
+This handshake is a cooperation protocol, not a follower-side topic firewall. Cyclo
+cannot block an uncooperative publisher, messages already in transport, or cancel the
+follower's trajectory during lost feedback. Model integration must honor ownership
+and bound scheduling horizons. Do not run independent publishers on the final topics.
+
+For Cyclo-controlled paths, source switches discard old input, stop all groups and rebase the command on fresh
 feedback. Requests are rejected while a preset or mode-pose movement is in progress.
 A configured teleop exit pose finishes before action takes ownership; returning to
 teleop runs its enabled initial pose even when the same mode was used previously.
@@ -77,24 +136,25 @@ teleop runs its enabled initial pose even when the same mode was used previously
 source service response acknowledges the request, not completion of its pose sequence.
 A failed handoff reports `none` and does not activate the target controller.
 
-Inputs from the inactive source are ignored. Losing the source heartbeat
+Cyclo ignores its inputs from the inactive source. Losing the source heartbeat
 for 0.5 s disables A2 raw and joystick motion output. Base release sends one zero
 Twist; it does not continually override another base controller.
 Joystick motion also stops on incomplete or expired follower feedback; buttons remain
 available, and fresh feedback rebases head/lift commands before motion resumes.
 
-Stamped action inputs must be valid, recent and ordered within each input channel.
+Stamped EEF/gripper inputs must be valid, recent and ordered within each input channel.
 Zero-stamped joint commands remain supported using reception-time freshness. A single
-fresh joint action is consumed immediately; teleop slow start still waits for its next
+fresh EEF action is consumed immediately; teleop slow start still waits for its next
 post-enable raw sample. Mode service replies and completion statuses share a transition ID.
 
 The runtime takes a domain/source-topic process lock before creating robot outputs,
 waits for ownership discovery, and stops if another source publisher is detected.
-Do not launch the compatibility action entry point alongside an enabled follower runtime.
+Do not launch the model-action executable alias alongside an enabled follower runtime.
 
 `CommandSourceManager` owns source transitions, `RuntimeOwnership` guards the output owner,
-`ActionInput` validates and timestamps group
-commands, `ModeRegistry` resolves YAML plugin IDs, and `ControlRuntime` executes the
+`ModelActionSession` negotiates external publication, `ModelActionInput` validates EEF/gripper
+inputs and observes direct joint commands for freshness/status, `ModeRegistry` resolves YAML modes,
+and `ControlRuntime` executes the
 shared QP. The robot plugin owns kinematics, ROS output and the existing
 `robotis_interfaces` bridge. Controller plugins only contribute `ModeOutput`;
 new plugins using the existing input types need no runtime or AI Worker C++ edits.
@@ -121,7 +181,7 @@ control_modes.3.kp_joint: 30.0
 control_modes.3.tracking_weight: 15.0
 ```
 
-Joint velocity limits are always enforced by the shared QP from the follower URDF.
+For plugin-controlled paths, the shared QP enforces joint velocity limits from the follower URDF.
 
 Preset IDs are global to the AI Worker profile. Each arm independently selects
 a preset, using that preset's duration. Joint velocity limits are

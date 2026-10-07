@@ -29,13 +29,13 @@ CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, S
         ownership_->check();
         publish(transitioning() ? "switching" : source_ ==
         ControlSource::kTeleoperation ? "teleop" :
-      source_ == ControlSource::kAction ? "action" : "none");
+      source_ == ControlSource::kModelAction ? "model_action" : "none");
   });
   set_service_ = node.create_service<std_srvs::srv::SetBool>(
     "/set_source", [this](const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
     std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
       try {
-        select(request->data ? ControlSource::kTeleoperation : ControlSource::kAction);
+        select(request->data ? ControlSource::kTeleoperation : ControlSource::kModelAction);
         response->success = true;
         response->message = "Source request accepted; /source reports transition completion";
       } catch (const std::exception & error) {
@@ -47,7 +47,7 @@ CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, S
     std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
       try {
         select(source_ == ControlSource::kTeleoperation ?
-          ControlSource::kAction : ControlSource::kTeleoperation);
+          ControlSource::kModelAction : ControlSource::kTeleoperation);
         response->success = true;
       } catch (const std::exception & error) {
         response->message = error.what();
@@ -91,6 +91,6 @@ void CommandSourceManager::complete(const ControlSource source)
   source_ = source;
   pending_ = ControlSource::kNone;
   publish(source == ControlSource::kTeleoperation ? "teleop" :
-    source == ControlSource::kAction ? "action" : "none");
+    source == ControlSource::kModelAction ? "model_action" : "none");
 }
 }  // namespace cyclo_teleoperation

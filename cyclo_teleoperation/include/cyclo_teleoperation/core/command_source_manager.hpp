@@ -23,7 +23,7 @@
 
 namespace cyclo_teleoperation
 {
-enum class ControlSource {kNone, kTeleoperation, kAction};
+enum class ControlSource {kNone, kTeleoperation, kModelAction};
 class RuntimeOwnership;
 
 // One owner, serialized with the control timer by the node's default callback group.

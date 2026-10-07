@@ -37,7 +37,8 @@
 #include "cyclo_teleoperation/core/teleoperation_node.hpp"
 #include "cyclo_teleoperation/core/soft_hold.hpp"
 #include "cyclo_teleoperation/core/pose_sequence_manager.hpp"
-#include "cyclo_teleoperation/core/action_input.hpp"
+#include "cyclo_teleoperation/core/model_action_input.hpp"
+#include "cyclo_teleoperation/core/model_action_session.hpp"
 #include "cyclo_teleoperation/core/control_runtime.hpp"
 #include "cyclo_teleoperation/core/mode_registry.hpp"
 #include "cyclo_teleoperation/core/command_source_manager.hpp"
@@ -81,7 +82,7 @@ public:
       throw std::runtime_error("Failed to configure pose sequences");
     }
 
-    runtime_ = std::make_unique<ControlRuntime>(*this, robot_teleoperation_->followerKinematics());
+    model_action_session_ = std::make_unique<ModelActionSession>(*this);
 
     const auto follower_qos = rclcpp::SensorDataQoS().keep_last(1);
     follower_subscription_ = create_subscription<sensor_msgs::msg::JointState>(
@@ -118,12 +119,16 @@ public:
       static_cast<uint16_t>(get_parameter("default_control_mode").as_int());
     teleop_requested_mode_ = requested_control_mode_;
     {
-      action_modes_.configure(*this, mode_loader_, "available_action_modes", "action_modes",
-        "default_action_mode", true);
-      action_requested_mode_ = action_modes_.defaultMode();
-      action_input_ = std::make_unique<ActionInput>(*this, *robot_teleoperation_,
-          [this]() {return source_ == ControlSource::kAction && mode_ready_;},
-          [this]() {return action_modes_.at(action_requested_mode_).reference_type;});
+      model_action_modes_.configure(*this, mode_loader_, "available_model_action_modes",
+          "model_action_modes",
+        "default_model_action_mode", true);
+      model_action_requested_mode_ = model_action_modes_.defaultMode();
+      model_action_input_ = std::make_unique<ModelActionInput>(*this, *robot_teleoperation_,
+          [this]() {
+            return source_ == ControlSource::kModelAction && mode_ready_ &&
+                   model_output_granted_ && feedbackFresh();
+                                                            },
+          [this]() {return model_action_modes_.at(model_action_requested_mode_).reference_type;});
     }
     robot_teleoperation_->setModeRequestCallback(
       [this](uint16_t mode, uint64_t & id, std::string & message) {
@@ -135,15 +140,15 @@ public:
         result.successful = true;
         for (const auto & parameter : parameters) {
           const std::string active_prefix =
-          (source_ == ControlSource::kAction ? "action_modes." : "control_modes.") +
+          (source_ == ControlSource::kModelAction ? "model_action_modes." : "control_modes.") +
           std::to_string(active_control_mode_) + ".";
           if (
             active_control_mode_ != 0 &&
             parameter.get_name().rfind(active_prefix, 0) == 0)
           {
-            if (source_ == ControlSource::kAction) {
+            if (source_ == ControlSource::kModelAction) {
               mode_ready_ = false;
-              action_input_->clear();
+              model_action_input_->clear();
             } else {
               transition_pending_ = true;
             }
@@ -159,16 +164,23 @@ public:
       ControlStatus::kHolding,
       "Waiting for complete follower feedback");
     const auto initial = get_parameter("initial_source").as_string();
-    if (initial != "teleop" && initial != "action") {
-      throw std::runtime_error("initial_source must be teleop or action");
+    if (initial != "teleop" && initial != "model_action") {
+      throw std::runtime_error("initial_source must be teleop or model_action");
     }
     source_manager_->select(initial == "teleop" ?
-      ControlSource::kTeleoperation : ControlSource::kAction);
+      ControlSource::kTeleoperation : ControlSource::kModelAction);
   }
 
 private:
   void validateSourceSwitch() const
   {
+    if (model_action_transition_pending_ || model_action_session_->pending()) {
+      throw std::runtime_error("Wait for the model publisher handoff to finish");
+    }
+    if (modelStopRequired() && !model_action_session_->available()) {
+      throw std::runtime_error(
+              "Model publisher must provide /model_action/set_enabled before switching source");
+    }
     if (source_ == ControlSource::kTeleoperation && mode_ready_ &&
       pose_sequences_->hasExitPose(active_control_mode_) && !feedbackFresh())
     {
@@ -189,11 +201,50 @@ private:
     setLeaderActionEnabled(false);
     source_ = ControlSource::kNone;
     source_exit_pending_ = false;
+    joint_output_allowed_ = false;
+    model_output_granted_ = false;
+    model_action_transition_pending_ = false;
+    if (mode_) {mode_->deactivate(); mode_.reset();}
+    mode_ready_ = false;
     transition_pending_ = false;
     source_manager_->complete(ControlSource::kNone);
   }
 
   void beginSourceSwitch(const ControlSource target)
+  {
+    model_action_transition_pending_ = true;
+    model_output_granted_ = false;
+    joint_output_allowed_ = false;
+    model_action_session_->request(false, modelStopRequired(),
+      [this, target](bool success, const std::string & message) {
+        model_action_transition_pending_ = false;
+        if (!success) {failSourceSwitch(message); return;}
+        model_publisher_acknowledged_ = false;
+        direct_command_seen_ = false;
+        // Model publication has stopped. Replace a remaining scheduled trajectory with
+        // measured hold only as part of transferring ownership away from direct mode.
+        if (isDirectModelJoint() && feedbackFresh()) {
+          robot_teleoperation_->publish(robot_teleoperation_->followerPosition(),
+            robot_teleoperation_->followerAuxiliaryPosition());
+        }
+        joint_output_allowed_ = source_ == ControlSource::kTeleoperation;
+        beginSourceSwitchAfterStop(target);
+      });
+  }
+
+  bool modelStopRequired() const
+  {
+    return model_publisher_acknowledged_ || direct_command_seen_ ||
+           (model_action_input_ && model_action_input_->hasExternalActionPublishers());
+  }
+
+  bool isDirectModelJoint() const
+  {
+    return source_ == ControlSource::kModelAction &&
+           model_action_modes_.at(model_action_requested_mode_).directJoint();
+  }
+
+  void beginSourceSwitchAfterStop(const ControlSource target)
   {
     source_target_ = target;
     try {
@@ -213,7 +264,6 @@ private:
       }
     } catch (const std::exception & error) {
       failSourceSwitch(error.what());
-      throw;
     }
   }
 
@@ -222,6 +272,7 @@ private:
     // This method and both input callbacks run in the same callback group. Closing the
     // output before resetting references gives a single, atomic publication boundary.
     source_ = ControlSource::kNone;
+    joint_output_allowed_ = false;
     if (mode_) {mode_->deactivate(); mode_.reset();}
     mode_ready_ = false;
     active_control_mode_ = 0;
@@ -229,31 +280,40 @@ private:
     leader_action_enabled_ = !teleop;
     setLeaderActionEnabled(teleop);
     std::fill(leader_received_.begin(), leader_received_.end(), false);
-    if (action_input_) {action_input_->clear();}
-    if (!robot_teleoperation_->selectControlSource(teleop ? "teleop" : "action")) {
+    if (model_action_input_) {model_action_input_->clear();}
+    if (!robot_teleoperation_->selectControlSource(teleop ? "teleop" : "model_action")) {
       throw std::runtime_error("Robot model rejected source selection");
     }
-    runtime_ = std::make_unique<ControlRuntime>(*this, robot_teleoperation_->followerKinematics());
+    if (teleop || !model_action_modes_.at(model_action_requested_mode_).directJoint()) {
+      runtime_ = std::make_unique<ControlRuntime>(*this,
+          robot_teleoperation_->followerKinematics());
+    } else {
+      runtime_.reset();
+    }
     if (!pose_sequences_->configure(*this, robot_teleoperation_->modeConfiguration(),
         get_parameter("available_control_modes").as_integer_array(),
         get_parameter("available_presets").as_integer_array()))
     {
       throw std::runtime_error("Failed to reconfigure pose sequences");
     }
-    requested_control_mode_ = teleop ? teleop_requested_mode_ : action_requested_mode_;
+    requested_control_mode_ = teleop ? teleop_requested_mode_ : model_action_requested_mode_;
     transition_pending_ = teleop;
     source_ = source;
+    joint_output_allowed_ = teleop;
     publishStatus(ControlStatus::kHolding, "Source selected; all groups remain stopped");
   }
 
   bool requestMode(const uint16_t mode, uint64_t & id, std::string & message)
   {
     id = 0;
-    if (source_manager_->transitioning()) {
+    if (source_manager_->transitioning() || model_action_transition_pending_ ||
+      model_action_session_->pending())
+    {
       message = "A source transition is in progress";
       return false;
     }
-    const auto & registry = source_ == ControlSource::kAction ? action_modes_ : teleop_modes_;
+    const auto & registry = source_ ==
+      ControlSource::kModelAction ? model_action_modes_ : teleop_modes_;
     if (source_ == ControlSource::kNone || !registry.contains(mode)) {
       message = "Unknown mode for the selected source";
       return false;
@@ -266,11 +326,39 @@ private:
       message = "All groups must be stopped and no pose movement may be in progress";
       return false;
     }
-    if (source_ == ControlSource::kAction) {
-      action_requested_mode_ = mode;
-      if (mode_) {mode_->deactivate(); mode_.reset();}
-      mode_ready_ = false;
-      action_input_->clear();
+    if (source_ == ControlSource::kModelAction) {
+      if (modelStopRequired() && !model_action_session_->available()) {
+        message = "Model publisher must acknowledge stop before changing model_action mode";
+        return false;
+      }
+      model_action_transition_pending_ = true;
+      model_output_granted_ = false;
+      joint_output_allowed_ = false;
+      model_action_session_->request(false, modelStopRequired(),
+        [this, mode](bool success, const std::string & reason) {
+          model_action_transition_pending_ = false;
+          if (!success) {failSourceSwitch(reason); return;}
+          model_publisher_acknowledged_ = false;
+          direct_command_seen_ = false;
+          if (isDirectModelJoint() && feedbackFresh()) {
+            robot_teleoperation_->publish(robot_teleoperation_->followerPosition(),
+              robot_teleoperation_->followerAuxiliaryPosition());
+          }
+          try {
+            model_action_requested_mode_ = mode;
+            if (mode_) {mode_->deactivate(); mode_.reset();}
+            mode_ready_ = false;
+            model_action_input_->clear();
+            if (model_action_modes_.at(mode).directJoint()) {runtime_.reset();} else {
+              runtime_ = std::make_unique<ControlRuntime>(
+                *this, robot_teleoperation_->followerKinematics());
+            }
+            syncCommandToFeedback();
+            hold_target_ = robot_teleoperation_->followerPosition();
+          } catch (const std::exception & error) {
+            failSourceSwitch(error.what());
+          }
+        });
     } else {
       teleop_requested_mode_ = mode;
       transition_pending_ = true;
@@ -282,26 +370,52 @@ private:
     return true;
   }
 
-  void updateAction()
+  void updateModelAction()
   {
     try {
       if (!mode_ready_) {
-        const auto & entry = action_modes_.at(action_requested_mode_);
+        const auto & entry = model_action_modes_.at(model_action_requested_mode_);
         if (mode_) {mode_->deactivate(); mode_.reset();}
-        mode_ = mode_loader_.createSharedInstance(entry.plugin);
-        if (!mode_->configure(*this, entry.parameter_prefix,
-            robot_teleoperation_->modeConfiguration()) || !mode_->activate(makeContext(0)))
-        {
-          throw std::runtime_error("Action mode rejected configuration or activation");
+        if (!entry.directJoint()) {
+          mode_ = mode_loader_.createSharedInstance(entry.plugin);
+          if (!mode_->configure(*this, entry.parameter_prefix,
+              robot_teleoperation_->modeConfiguration()) || !mode_->activate(makeContext(0)))
+          {
+            throw std::runtime_error("Model action mode rejected configuration or activation");
+          }
         }
-        active_control_mode_ = action_requested_mode_;
+        active_control_mode_ = model_action_requested_mode_;
         active_groups_ = 0;
-        action_input_->clear();
+        model_action_input_->clear();
         mode_ready_ = true;
         transition_pending_ = false;
-        publishStatus(ControlStatus::kHolding, "Action mode activated");
+        publishStatus(ControlStatus::kHolding, entry.directJoint() ?
+          "Direct model joint mode selected; Cyclo joint output and QP are disabled" :
+          "Model pose controller activated");
+        model_action_transition_pending_ = true;
+        const bool has_service = model_action_session_->available();
+        model_action_session_->request(true, false,
+          [this, has_service](bool success, const std::string & message) {
+            model_action_transition_pending_ = false;
+            if (!success) {failSourceSwitch(message); return;}
+            model_publisher_acknowledged_ = has_service;
+            model_output_granted_ = true;
+            joint_output_allowed_ = !isDirectModelJoint();
+            if (source_manager_->transitioning()) {source_manager_->complete(source_);}
+          });
       }
-      const auto desired = action_input_->freshGroups();
+      if (!model_output_granted_) {return;}
+      if (isDirectModelJoint()) {
+        const auto observed = model_action_input_->freshGroups();
+        direct_command_seen_ = direct_command_seen_ || observed != 0;
+        if (active_groups_ != observed) {
+          active_groups_ = observed;
+          publishStatus(ControlStatus::kHolding,
+            "Direct model joint commands observed; no Cyclo joint commands are published");
+        }
+        return;
+      }
+      const auto desired = model_action_input_->freshGroups();
       const auto changed = desired ^ active_groups_;
       const auto enabled = desired & ~active_groups_;
       if (changed != 0) {
@@ -334,14 +448,14 @@ private:
         get_parameter("hold.tracking_weight").as_double());
       if (!runtime_->step(output, context.dt, command_position_, command_velocity_)) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-          "Action QP failed; holding the last command and retrying");
+          "Model action QP failed; holding the last command and retrying");
       }
       publishCommand(command_position_, &output);
     } catch (const std::exception & error) {
       RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 1000, "%s", error.what());
       if (mode_) {mode_->deactivate(); mode_.reset();}
       mode_ready_ = false;
-      action_input_->clear();
+      model_action_input_->clear();
       active_groups_ = 0;
       previous_controlled_groups_ = 0;
       hold_target_ = robot_teleoperation_->followerPosition();
@@ -456,7 +570,7 @@ private:
   {
     declare_parameter("robot.plugin", "");
     declare_parameter("robot.parameter_prefix", "");
-    declare_parameter("initial_source", "action");
+    declare_parameter("initial_source", "model_action");
     declare_parameter("control_frequency", 100.0);
     declare_parameter("joint_state_timeout", 0.5);
     declare_parameter("leader_command_timeout", 0.5);
@@ -648,9 +762,9 @@ private:
       active_groups_ = 0;
       previous_controlled_groups_ = 0;
     }
-    if (recovering && source_ == ControlSource::kAction && action_input_) {
+    if (recovering && source_ == ControlSource::kModelAction && model_action_input_) {
       // Do not replay model commands received while follower feedback was unavailable.
-      action_input_->clear();
+      model_action_input_->clear();
     }
     last_follower_time_ = now();
     follower_received_ = true;
@@ -717,8 +831,8 @@ private:
     if (source_manager_->transitioning()) {return;}
     next_transition_id_ = std::max(next_transition_id_, request.transition_id);
     if (source_ != ControlSource::kTeleoperation) {
-      // A stopped teleop configuration can be selected while action input owns the robot.
-      // It must never modify the active action mode or active groups.
+      // A stopped teleop configuration can be selected while model action input owns the robot.
+      // It must never modify the active model action mode or active groups.
       if (request.enabled_groups == 0 && request.preset_target_groups == 0 &&
         request.initial_pose_target_groups == 0 && teleop_modes_.contains(request.control_mode))
       {
@@ -916,14 +1030,14 @@ private:
 
   void publishCommand(const Eigen::VectorXd & command, const ModeOutput * output = nullptr)
   {
-    if (source_ == ControlSource::kNone) {
+    if (!joint_output_allowed_ || source_ == ControlSource::kNone || isDirectModelJoint()) {
       return;
     }
     const auto & leader_auxiliary = robot_teleoperation_->leaderAuxiliaryReference();
     for (const auto & group : robot_teleoperation_->modeConfiguration().control_groups) {
       const bool teleop_active = source_ == ControlSource::kTeleoperation &&
         containsControlGroup(active_groups_, group.id);
-      if (source_ == ControlSource::kAction && action_input_->hasGripper(group.id)) {
+      if (source_ == ControlSource::kModelAction && model_action_input_->hasGripper(group.id)) {
         auxiliary_command_[group.id] = leader_auxiliary[group.id];
         auxiliary_hold_target_[group.id] = auxiliary_command_[group.id];
       } else if (teleop_active) {
@@ -950,9 +1064,13 @@ private:
       }
     }
     robot_teleoperation_->publish(command, auxiliary_command_);
-    static const std::vector<EefPoseReference> empty_references;
-    robot_teleoperation_->publishEefPoseReferences(
-      command, output == nullptr ? empty_references : output->eef_pose_references);
+    if (source_ == ControlSource::kTeleoperation) {
+      // Action pose is the desired EEF target. In model_action the external model
+      // owns that topic, including while an arm is held or its input has timed out.
+      static const std::vector<EefPoseReference> empty_references;
+      robot_teleoperation_->publishEefPoseReferences(
+        command, output == nullptr ? empty_references : output->eef_pose_references);
+    }
   }
 
   void captureAuxiliaryCommandAsHold(const ControlGroupMask groups)
@@ -980,7 +1098,8 @@ private:
       robot_teleoperation_->leaderReference(),
       robot_teleoperation_->leaderPosition(),
       source_ ==
-      ControlSource::kAction ? action_input_->cartesianReferences() : cartesian_references_,
+      ControlSource::kModelAction ? model_action_input_->cartesianReferences() :
+      cartesian_references_,
       robot_teleoperation_->followerAuxiliaryPosition(),
       context_group_states_,
       requested_groups_,
@@ -990,7 +1109,7 @@ private:
       pose_sequences_->activeFinalInitialPoseGroups()) : 0,
       now().seconds(),
       1.0 / std::max(1.0, get_parameter("control_frequency").as_double()),
-      source_ == ControlSource::kAction};
+      source_ == ControlSource::kModelAction};
   }
 
   const std::vector<uint16_t> & selectedPresetIds() const
@@ -1328,7 +1447,9 @@ private:
 
   void controlLoop()
   {
+    model_action_session_->poll();
     if (!source_manager_->ready()) {return;}
+    if (model_action_transition_pending_) {return;}
     if (!feedbackFresh()) {
       if (follower_received_ && !feedback_error_reported_) {
         feedback_error_reported_ = true;
@@ -1336,10 +1457,23 @@ private:
         command_initialized_ = false;
         active_groups_ = 0;
         previous_controlled_groups_ = 0;
-        if (action_input_) {action_input_->clear();}
+        if (model_action_input_) {model_action_input_->clear();}
+        if (source_ == ControlSource::kModelAction && model_output_granted_) {
+          model_output_granted_ = false;
+          joint_output_allowed_ = false;
+          model_action_transition_pending_ = true;
+          model_action_session_->request(false, modelStopRequired(),
+            [this](bool success, const std::string & message) {
+              model_action_transition_pending_ = false;
+              if (!success) {failSourceSwitch(message); return;}
+              model_publisher_acknowledged_ = false;
+              direct_command_seen_ = false;
+              mode_ready_ = false;
+            });
+        }
         publishStatus(
           ControlStatus::kError,
-          "Follower feedback timed out; holding all control groups");
+          "Follower feedback timed out; Cyclo joint output suspended");
       }
       return;
     }
@@ -1365,11 +1499,13 @@ private:
     if (source_ == ControlSource::kNone) {
       return;
     }
-    if (source_ == ControlSource::kAction) {
-      updateAction();
+    if (source_ == ControlSource::kModelAction) {
+      updateModelAction();
       if (source_manager_->transitioning()) {
-        if (mode_ready_) {source_manager_->complete(source_);} else {
-          failSourceSwitch("Action controller could not be activated");
+        if (mode_ready_ && model_output_granted_) {
+          source_manager_->complete(source_);
+        } else if (!model_action_transition_pending_) {
+          failSourceSwitch("Model action controller could not be activated");
         }
       }
       return;
@@ -1600,11 +1736,17 @@ private:
   std::shared_ptr<TeleoperationMode> mode_;
   std::unique_ptr<PoseSequenceManager> pose_sequences_;
   std::unique_ptr<ControlRuntime> runtime_;
-  std::unique_ptr<ActionInput> action_input_;
+  std::unique_ptr<ModelActionInput> model_action_input_;
+  std::unique_ptr<ModelActionSession> model_action_session_;
+  bool model_action_transition_pending_ = false;
+  bool model_output_granted_ = false;
+  bool model_publisher_acknowledged_ = false;
+  bool direct_command_seen_ = false;
+  bool joint_output_allowed_ = false;
   std::unique_ptr<CommandSourceManager> source_manager_;
-  ModeRegistry teleop_modes_, action_modes_;
+  ModeRegistry teleop_modes_, model_action_modes_;
   ControlSource source_ = ControlSource::kNone;
-  uint16_t teleop_requested_mode_ = 1, action_requested_mode_ = 1;
+  uint16_t teleop_requested_mode_ = 1, model_action_requested_mode_ = 1;
   ControlSource source_target_ = ControlSource::kNone;
   bool source_exit_pending_ = false;
 
