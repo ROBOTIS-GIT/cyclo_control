@@ -163,6 +163,9 @@ struct ModeContext
   ControlGroupMask pose_sequence_groups;
   double now_seconds;
   double dt;
+  // Action groups are enabled by an already validated fresh command. Teleop enable
+  // still waits for the next raw sample, whose duration was calculated after enable.
+  bool reference_ready_on_enable = false;
 };
 
 struct ModeConfiguration

@@ -11,14 +11,31 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #pragma once
 
-#include <memory>
-
+#include <chrono>
+#include <string>
 #include <rclcpp/rclcpp.hpp>
 
 namespace cyclo_teleoperation
 {
-std::shared_ptr<rclcpp::Node> makeActionControllerNode();
+// A local process lock prevents launch races. The graph check also fails closed if
+// another host/container advertises an owner for the same remapped source topic.
+class RuntimeOwnership
+{
+public:
+  RuntimeOwnership(rclcpp::Node & node, const std::string & source_topic);
+  ~RuntimeOwnership();
+  RuntimeOwnership(const RuntimeOwnership &) = delete;
+  RuntimeOwnership & operator=(const RuntimeOwnership &) = delete;
+  void check();
+  bool ready() const {return ready_;}
+
+private:
+  rclcpp::Node & node_;
+  std::string topic_;
+  int lock_fd_ = -1;
+  std::chrono::steady_clock::time_point start_;
+  bool ready_ = false;
+};
 }  // namespace cyclo_teleoperation

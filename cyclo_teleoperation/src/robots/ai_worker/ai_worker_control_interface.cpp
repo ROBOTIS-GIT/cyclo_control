@@ -56,10 +56,10 @@ bool AIWorkerControlInterface::configure(
   const auto command_parameter = parameterName("control_command_topic");
   const auto status_parameter = parameterName("control_status_topic");
   if (!node_->has_parameter(command_parameter)) {
-    node_->declare_parameter(command_parameter, "/leader/teleoperation/control_command");
+    node_->declare_parameter(command_parameter, "/control/command");
   }
   if (!node_->has_parameter(status_parameter)) {
-    node_->declare_parameter(status_parameter, "/leader/teleoperation/control_status");
+    node_->declare_parameter(status_parameter, "/control/status");
   }
 
   auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
@@ -175,5 +175,17 @@ void AIWorkerControlInterface::publishStatus(const ControlStatus & input)
   status.state = input.state;
   status.message = input.message;
   status_publisher_->publish(status);
+}
+
+void AIWorkerControlInterface::setModeRequestCallback(
+  std::function<bool(uint16_t, uint64_t &, std::string &)> callback)
+{
+  mode_service_ = node_->create_service<robotis_interfaces::srv::SetControlMode>(
+    "/set_mode", [this, callback = std::move(callback)](
+      const std::shared_ptr<robotis_interfaces::srv::SetControlMode::Request> request,
+      std::shared_ptr<robotis_interfaces::srv::SetControlMode::Response> response) {
+      response->accepted = callback(
+        request->control_mode, response->transition_id, response->message);
+    });
 }
 }  // namespace cyclo_teleoperation::robots::ai_worker

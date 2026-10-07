@@ -32,7 +32,7 @@ class FixedDurationSlowStart
 {
 public:
   void reset();
-  void restart(uint64_t current_sequence);
+  void restart(uint64_t current_sequence, bool wait_for_next_reference = true);
 
   FixedDurationSlowStartSample update(
     const Eigen::VectorXd & start_position,
@@ -51,6 +51,7 @@ private:
   double start_time_ = 0.0;
   double duration_ = 0.0;
   bool waiting_for_command_ = false;
+  bool accept_current_reference_ = false;
   bool active_ = false;
 };
 }  // namespace cyclo_teleoperation

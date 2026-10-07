@@ -92,6 +92,9 @@ public:
     const Eigen::VectorXd & command,
     const std::vector<EefPoseReference> & references) override;
   void publishStatus(const ControlStatus & status) override;
+  void publishFollowerEefState(const std_msgs::msg::Header & header) override;
+  bool selectControlSource(const std::string & source) override;
+  void setModeRequestCallback(ModeRequest callback) override;
 
 private:
   bool initialize();
@@ -133,6 +136,7 @@ private:
   std::string left_gripper_joint_;
   std::string follower_base_frame_;
   std::string temporary_leader_urdf_path_;
+  std::string active_srdf_path_;
   GroupAuxiliaryPositions follower_auxiliary_position_;
   GroupAuxiliaryPositions leader_auxiliary_reference_;
 

@@ -65,7 +65,7 @@ void MoveJMode::onGroupsEnabled(
       continue;
     }
     trajectories_.at(group.id).slow_start.restart(
-      context.group_states[group.id].leader_sequence);
+      context.group_states[group.id].leader_sequence, !context.reference_ready_on_enable);
   }
 }
 

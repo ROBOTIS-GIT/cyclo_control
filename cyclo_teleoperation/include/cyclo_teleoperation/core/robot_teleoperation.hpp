@@ -81,6 +81,11 @@ public:
   virtual void publishEefPoseReferences(
     const Eigen::VectorXd &,
     const std::vector<EefPoseReference> &) {}
+  // State ingestion must not publish. The runtime owns output scheduling and source selection.
+  virtual void publishFollowerEefState(const std_msgs::msg::Header &) {}
+  virtual bool selectControlSource(const std::string &) {return true;}
+  using ModeRequest = std::function<bool(uint16_t, uint64_t &, std::string &)>;
+  virtual void setModeRequestCallback(ModeRequest) {}
   virtual void publishStatus(const ControlStatus & status) = 0;
 };
 }  // namespace cyclo_teleoperation

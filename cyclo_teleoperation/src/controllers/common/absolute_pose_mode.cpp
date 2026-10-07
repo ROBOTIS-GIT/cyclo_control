@@ -88,6 +88,8 @@ bool AbsolutePoseMode::update(const ModeContext & context, ModeOutput & output)
       return false;
     }
     TaskObjective task;
+    output.eef_pose_references.push_back(
+      EefPoseReference{group.id, context.cartesian_references[group.id].pose});
     task.link_name = group.follower_eef;
     task.desired_velocity = desiredVelocity(
       configuration_.follower_kinematics->getPose(group.follower_eef),

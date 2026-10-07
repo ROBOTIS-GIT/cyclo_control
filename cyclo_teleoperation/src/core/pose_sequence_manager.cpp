@@ -88,6 +88,10 @@ bool PoseSequenceManager::configure(
     return false;
   }
   runners_.clear();
+  initial_poses_.clear();
+  exit_poses_.clear();
+  presets_.clear();
+  automatic_initial_pose_enabled_.clear();
   for (const auto & group : configuration_.control_groups) {
     if (group.id >= 64 || group.follower_joint_indices.empty()) {
       return false;

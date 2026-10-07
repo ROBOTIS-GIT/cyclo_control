@@ -154,9 +154,11 @@ source install/setup.bash
 
 ### Teleoperation and Action Control
 
-The `cyclo_teleoperation` package provides `cyclo_teleoperation_node` for leader-driven control and
-`cyclo_action_controller_node` for model inference. Robot-specific repositories provide the robot
-model, topic mappings, available control-mode plugins, and launch configuration.
+The `cyclo_teleoperation` package provides one `cyclo_teleoperation_node` for both leader-driven
+teleoperation and model-action control, selected through the command-source interface. Robot-specific
+repositories provide follower profiles, leader references, and controller-mode configuration.
+The old `cyclo_control_node` and `cyclo_action_controller_node` executable names are compatibility
+aliases for this same runtime, not separate nodes to run alongside it.
 
 ### AI Worker Controllers
 

@@ -17,6 +17,7 @@ find_package(rclcpp REQUIRED)
 find_package(robotis_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 
 add_library(cyclo_teleoperation_runtime SHARED
@@ -78,48 +79,34 @@ target_link_libraries(cyclo_teleoperation_ai_worker_robot_plugin
 ament_target_dependencies(cyclo_teleoperation_ai_worker_robot_plugin
   geometry_msgs pluginlib rclcpp robotis_interfaces sensor_msgs trajectory_msgs)
 
-add_executable(cyclo_teleoperation_node
+add_library(cyclo_teleoperation_node_runtime SHARED
+  src/core/action_input.cpp
+  src/core/mode_registry.cpp
+  src/core/command_source_manager.cpp
+  src/core/runtime_ownership.cpp
   src/core/pose_sequence_manager.cpp
   src/core/teleoperation_node.cpp
-  src/cyclo_teleoperation_main.cpp
 )
-target_include_directories(cyclo_teleoperation_node PRIVATE
+target_include_directories(cyclo_teleoperation_node_runtime PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_link_libraries(cyclo_teleoperation_node
+target_link_libraries(cyclo_teleoperation_node_runtime
   cyclo_teleoperation_runtime
   cyclo_teleoperation_qp
   cyclo_motion_controller_core::cyclo_motion_controller_core
   Eigen3::Eigen
 )
-ament_target_dependencies(cyclo_teleoperation_node
-  pluginlib rclcpp sensor_msgs std_msgs trajectory_msgs)
+ament_target_dependencies(cyclo_teleoperation_node_runtime
+  geometry_msgs pluginlib rclcpp sensor_msgs std_msgs std_srvs trajectory_msgs)
 
-add_executable(cyclo_action_controller_node
-  src/core/action_controller_node.cpp
-  src/cyclo_action_controller_main.cpp
-)
-target_include_directories(cyclo_action_controller_node PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(cyclo_action_controller_node
-  cyclo_teleoperation_qp
-  cyclo_teleoperation_runtime
-  cyclo_motion_controller_core::cyclo_motion_controller_core
-  Eigen3::Eigen
-)
-ament_target_dependencies(cyclo_action_controller_node
-  geometry_msgs pluginlib rclcpp robotis_interfaces sensor_msgs std_msgs trajectory_msgs)
-
-add_executable(joint_trajectory_source_mux
-  src/core/joint_trajectory_source_mux.cpp
-  src/joint_trajectory_source_mux_main.cpp
-)
-target_include_directories(joint_trajectory_source_mux PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-ament_target_dependencies(joint_trajectory_source_mux
-  rclcpp std_msgs trajectory_msgs)
+# Compatibility executable names share exactly the same runtime. Select the
+# input source with the standard service, not with a second control process.
+foreach(executable cyclo_teleoperation_node cyclo_control_node cyclo_action_controller_node)
+  add_executable(${executable} src/cyclo_teleoperation_main.cpp)
+  target_include_directories(${executable} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  target_link_libraries(${executable} cyclo_teleoperation_node_runtime)
+  ament_target_dependencies(${executable} rclcpp)
+endforeach()
 
 pluginlib_export_plugin_description_file(
   cyclo_teleoperation cyclo_teleoperation_controller_plugins.xml)
@@ -129,11 +116,12 @@ pluginlib_export_plugin_description_file(
 install(TARGETS
   cyclo_teleoperation_qp
   cyclo_teleoperation_runtime
+  cyclo_teleoperation_node_runtime
   cyclo_teleoperation_common_controller_plugins
   cyclo_teleoperation_ai_worker_robot_plugin
   cyclo_teleoperation_node
   cyclo_action_controller_node
-  joint_trajectory_source_mux
+  cyclo_control_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

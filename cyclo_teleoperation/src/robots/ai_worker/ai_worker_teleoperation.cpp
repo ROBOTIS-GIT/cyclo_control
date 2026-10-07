@@ -48,22 +48,23 @@ bool AIWorkerTeleoperation::configure(
     };
   declare_string("follower_urdf_path", "");
   declare_string("follower_srdf_path", "");
+  declare_string("action_follower_srdf_path", "");
   declare_string("leader_urdf_path", "");
   declare_string("leader_urdf_xml", "");
   declare_string("leader_srdf_path", "");
   declare_string("follower_joint_states_topic", "/joint_states");
   declare_string(
     "right_leader_topic",
-    "/leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory");
+    "/reference/right/joint");
   declare_string(
     "left_leader_topic",
-    "/leader/joint_trajectory_command_broadcaster_left/raw_joint_trajectory");
+    "/reference/left/joint");
   declare_string(
     "right_command_topic",
-    "/leader/joint_trajectory_command_broadcaster_right/joint_trajectory");
+    "/action/right/joint");
   declare_string(
     "left_command_topic",
-    "/leader/joint_trajectory_command_broadcaster_left/joint_trajectory");
+    "/action/left/joint");
   declare_string("right_gripper_joint", "gripper_r_joint1");
   declare_string("left_gripper_joint", "gripper_l_joint1");
   declare_string("follower_right_eef", "arm_r_link7");
@@ -107,9 +108,6 @@ bool AIWorkerTeleoperation::configure(
       kRightGroupId, node_->get_parameter(parameterName("right_leader_topic")).as_string()}};
   if (!initialize()) {
     return false;
-  }
-  if (!enable_leader_interface_) {
-    return true;
   }
   return control_interface_.configure(
     node, parameter_prefix, mode_configuration_.control_groups,
@@ -162,6 +160,7 @@ bool AIWorkerTeleoperation::initialize()
   follower_kinematics_ =
     std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(
     follower_urdf, follower_srdf);
+  active_srdf_path_ = follower_srdf;
 
   follower_joint_names_ = follower_kinematics_->getJointNames();
   for (size_t i = 0; i < follower_joint_names_.size(); ++i) {
@@ -265,6 +264,9 @@ bool AIWorkerTeleoperation::initialize()
 
 bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointState & message)
 {
+  if (message.header.stamp.sec < 0 || message.header.stamp.nanosec >= 1000000000u) {
+    return false;
+  }
   if (
     message.position.size() != message.name.size() ||
     (!message.velocity.empty() && message.velocity.size() != message.name.size()))
@@ -316,10 +318,35 @@ bool AIWorkerTeleoperation::updateFollowerState(const sensor_msgs::msg::JointSta
   follower_position_ = std::move(follower_position);
   follower_velocity_ = std::move(follower_velocity);
   follower_auxiliary_position_ = std::move(follower_auxiliary_position);
-  if (publish_follower_eef_state_) {
-    publishFollowerEefPoses(message.header);
-  }
   return true;
+}
+
+void AIWorkerTeleoperation::publishFollowerEefState(const std_msgs::msg::Header & header)
+{
+  if (publish_follower_eef_state_) {publishFollowerEefPoses(header);}
+}
+
+bool AIWorkerTeleoperation::selectControlSource(const std::string & source)
+{
+  auto srdf = node_->get_parameter(parameterName(
+    source == "action" ? "action_follower_srdf_path" : "follower_srdf_path")).as_string();
+  if (srdf.empty()) {
+    srdf = node_->get_parameter(parameterName("follower_srdf_path")).as_string();
+  }
+  if (srdf == active_srdf_path_) {return true;}
+  auto kinematics = std::make_shared<cyclo_motion_controller::kinematics::KinematicsSolver>(
+    node_->get_parameter(parameterName("follower_urdf_path")).as_string(), srdf);
+  if (kinematics->getJointNames() != follower_joint_names_) {return false;}
+  kinematics->updateState(follower_position_, follower_velocity_);
+  follower_kinematics_ = std::move(kinematics);
+  mode_configuration_.follower_kinematics = follower_kinematics_;
+  active_srdf_path_ = srdf;
+  return true;
+}
+
+void AIWorkerTeleoperation::setModeRequestCallback(ModeRequest callback)
+{
+  control_interface_.setModeRequestCallback(std::move(callback));
 }
 
 void AIWorkerTeleoperation::publishFollowerEefPoses(

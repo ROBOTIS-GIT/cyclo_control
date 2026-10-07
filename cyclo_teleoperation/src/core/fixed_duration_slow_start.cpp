@@ -31,14 +31,17 @@ void FixedDurationSlowStart::reset()
   start_time_ = 0.0;
   duration_ = 0.0;
   waiting_for_command_ = false;
+  accept_current_reference_ = false;
   active_ = false;
 }
 
-void FixedDurationSlowStart::restart(const uint64_t current_sequence)
+void FixedDurationSlowStart::restart(
+  const uint64_t current_sequence, const bool wait_for_next_reference)
 {
   reset();
   last_sequence_ = current_sequence;
   waiting_for_command_ = true;
+  accept_current_reference_ = !wait_for_next_reference;
 }
 
 FixedDurationSlowStartSample FixedDurationSlowStart::update(
@@ -58,9 +61,10 @@ FixedDurationSlowStartSample FixedDurationSlowStart::update(
     return sample;
   }
 
-  if (waiting_for_command_ && command_sequence != last_sequence_) {
+  if (waiting_for_command_ && (accept_current_reference_ || command_sequence != last_sequence_)) {
     last_sequence_ = command_sequence;
     waiting_for_command_ = false;
+    accept_current_reference_ = false;
     if (command_duration > kDurationEpsilon) {
       start_position_ = start_position;
       start_time_ = current_time;

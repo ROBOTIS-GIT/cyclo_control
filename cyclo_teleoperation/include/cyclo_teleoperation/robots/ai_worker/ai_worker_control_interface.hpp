@@ -20,6 +20,7 @@
 
 #include <robotis_interfaces/msg/control_mode_command.hpp>
 #include <robotis_interfaces/msg/control_mode_status.hpp>
+#include <robotis_interfaces/srv/set_control_mode.hpp>
 
 #include "cyclo_teleoperation/core/control_interface.hpp"
 
@@ -35,6 +36,7 @@ public:
     RequestCallback request_callback) override;
 
   void publishStatus(const ControlStatus & status) override;
+  void setModeRequestCallback(std::function<bool(uint16_t, uint64_t &, std::string &)> callback);
 
 private:
   std::optional<ControlGroupMask> groupsFromName(const std::string & name) const;
@@ -51,6 +53,7 @@ private:
   ControlGroupId left_group_ = kInvalidControlGroup;
   ControlGroupId right_group_ = kInvalidControlGroup;
   ControlStatus last_status_;
+  rclcpp::Service<robotis_interfaces::srv::SetControlMode>::SharedPtr mode_service_;
 
   rclcpp::Subscription<robotis_interfaces::msg::ControlModeCommand>::SharedPtr
     command_subscription_;
