@@ -52,6 +52,22 @@ void ModeRegistry::configure(
     }
     entries_.emplace(static_cast<uint16_t>(id), std::move(entry));
   }
+  if (model_action_inputs) {
+    default_ = 0;
+    for (const auto & [id, entry] : entries_) {
+      if (!entry.directJoint()) {continue;}
+      if (default_ != 0) {
+        throw std::runtime_error(list_parameter +
+                " must contain exactly one absolute_joint_position startup mode");
+      }
+      default_ = id;
+    }
+    if (default_ == 0) {
+      throw std::runtime_error(list_parameter +
+              " requires an absolute_joint_position startup mode");
+    }
+    return;
+  }
   const auto value = parameter(default_parameter, int64_t{1}).as_int();
   if (value <= 0 || value > UINT16_MAX || !contains(static_cast<uint16_t>(value))) {
     throw std::runtime_error(default_parameter + " must name a configured mode");

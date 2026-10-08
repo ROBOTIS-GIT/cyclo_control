@@ -20,6 +20,20 @@ find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 
+# Public robot/controller plugin API, independent of AI Worker implementations.
+add_library(cyclo_teleoperation_interfaces INTERFACE)
+target_include_directories(cyclo_teleoperation_interfaces INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_compile_features(cyclo_teleoperation_interfaces INTERFACE cxx_std_17)
+target_link_libraries(cyclo_teleoperation_interfaces INTERFACE
+  cyclo_motion_controller_core::cyclo_motion_controller_core
+  Eigen3::Eigen
+)
+ament_target_dependencies(cyclo_teleoperation_interfaces INTERFACE
+  geometry_msgs pluginlib rclcpp sensor_msgs std_msgs std_srvs trajectory_msgs)
+
 add_library(cyclo_teleoperation_runtime SHARED
   src/core/controller_constraints.cpp
   src/core/fixed_duration_slow_start.cpp
@@ -29,11 +43,9 @@ target_include_directories(cyclo_teleoperation_runtime PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(cyclo_teleoperation_runtime
-  cyclo_motion_controller_core::cyclo_motion_controller_core
-  Eigen3::Eigen
+target_link_libraries(cyclo_teleoperation_runtime PUBLIC
+  cyclo_teleoperation_interfaces
 )
-ament_target_dependencies(cyclo_teleoperation_runtime rclcpp)
 
 add_library(cyclo_teleoperation_qp SHARED
   src/core/soft_hold.cpp
@@ -83,6 +95,8 @@ add_library(cyclo_teleoperation_node_runtime SHARED
   src/core/model_action_input.cpp
   src/core/model_action_session.cpp
   src/core/mode_registry.cpp
+  src/core/mode_manager.cpp
+  src/core/feedback_state.cpp
   src/core/command_source_manager.cpp
   src/core/runtime_ownership.cpp
   src/core/pose_sequence_manager.cpp
@@ -100,14 +114,11 @@ target_link_libraries(cyclo_teleoperation_node_runtime
 ament_target_dependencies(cyclo_teleoperation_node_runtime
   geometry_msgs pluginlib rclcpp sensor_msgs std_msgs std_srvs trajectory_msgs)
 
-# Compatibility executable names share exactly the same runtime. Select the
-# input source with the standard service, not with a second control process.
-foreach(executable cyclo_teleoperation_node cyclo_control_node cyclo_model_action_controller_node)
-  add_executable(${executable} src/cyclo_teleoperation_main.cpp)
-  target_include_directories(${executable} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-  target_link_libraries(${executable} cyclo_teleoperation_node_runtime)
-  ament_target_dependencies(${executable} rclcpp)
-endforeach()
+# Both input sources share one process and switch through the source interface.
+add_executable(cyclo_teleoperation_node src/cyclo_teleoperation_main.cpp)
+target_include_directories(cyclo_teleoperation_node PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(cyclo_teleoperation_node cyclo_teleoperation_node_runtime)
+ament_target_dependencies(cyclo_teleoperation_node rclcpp)
 
 pluginlib_export_plugin_description_file(
   cyclo_teleoperation cyclo_teleoperation_controller_plugins.xml)
@@ -115,14 +126,18 @@ pluginlib_export_plugin_description_file(
   cyclo_teleoperation cyclo_teleoperation_robot_plugins.xml)
 
 install(TARGETS
+  cyclo_teleoperation_interfaces
   cyclo_teleoperation_qp
   cyclo_teleoperation_runtime
+  EXPORT cyclo_teleoperationTargets
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+)
+install(TARGETS
   cyclo_teleoperation_node_runtime
   cyclo_teleoperation_common_controller_plugins
   cyclo_teleoperation_ai_worker_robot_plugin
   cyclo_teleoperation_node
-  cyclo_model_action_controller_node
-  cyclo_control_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -134,6 +149,9 @@ install(FILES
   DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)
-ament_export_dependencies(cyclo_motion_controller_core Eigen3 pluginlib rclcpp std_msgs)
+ament_export_targets(cyclo_teleoperationTargets HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  cyclo_motion_controller_core Eigen3 geometry_msgs pluginlib rclcpp
+  sensor_msgs std_msgs std_srvs trajectory_msgs)
 
 ament_package()

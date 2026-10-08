@@ -129,7 +129,6 @@ private:
   std::vector<ControlGroupState> control_group_states_;
   std::string follower_joint_states_topic_;
   std::vector<JointTrajectoryChannel> leader_input_channels_;
-  bool enable_leader_interface_ = true;
   bool publish_follower_eef_state_ = true;
   bool publish_eef_pose_references_ = true;
 

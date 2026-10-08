@@ -30,23 +30,29 @@ The follower bringup is the launch entry point. The intermediate
 `ffw_control.launch.py`, `ffw_teleoperation.launch.py`, and
 `ffw_follower_action_controller.launch.py` entry points have been removed.
 
-`cyclo_control_node` and `cyclo_model_action_controller_node` remain compatibility executable
-names for the same runtime, not additional controllers. Do not run them together.
+`cyclo_teleoperation_node` is the only executable. Both input paths are always available;
+there is no model-only startup option. Loading the leader calculation model does not
+require connected leader hardware or a running leader bringup.
 
 ## Shared teleoperation / model_action runtime
 
-With AI Worker, launch the follower with `enable_control:=true` and start the A2
-hardware bringup normally. The follower launch starts the common runtime once,
-after its initial-position actions finish. No separate action node or topic mux
-is needed. `enable_control:=false` (default) preserves the legacy LG2 connection.
+The SG2 and BG2 AI Worker follower bringups (including Gazebo) always start the
+common runtime once, after controller activation and any initial-position actions.
+There is no `enable_control` argument or separate action node/topic mux. Other
+follower models retain their existing launches.
 
 ```bash
-ros2 launch ffw_bringup ffw_sg2_follower_ai.launch.py enable_control:=true
+ros2 launch ffw_bringup ffw_sg2_follower_ai.launch.py
 ros2 launch ffw_bringup ffw_a2_leader_ai.launch.py
 ```
 
-Both input paths are available. An external model publisher must cooperate with source
-ownership as described below. The default `initial_source:=model_action` waits for model commands. Holding both A2
+Both input paths are available. Startup is fixed to `model_action` and the unique
+mode with `reference_type: absolute_joint_position`, independent of its numeric ID.
+The `initial_source` and `default_model_action_mode` parameters are removed.
+Legacy LG2 publishers can use their existing topics without a model handshake
+service: Cyclo does not publish or replace joint commands at startup or feedback
+recovery. An actual handoff away from an external publisher still requires the
+stop acknowledgement described below. Holding both A2
 buttons toggles the source with both arms initially stopped; individual long
 presses enable/pause each arm in teleop. Both short presses switch head/swerve
 joystick mode. Joystick motion output is disabled in `model_action` source.
@@ -94,8 +100,7 @@ Every `absolute_joint_position` mode is direct, regardless of its numeric ID. Do
 specify a `plugin` or controller tuning for that mode. No plugin or QP is instantiated,
 and Cyclo publishes no joint commands, including holds, while direct mode is active.
 The old `/action/{left,right}/joint` output layer is removed. Follower arm, head and
-lift input topics remain compatible with legacy bringups whether `enable_control` is
-true or false.
+lift input topics remain compatible with legacy bringups.
 
 Direct commands bypass **all Cyclo filtering, interpolation, velocity limits and
 collision constraints**. The model/follower integration must supply any required
@@ -149,13 +154,19 @@ post-enable raw sample. Mode service replies and completion statuses share a tra
 
 The runtime takes a domain/source-topic process lock before creating robot outputs,
 waits for ownership discovery, and stops if another source publisher is detected.
-Do not launch the model-action executable alias alongside an enabled follower runtime.
+Do not launch a second runtime alongside an enabled follower runtime.
 
-`CommandSourceManager` owns source transitions, `RuntimeOwnership` guards the output owner,
-`ModelActionSession` negotiates external publication, `ModelActionInput` validates EEF/gripper
-inputs and observes direct joint commands for freshness/status, `ModeRegistry` resolves YAML modes,
-and `ControlRuntime` executes the
-shared QP. The robot plugin owns kinematics, ROS output and the existing
+`TeleoperationNode` connects ROS callbacks and the periodic control loop.
+`CommandSourceManager` owns source transitions and publication permissions, with
+`ModelActionSession` handling external publication and `RuntimeOwnership` guarding
+the output owner. `ModeManager` owns the selected plugin and exit/initial/activation
+lifecycle; `ModeRegistry` resolves its YAML entries. `FeedbackState` owns feedback
+freshness, integrated command state and hold targets; it rebases commands only at
+explicit enable/recovery events, not every feedback callback.
+`PoseSequenceManager` retains preset/initial/exit interpolation, and `ControlRuntime`
+executes the shared QP. `ModelActionInput` validates EEF/gripper inputs and observes
+direct joint commands. These are ordinary classes, not additional ROS nodes.
+The robot plugin owns kinematics, ROS output and the existing
 `robotis_interfaces` bridge. Controller plugins only contribute `ModeOutput`;
 new plugins using the existing input types need no runtime or AI Worker C++ edits.
 
@@ -223,6 +234,21 @@ For a new control law:
 2. Implement `configure`, `activate`, `onGroupsEnabled`, and `update`.
 3. Fill `ModeOutput`; do not publish commands or create another QP.
 4. Add and export the plugin, then map any free positive numeric ID in the YAML.
+
+An external plugin package can use the exported CMake targets without linking the
+AI Worker robot plugin or node runtime:
+
+```cmake
+find_package(cyclo_teleoperation REQUIRED)
+target_link_libraries(my_controller_plugin PRIVATE
+  cyclo_teleoperation::cyclo_teleoperation_runtime)
+```
+
+The runtime target includes the plugin interfaces and shared slow-start/constraint
+helpers with their transitive dependencies. For interfaces only, link
+`cyclo_teleoperation::cyclo_teleoperation_interfaces`. The shared QP is exported
+as `cyclo_teleoperation::cyclo_teleoperation_qp`; controller plugins normally do
+not need to instantiate or link their own QP.
 
 The default `controlledGroups()` returns `context.enabled_groups`. The
 runtime combines it with the active preset arms before applying soft hold,

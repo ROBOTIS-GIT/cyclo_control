@@ -157,8 +157,7 @@ source install/setup.bash
 The `cyclo_teleoperation` package provides one `cyclo_teleoperation_node` for both leader-driven
 teleoperation and model-action control, selected through the command-source interface. Robot-specific
 repositories provide follower profiles, leader references, and controller-mode configuration.
-The `cyclo_control_node` and `cyclo_model_action_controller_node` executable names are compatibility
-aliases for this same runtime, not separate nodes to run alongside it.
+Both input paths are available in this single executable; no separate model-action node is needed.
 Model absolute joint actions go directly to the follower's legacy joint trajectory topics,
 without a Cyclo plugin or QP. Absolute EEF actions retain plugin/QP conversion.
 See the package README for the model publisher handoff contract and direct-control limitations.

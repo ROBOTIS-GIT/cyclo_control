@@ -21,7 +21,7 @@ namespace cyclo_teleoperation
 {
 CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, Switch validate)
 : change_(std::move(change)), validate_(std::move(validate)),
-  ownership_(std::make_unique<RuntimeOwnership>(node, "/source"))
+  ownership_(std::make_unique<RuntimeOwnership>(node, "/source")), model_session_(node)
 {
   publisher_ = node.create_publisher<std_msgs::msg::String>(
     "/source", rclcpp::QoS(1).reliable().transient_local());
@@ -56,6 +56,72 @@ CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, S
 }
 
 CommandSourceManager::~CommandSourceManager() = default;
+
+void CommandSourceManager::startDirect()
+{
+  // Cold startup does not take command ownership from an existing LG2 publisher.
+  // Unlike a handoff, it must never request an external publisher to stop.
+  pending_ = ControlSource::kModelAction;
+  publish("switching");
+}
+
+void CommandSourceManager::activateSource(ControlSource source, bool direct)
+{
+  active_source_ = source;
+  direct_ = direct;
+  joint_output_allowed_ = source == ControlSource::kTeleoperation;
+}
+
+void CommandSourceManager::suspendModelOutput()
+{
+  model_granted_ = false;
+  joint_output_allowed_ = false;
+}
+
+void CommandSourceManager::fail()
+{
+  suspendModelOutput();
+  active_source_ = ControlSource::kNone;
+  exit_pending_ = false;
+  complete(ControlSource::kNone);
+}
+
+bool CommandSourceManager::stopRequired(bool external_publishers) const
+{
+  return model_acknowledged_ || direct_seen_ || external_publishers;
+}
+
+void CommandSourceManager::stopModel(
+  bool required, ModelActionSession::Completion completion)
+{
+  suspendModelOutput();
+  model_session_.request(false, required,
+    [this, completion](bool success, const std::string & message) {
+      if (success) {model_acknowledged_ = false; direct_seen_ = false;}
+      completion(success, message);
+    });
+}
+
+void CommandSourceManager::startModel(
+  bool direct, ModelActionSession::Completion completion)
+{
+  direct_ = direct;
+  const bool available = model_session_.available();
+  model_session_.request(true, false,
+    [this, direct, available, completion](bool success, const std::string & message) {
+      if (success) {
+        model_acknowledged_ = available;
+        model_granted_ = true;
+        joint_output_allowed_ = !direct;
+      }
+      completion(success, message);
+    });
+}
+
+bool CommandSourceManager::jointOutputAllowed() const
+{
+  return joint_output_allowed_ && active_source_ != ControlSource::kNone && !direct();
+}
 
 bool CommandSourceManager::ready() const {return ownership_->ready();}
 
