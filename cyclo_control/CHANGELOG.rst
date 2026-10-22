@@ -2,6 +2,12 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-10-21)
+------------------
+* Enabled BG2, F1, and F2 model selection in the AI Worker controller launch
+* Refined F1 and F2 collision geometry and restored fixed head collision models
+* Contributors: Yeonguk Kim
+
 0.5.0 (2026-10-19)
 ------------------
 * Unified teleoperation and external action control with shared controller plugins and source handoff

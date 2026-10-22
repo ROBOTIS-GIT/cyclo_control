@@ -2,6 +2,13 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-10-21)
+------------------
+* Replaced F1 and F2 arm collision boxes with BG2/SG2-style proxies adjusted for F-series link lengths
+* Removed F1 and F2 EEF collision boxes while retaining gripper collision geometry
+* Restored fixed head collision models using F1 and F2 mounting transforms
+* Contributors: Yeonguk Kim
+
 0.5.0 (2026-10-19)
 ------------------
 * Added BG2, F1, F2, BH5, and SH5 follower models and associated collision configurations

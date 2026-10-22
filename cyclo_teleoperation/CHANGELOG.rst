@@ -2,6 +2,10 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-10-21)
+------------------
+* None
+
 0.5.0 (2026-10-19)
 ------------------
 * Unified teleoperation and external action control with source switching and direct absolute-joint command compatibility
