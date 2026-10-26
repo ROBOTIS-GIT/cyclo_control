@@ -74,9 +74,11 @@ configure_package_config_file(
     PATH_VARS CMAKE_INSTALL_INCLUDEDIR
 )
 
+ament_package_xml()
+
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    VERSION 0.1.1
+    VERSION ${${PROJECT_NAME}_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 

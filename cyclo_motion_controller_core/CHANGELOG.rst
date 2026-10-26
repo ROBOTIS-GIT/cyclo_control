@@ -2,6 +2,11 @@
 Changelog for package cyclo_motion_controller_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-10-26)
+------------------
+* Synchronized exported CMake package metadata with the package.xml version
+* Contributors: Yeonguk Kim
+
 0.5.0 (2026-10-19)
 ------------------
 * None

@@ -1,7 +1,96 @@
 <?xml version="1.0"?>
 <robot name="ffw_f2_follower">
-  <!--Calculation model: measured lift + 14 arm DOFs; no hardware or finger DOFs.-->
+  <!--Calculation model: measured lift + 14 arm DOFs; head collision fixed at neutral, as in BG2/SG2.-->
+  <!--No hardware or finger DOFs.-->
+  <!--Visual meshes from ffw_description; accessory visuals are folded into parent links at neutral joint positions.-->
   <link name="base_link">
+    <visual name="base_link_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/base_mobile_assy.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="lidar_l_link_visual_0">
+      <origin xyz="-0.1115 0.24 0.34432" rpy="0 0 1.57079632679" />
+      <geometry>
+        <cylinder length="0.03" radius="0.03" />
+      </geometry>
+    </visual>
+    <visual name="lidar_r_link_visual_0">
+      <origin xyz="-0.1115 -0.24 0.34432" rpy="0 0 -1.57079632679" />
+      <geometry>
+        <cylinder length="0.03" radius="0.03" />
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1" />
+      </material>
+    </visual>
+    <visual name="lift_link_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/lift_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="left_wheel_steer_link_visual_0">
+      <origin rpy="0 0 0" xyz="0.1375 0.2554 0.25855" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/left_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="left_wheel_drive_link_visual_0">
+      <origin rpy="0 0 0" xyz="0.1375 0.2554 0.0865" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/left_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="right_wheel_steer_link_visual_0">
+      <origin rpy="0 0 0" xyz="0.1375 -0.2554 0.25855" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/right_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="right_wheel_drive_link_visual_0">
+      <origin rpy="0 0 0" xyz="0.1375 -0.2554 0.0865" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/right_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="rear_wheel_steer_link_visual_0">
+      <origin rpy="0 0 0" xyz="-0.2895 0 0.25855" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/rear_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+    <visual name="rear_wheel_drive_link_visual_0">
+      <origin rpy="0 0 0" xyz="-0.2895 0 0.0865" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_swerve/rear_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
     <collision>
       <origin rpy="0 0 0" xyz="-0.15 0 0.2" />
       <geometry>
@@ -40,145 +129,499 @@
     </collision>
   </link>
   <link name="arm_base_link">
-    <collision>
-      <origin xyz="0.05398438 0.00000000 -0.05320479" rpy="0 0 0" />
+    <visual name="arm_base_link_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.19196877 0.34579999 0.42319040" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/body_arm_assy.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 body proxies shifted to the F-series shoulder mount center and spacing.-->
+    <collision>
+      <origin rpy="0 0.1 0" xyz="0.0255 0 -0.186" />
+      <geometry>
+        <box size="0.2 0.2179 0.63" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0.1 0" xyz="0.07525 0.10895 -0.191" />
+      <geometry>
+        <cylinder length="0.63" radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0.1 0" xyz="-0.02425 0.10895 -0.181" />
+      <geometry>
+        <box size="0.2 0.1 0.63" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0.1 0" xyz="0.07525 -0.10895 -0.191" />
+      <geometry>
+        <cylinder length="0.63" radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0.1 0" xyz="-0.02425 -0.10895 -0.181" />
+      <geometry>
+        <box size="0.2 0.1 0.63" />
+      </geometry>
+    </collision>
+  </link>
+  <!--F-series head mounting transforms; retain the BG2/SG2 head collision sphere.-->
+  <joint name="head_joint1" type="fixed">
+    <parent link="arm_base_link" />
+    <child link="head_link1" />
+    <origin rpy="0 0 0" xyz="0.102729 0 0.116803" />
+  </joint>
+  <link name="head_link1">
+    <visual name="head_link1_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/head_link1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="head_joint2" type="fixed">
+    <parent link="head_link1" />
+    <child link="head_link2" />
+    <origin rpy="0 0 0" xyz="0.04 0 0.064" />
+  </joint>
+  <link name="head_link2">
+    <visual name="head_link2_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/head_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <visual name="camera_head_link_visual_0">
+      <origin rpy="1.5707963267949 0 1.5707963267949" xyz="0.048505 0 -0.011" />
+      <geometry>
+        <mesh filename="package://realsense2_description/meshes/d455.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="aluminum">
+        <color rgba="0.5 0.5 0.5 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.02" />
+      <geometry>
+        <sphere radius="0.1" />
       </geometry>
     </collision>
   </link>
   <link name="arm_l_link1">
-    <collision>
-      <origin xyz="-0.00156822 0.09605000 0.00000000" rpy="0 0 0" />
+    <visual name="arm_l_link1_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13713644 0.11250000 0.09700000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link1.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_l_link2">
-    <collision>
-      <origin xyz="-0.00004341 0.00000000 -0.10720024" rpy="0 0 0" />
+    <visual name="arm_l_link2_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13231318 0.09700000 0.31139951" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.3000 -> 0.3200 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 1.5708 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.16" />
+      <geometry>
+        <cylinder length="0.32" radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.32" />
+      <geometry>
+        <sphere radius="0.07" />
       </geometry>
     </collision>
   </link>
   <link name="arm_l_link3">
-    <collision>
-      <origin xyz="0.02050818 -0.00663605 -0.09604964" rpy="0 0 0" />
+    <visual name="arm_l_link3_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.12799039 0.10727209 0.12049929" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link3.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_l_link4">
-    <collision>
-      <origin xyz="-0.02250293 0.00454995 -0.07875054" rpy="0 0 0" />
+    <visual name="arm_l_link4_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13199414 0.10549990 0.24449892" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.3415 -> 0.3200 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 0" />
+      <geometry>
+        <sphere radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 -0.13925" />
+      <geometry>
+        <cylinder length="0.2785" radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 -0.2785" />
+      <geometry>
+        <sphere radius="0.07" />
       </geometry>
     </collision>
   </link>
   <link name="arm_l_link5">
-    <collision>
-      <origin xyz="0.00000000 -0.00663468 -0.08755000" rpy="0 0 0" />
+    <visual name="arm_l_link5_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.08700000 0.10726935 0.10150000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link5.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_l_link6">
-    <collision>
-      <origin xyz="0.00000000 0.01183835 -0.03000000" rpy="0 0 0" />
+    <visual name="arm_l_link6_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.10000000 0.08907671 0.14700000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link6.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_l_link7">
-    <collision>
-      <origin xyz="0.00275000 0.00000000 -0.02360772" rpy="0 0 0" />
+    <visual name="arm_l_link7_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.11700000 0.05800000 0.09075455" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link7.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="camera_left_base_link_visual_0">
+      <origin xyz="0.02675 0 -0.084575" rpy="-1.57079632679 1.57079632679 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/wrist_d401_base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="d401_black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_l_hx2_d1_base_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.00025 0 -0.05" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_l_hx2_d1_r1_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000011582 -0.00799999999999998 -0.098" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/r1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_l_hx2_d1_r2_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000027666 -0.0574977 -0.1262667" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/r2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_l_hx2_d1_l1_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000008273 0.00800000000000002 -0.098" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/l1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_l_hx2_d1_l2_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000003882 0.0574977 -0.1262667" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/l2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.2150 -> 0.1860 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.085" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.0455" />
+      <geometry>
+        <cylinder length="0.091" radius="0.085" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.091" />
+      <geometry>
+        <sphere radius="0.085" />
       </geometry>
     </collision>
   </link>
   <link name="arm_r_link1">
-    <collision>
-      <origin xyz="-0.00147079 -0.09605005 0.00000000" rpy="0 0 0" />
+    <visual name="arm_r_link1_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13694157 0.11250011 0.09700000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link1.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_r_link2">
-    <collision>
-      <origin xyz="-0.00004341 0.00000000 -0.10720024" rpy="0 0 0" />
+    <visual name="arm_r_link2_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13231318 0.09700000 0.31139951" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.3000 -> 0.3200 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 1.5708 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.16" />
+      <geometry>
+        <cylinder length="0.32" radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.32" />
+      <geometry>
+        <sphere radius="0.07" />
       </geometry>
     </collision>
   </link>
   <link name="arm_r_link3">
-    <collision>
-      <origin xyz="0.02050818 0.00663605 -0.09654964" rpy="0 0 0" />
+    <visual name="arm_r_link3_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.12799039 0.10727209 0.11949929" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link3.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_r_link4">
-    <collision>
-      <origin xyz="-0.02250293 -0.00454995 -0.07875054" rpy="0 0 0" />
+    <visual name="arm_r_link4_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.13199414 0.10549990 0.24449892" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.3415 -> 0.3200 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 0" />
+      <geometry>
+        <sphere radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 -0.13925" />
+      <geometry>
+        <cylinder length="0.2785" radius="0.07" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.04 0 -0.2785" />
+      <geometry>
+        <sphere radius="0.07" />
       </geometry>
     </collision>
   </link>
   <link name="arm_r_link5">
-    <collision>
-      <origin xyz="0.00000000 0.00663468 -0.08755000" rpy="0 0 0" />
+    <visual name="arm_r_link5_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.08700000 0.10726935 0.10150000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link5.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_r_link6">
-    <collision>
-      <origin xyz="0.00000000 -0.01183835 -0.03000000" rpy="0 0 0" />
+    <visual name="arm_r_link6_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.10000000 0.08907671 0.14700000" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link6.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_r_link7">
-    <collision>
-      <origin xyz="0.00275000 0.00000000 -0.02360772" rpy="0 0 0" />
+    <visual name="arm_r_link7_visual_0">
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <box size="0.11700000 0.05800000 0.09075455" />
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link7.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="camera_right_base_link_visual_0">
+      <origin xyz="0.02675 0 -0.08575" rpy="-1.57079632679 1.57079632679 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/wrist_d401_base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="d401_black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_r_hx2_d1_base_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.00025 0 -0.05" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_r_hx2_d1_r1_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000011582 -0.00799999999999998 -0.098" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/r1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_r_hx2_d1_r2_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000027666 -0.0574977 -0.1262667" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/r2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_r_hx2_d1_l1_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000008273 0.00800000000000002 -0.098" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/l1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <visual name="gripper_r_hx2_d1_l2_visual_0">
+      <origin rpy="3.14159265358979 0 0" xyz="0.000350000000003882 0.0574977 -0.1262667" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx2_d1/l2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+    <!--BG2/SG2 capsule: axial span 0.2150 -> 0.1860 m; keep radii and end padding.-->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.085" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.0455" />
+      <geometry>
+        <cylinder length="0.091" radius="0.085" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.091" />
+      <geometry>
+        <sphere radius="0.085" />
       </geometry>
     </collision>
   </link>
   <link name="end_effector_l_link">
-    <collision>
-      <origin xyz="0.00145000 0.00000000 0.06453261" rpy="0 0 0" />
+    <!--TCP marker only; gripper collision is represented on arm_l_link7.-->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <box size="0.06640000 0.16631853 0.15493479" />
+        <box size="0.01 0.01 0.01" />
       </geometry>
-    </collision>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
   </link>
   <link name="end_effector_r_link">
-    <collision>
-      <origin xyz="0.00145000 0.00000000 0.06453261" rpy="0 0 0" />
+    <!--TCP marker only; gripper collision is represented on arm_r_link7.-->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <box size="0.06640000 0.16631853 0.15493479" />
+        <box size="0.01 0.01 0.01" />
       </geometry>
-    </collision>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
   </link>
   <joint name="lift_joint" type="prismatic">
     <parent link="base_link" />
     <child link="arm_base_link" />
-    <origin rpy="0 0 0" xyz="-0.0753807 0 1.407" />
+    <origin rpy="0 0 0" xyz="-0.075 0 1.423" />
     <axis xyz="0 0 1" />
     <limit effort="1000" lower="-0.5" upper="0.0" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -186,7 +629,7 @@
   <joint name="arm_l_joint1" type="revolute">
     <parent link="arm_base_link" />
     <child link="arm_l_link1" />
-    <origin rpy="0 0 0" xyz="0.059 0.1127 0.030" />
+    <origin rpy="0 0 0" xyz="0.0555 0.11345 0.014" />
     <axis xyz="0 1 0" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -194,7 +637,7 @@
   <joint name="arm_l_joint2" type="revolute">
     <parent link="arm_l_link1" />
     <child link="arm_l_link2" />
-    <origin rpy="0 0 0" xyz="0.0177 0.1038 0" />
+    <origin rpy="0 0 0" xyz="0.01845 0.10305 0" />
     <axis xyz="1 0 0" />
     <limit effort="1000" lower="0.0" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -202,7 +645,7 @@
   <joint name="arm_l_joint3" type="revolute">
     <parent link="arm_l_link2" />
     <child link="arm_l_link3" />
-    <origin rpy="0 0 0" xyz="-0.0177 0 -0.2072" />
+    <origin rpy="0 0 0" xyz="-0.01845 0 -0.20795" />
     <axis xyz="0 0 1" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -210,15 +653,16 @@
   <joint name="arm_l_joint4" type="revolute">
     <parent link="arm_l_link3" />
     <child link="arm_l_link4" />
-    <origin rpy="0 0 0" xyz="0.0410041 0.0007 -0.1128" />
+    <origin rpy="0 0 0" xyz="0.0410041 0.00145 -0.11205" />
     <axis xyz="0 1 0" />
-    <limit effort="1000" lower="-2.9361" upper="1.0786" velocity="4.8" />
+    <!-- Keep the elbow bent to avoid the straight-arm singularity. -->
+    <limit effort="1000" lower="-2.9361" upper="-0.7" velocity="4.8" />
     <dynamics damping="0.1" />
   </joint>
   <joint name="arm_l_joint5" type="revolute">
     <parent link="arm_l_link4" />
     <child link="arm_l_link5" />
-    <origin rpy="0 0 0" xyz="-0.041 -0.0007 -0.1477" />
+    <origin rpy="0 0 0" xyz="-0.041 -0.00145 -0.14845" />
     <axis xyz="0 0 1" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -226,7 +670,7 @@
   <joint name="arm_l_joint6" type="revolute">
     <parent link="arm_l_link5" />
     <child link="arm_l_link6" />
-    <origin rpy="0 0 0" xyz="0 0.0007 -0.0948" />
+    <origin rpy="0 0 0" xyz="0 0.00145 -0.09405" />
     <axis xyz="0 1 0" />
     <limit effort="1000" lower="-1.57" upper="1.57" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -234,7 +678,7 @@
   <joint name="arm_l_joint7" type="revolute">
     <parent link="arm_l_link6" />
     <child link="arm_l_link7" />
-    <origin rpy="0 0 0" xyz="-0.00025 -0.0007 -0.0775" />
+    <origin rpy="0 0 0" xyz="-0.00025 -0.00145 -0.0775" />
     <axis xyz="1 0 0" />
     <limit effort="1000" lower="-1.5804" upper="1.8201" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -242,7 +686,7 @@
   <joint name="arm_r_joint1" type="revolute">
     <parent link="arm_base_link" />
     <child link="arm_r_link1" />
-    <origin rpy="0 0 0" xyz="0.055 -0.1127 0.030" />
+    <origin rpy="0 0 0" xyz="0.0555 -0.11345 0.014" />
     <axis xyz="0 1 0" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -250,7 +694,7 @@
   <joint name="arm_r_joint2" type="revolute">
     <parent link="arm_r_link1" />
     <child link="arm_r_link2" />
-    <origin rpy="0 0 0" xyz="0.0177 -0.1038 0" />
+    <origin rpy="0 0 0" xyz="0.01845 -0.10305 0" />
     <axis xyz="1 0 0" />
     <limit effort="1000" lower="-3.14" upper="0" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -258,7 +702,7 @@
   <joint name="arm_r_joint3" type="revolute">
     <parent link="arm_r_link2" />
     <child link="arm_r_link3" />
-    <origin rpy="0 0 0" xyz="-0.0177 0 -0.2072" />
+    <origin rpy="0 0 0" xyz="-0.01845 0 -0.20795" />
     <axis xyz="0 0 1" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -266,15 +710,16 @@
   <joint name="arm_r_joint4" type="revolute">
     <parent link="arm_r_link3" />
     <child link="arm_r_link4" />
-    <origin rpy="0 0 0" xyz="0.0410041 -0.0007 -0.1128" />
+    <origin rpy="0 0 0" xyz="0.0410041 -0.00145 -0.11205" />
     <axis xyz="0 1 0" />
-    <limit effort="1000" lower="-2.9361" upper="1.0786" velocity="4.8" />
+    <!-- Keep the elbow bent to avoid the straight-arm singularity. -->
+    <limit effort="1000" lower="-2.9361" upper="-0.7" velocity="4.8" />
     <dynamics damping="0.1" />
   </joint>
   <joint name="arm_r_joint5" type="revolute">
     <parent link="arm_r_link4" />
     <child link="arm_r_link5" />
-    <origin rpy="0 0 0" xyz="-0.041 0.0007 -0.1477" />
+    <origin rpy="0 0 0" xyz="-0.041 0.00145 -0.14845" />
     <axis xyz="0 0 1" />
     <limit effort="1000" lower="-3.14" upper="3.14" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -282,7 +727,7 @@
   <joint name="arm_r_joint6" type="revolute">
     <parent link="arm_r_link5" />
     <child link="arm_r_link6" />
-    <origin rpy="0 0 0" xyz="0 -0.0007 -0.0948" />
+    <origin rpy="0 0 0" xyz="0 -0.00145 -0.09405" />
     <axis xyz="0 1 0" />
     <limit effort="1000" lower="-1.57" upper="1.57" velocity="4.8" />
     <dynamics damping="0.1" />
@@ -290,7 +735,7 @@
   <joint name="arm_r_joint7" type="revolute">
     <parent link="arm_r_link6" />
     <child link="arm_r_link7" />
-    <origin rpy="0 0 0" xyz="-0.00025 -0.0007 -0.0775" />
+    <origin rpy="0 0 0" xyz="-0.00025 -0.00145 -0.0775" />
     <axis xyz="1 0 0" />
     <limit effort="1000" lower="-1.8201" upper="1.5804" velocity="4.8" />
     <dynamics damping="0.1" />

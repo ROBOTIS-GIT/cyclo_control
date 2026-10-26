@@ -34,7 +34,14 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     """Create the launch description for AI worker controllers."""
+    model = LaunchConfiguration('model')
     declared_arguments = [
+        DeclareLaunchArgument(
+            'model',
+            default_value='sg2',
+            choices=['sg2', 'bg2', 'f1', 'f2'],
+            description='Follower model used for the default URDF and SRDF paths.',
+        ),
         DeclareLaunchArgument(
             'start_interactive_marker',
             default_value='false',
@@ -107,7 +114,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    'ffw_sg2_follower.urdf',
+                    ['ffw_', model, '_follower.urdf'],
                 ]
             ),
             description='Path to robot URDF file.',
@@ -119,7 +126,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    'ffw_sg2_follower_default.srdf',
+                    ['ffw_', model, '_follower_default.srdf'],
                 ]
             ),
             description='Path to robot SRDF file.',
@@ -131,7 +138,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    'ffw_sg2_follower_modified.srdf',
+                    ['ffw_', model, '_follower_modified.srdf'],
                 ]
             ),
             description='Path to robot SRDF file with hand collision disabled.',
@@ -505,6 +512,7 @@ def generate_launch_description():
         package='cyclo_motion_controller_ros_py',
         executable='arm_retargeting_teleop',
         name='arm_retargeting_teleop',
+        parameters=[{'urdf_path': follower_urdf_path}],
         output='screen',
         condition=IfCondition(
             PythonExpression(

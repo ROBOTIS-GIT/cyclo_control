@@ -152,16 +152,6 @@ source install/setup.bash
 
 ## Run
 
-### Teleoperation and Model Action Control
-
-The `cyclo_teleoperation` package provides one `cyclo_teleoperation_node` for both leader-driven
-teleoperation and model-action control, selected through the command-source interface. Robot-specific
-repositories provide follower profiles, leader references, and controller-mode configuration.
-Both input paths are available in this single executable; no separate model-action node is needed.
-Model absolute joint actions go directly to the follower's legacy joint trajectory topics,
-without a Cyclo plugin or QP. Absolute EEF actions retain plugin/QP conversion.
-See the package README for the model publisher handoff contract and direct-control limitations.
-
 ### AI Worker Controllers
 
 Launch AI Worker controllers:
@@ -170,10 +160,21 @@ Launch AI Worker controllers:
 ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py
 ```
 
+The default follower model is SG2. Select `model:=bg2`, `model:=f1`, or `model:=f2`
+for the corresponding follower. For example:
+
+```bash
+ros2 launch cyclo_motion_controller_ros ai_worker_controller.launch.py model:=f2 controller_type:=movel
+```
+
+BG2 uses its own URDF with the SG2 default/modified SRDF collision policies,
+as specified by the packaged BG2 model. F1 and F2 use their own URDF/SRDF files.
+
 Launch arguments:
 
 | Argument | Default | Description |
 | --- | --- | --- |
+| `model` | `sg2` | Follower model: `sg2`, `bg2`, `f1`, or `f2`. Sets the default URDF/SRDF paths. |
 | `controller_type` | `movel` | Selects the controller mode. Available values are listed below. |
 | `config_file` | package default | Controller YAML file. |
 | `follower_urdf_path` | package default | Follower robot URDF. |
