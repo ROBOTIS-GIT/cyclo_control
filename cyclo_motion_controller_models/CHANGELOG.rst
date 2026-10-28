@@ -2,6 +2,14 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.2 (2026-10-27)
+------------------
+* Updated A1 arm geometry and joint axes for physical DHI joint states
+* Aligned both A1 end-effector offsets with the current AI Worker Xacro
+* Added A1 and A2 RViz launch files with optional GUI and RViz startup
+* Shared renamed RViz configurations across leader and follower viewers
+* Contributors: Yeonguk Kim
+
 0.5.1 (2026-10-26)
 ------------------
 * Replaced F1 and F2 arm collision boxes with BG2/SG2-style proxies adjusted for F-series link lengths

@@ -2,6 +2,13 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.2 (2026-10-27)
+------------------
+* Corrected A1 leader kinematics and synchronized end-effector positions with AI Worker
+* Added A1 and A2 model viewers and shared RViz configurations
+* Added Cartesian translation scaling while preserving existing leader-reference callers
+* Contributors: Yeonguk Kim
+
 0.5.1 (2026-10-26)
 ------------------
 * Enabled BG2, F1, and F2 model selection in the AI Worker controller launch

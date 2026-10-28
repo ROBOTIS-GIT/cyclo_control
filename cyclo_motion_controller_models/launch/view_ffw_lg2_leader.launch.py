@@ -44,7 +44,7 @@ def generate_launch_description():
         'leader',
         'ffw_lg2_leader.urdf',
     )
-    rviz_config_file = os.path.join(pkg_share, 'rviz', 'ffw_lg2_leader.rviz')
+    rviz_config_file = os.path.join(pkg_share, 'rviz', 'ffw_follower.rviz')
 
     with open(urdf_path, 'r', encoding='utf-8') as f:
         robot_description = f.read()

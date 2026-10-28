@@ -32,6 +32,11 @@ public:
   static Eigen::Affine3d absoluteGoal(
     const Eigen::Affine3d & leader_start, const Eigen::Affine3d & leader_now,
     const Eigen::Affine3d & follower_start_in_arm, const Eigen::Affine3d & base_from_arm);
+  // Uniform translation gain about the anchors; orientation and FK are unchanged.
+  static Eigen::Affine3d absoluteGoal(
+    const Eigen::Affine3d & leader_start, const Eigen::Affine3d & leader_now,
+    const Eigen::Affine3d & follower_start_in_arm, const Eigen::Affine3d & base_from_arm,
+    double translation_gain);
 
 private:
   struct Model;

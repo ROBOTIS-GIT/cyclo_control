@@ -111,9 +111,21 @@ Eigen::Affine3d LeaderPoseReference::absoluteGoal(
   const Eigen::Affine3d & leader_start, const Eigen::Affine3d & leader_now,
   const Eigen::Affine3d & follower_start_in_arm, const Eigen::Affine3d & base_from_arm)
 {
+  return absoluteGoal(leader_start, leader_now, follower_start_in_arm, base_from_arm, 1.0);
+}
+
+Eigen::Affine3d LeaderPoseReference::absoluteGoal(
+  const Eigen::Affine3d & leader_start, const Eigen::Affine3d & leader_now,
+  const Eigen::Affine3d & follower_start_in_arm, const Eigen::Affine3d & base_from_arm,
+  const double translation_gain)
+{
+  if (!std::isfinite(translation_gain) || translation_gain <= 0.0) {
+    throw std::invalid_argument("Cartesian translation gain must be finite and positive");
+  }
   Eigen::Affine3d goal = follower_start_in_arm;
   const Eigen::Matrix3d arm_from_base = base_from_arm.linear().transpose();
-  goal.translation() += arm_from_base * (leader_now.translation() - leader_start.translation());
+  goal.translation() += arm_from_base *
+    (translation_gain * (leader_now.translation() - leader_start.translation()));
   goal.linear() = arm_from_base * leader_now.linear() * leader_start.linear().transpose() *
     base_from_arm.linear() * follower_start_in_arm.linear();
   return base_from_arm * goal;

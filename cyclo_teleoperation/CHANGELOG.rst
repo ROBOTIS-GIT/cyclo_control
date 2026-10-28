@@ -2,6 +2,14 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.2 (2026-10-27)
+------------------
+* Added an anchored Cartesian translation-gain overload while preserving orientation
+* Preserved the existing four-argument leader-reference API with unit gain
+* Rejected non-finite and non-positive translation gains
+* Documented per-arm scaling and follower-reference-model behavior
+* Contributors: Yeonguk Kim
+
 0.5.1 (2026-10-26)
 ------------------
 * None

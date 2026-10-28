@@ -316,3 +316,24 @@ profile enables `leader_use_follower_reference_model` to preserve its existing
 follower-sized geometry for these models. Such FK uses the configured arm anchor
 as its root, so a non-arm joint such as lift is not treated as a leader input.
 Set this flag to false when supplying a different leader calculation URDF.
+
+LG2, A2 and A1 share optional Cartesian translation scaling in their leader input
+YAML, under `/leader/joint_trajectory_command_broadcaster.ros__parameters`:
+
+```yaml
+cartesian_scaling:
+  left_translation_gain: 1.0
+  right_translation_gain: 1.0
+```
+
+Each positive, finite gain multiplies the selected FK model's displacement from
+its per-arm start/resume anchor. The published `/action/left/pose` and
+`/action/right/pose` already contain the scaled absolute target positions; the
+follower must not apply this gain again. Rotation remains 1:1, and the measured
+JointState, FK, gripper, joint-mode mapping/scaling and follower lift motion are
+unchanged. A gain of 1.5 maps a 10 cm reference displacement to a 15 cm target
+displacement. A2's follower-reference-model option scales that selected model's
+displacement, not the physical A2 hand displacement. Defaults of 1.0 preserve
+existing behavior. Gains are read-only after parameter declaration; configure
+them before launching the leader. Existing hold and resume anchoring remain in
+use, and the gains do not modify external model-action pose inputs.
