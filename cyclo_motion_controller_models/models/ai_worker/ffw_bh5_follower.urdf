@@ -116,6 +116,12 @@
   <link name="arm_l_link5" />
   <link name="arm_l_link6" />
   <link name="arm_l_link7">
+    <collision name="camera_l_envelope">
+      <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0" />
+      <geometry>
+        <box size="0.023 0.042 0.042" />
+      </geometry>
+    </collision>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -123,13 +129,13 @@
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.06" />
+      <origin rpy="0 0 0" xyz="0 0 -0.03" />
       <geometry>
-        <cylinder length="0.12" radius="0.085" />
+        <cylinder length="0.06" radius="0.085" />
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.12" />
+      <origin rpy="0 0 0" xyz="0 0 -0.06" />
       <geometry>
         <sphere radius="0.085" />
       </geometry>
@@ -180,6 +186,12 @@
   <link name="arm_r_link5" />
   <link name="arm_r_link6" />
   <link name="arm_r_link7">
+    <collision name="camera_r_envelope">
+      <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0" />
+      <geometry>
+        <box size="0.023 0.042 0.042" />
+      </geometry>
+    </collision>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -187,33 +199,91 @@
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.06" />
+      <origin rpy="0 0 0" xyz="0 0 -0.03" />
       <geometry>
-        <cylinder length="0.12" radius="0.085" />
+        <cylinder length="0.06" radius="0.085" />
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.12" />
+      <origin rpy="0 0 0" xyz="0 0 -0.06" />
       <geometry>
         <sphere radius="0.085" />
       </geometry>
     </collision>
   </link>
   <link name="hx5_d20_left_base">
-    <!--Static hand workspace envelope; actual hand control is separate.-->
-    <collision>
-      <origin xyz="0.05804047 -0.01135176 0.08881833" rpy="0 0 0" />
+    <collision name="hand_l_envelope_0">
+      <origin xyz="0.116 -0.004 0.096" rpy="0 0 0" />
       <geometry>
-        <box size="0.18094583 0.29115649 0.31842334" />
+        <sphere radius="0.089" />
+      </geometry>
+    </collision>
+    <collision name="hand_l_envelope_1">
+      <origin xyz="0.047 -0.043 0.180" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_l_envelope_2">
+      <origin xyz="0.043 -0.071 0.078" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_l_envelope_3">
+      <origin xyz="0.055 -0.076 0.006" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.104" />
+      </geometry>
+    </collision>
+    <collision name="hand_l_envelope_4">
+      <origin xyz="0.054 0.053 0.170" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_l_envelope_5">
+      <origin xyz="0.029 0.026 0.064" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.097" />
       </geometry>
     </collision>
   </link>
   <link name="hx5_d20_right_base">
-    <!--Static hand workspace envelope; actual hand control is separate.-->
-    <collision>
-      <origin xyz="0.05857498 0.01856050 0.08737913" rpy="0 0 0" />
+    <collision name="hand_r_envelope_0">
+      <origin xyz="0.116 0.004 0.096" rpy="0 0 0" />
       <geometry>
-        <box size="0.18199472 0.27673900 0.32130175" />
+        <sphere radius="0.089" />
+      </geometry>
+    </collision>
+    <collision name="hand_r_envelope_1">
+      <origin xyz="0.047 0.043 0.180" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_r_envelope_2">
+      <origin xyz="0.043 0.071 0.078" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_r_envelope_3">
+      <origin xyz="0.055 0.076 0.006" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.104" />
+      </geometry>
+    </collision>
+    <collision name="hand_r_envelope_4">
+      <origin xyz="0.054 -0.053 0.170" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.095" />
+      </geometry>
+    </collision>
+    <collision name="hand_r_envelope_5">
+      <origin xyz="0.029 -0.026 0.064" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.097" />
       </geometry>
     </collision>
   </link>

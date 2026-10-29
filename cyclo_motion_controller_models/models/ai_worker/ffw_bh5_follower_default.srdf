@@ -123,8 +123,12 @@
   <disable_collisions link1="arm_r_link5" link2="arm_r_link6" reason="Adjacent" />
   <disable_collisions link1="arm_r_link5" link2="arm_r_link7" reason="Never" />
   <disable_collisions link1="arm_r_link6" link2="arm_r_link7" reason="Adjacent" />
-  <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link6" reason="Adjacent" />
+  <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link4" reason="User" />
+  <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link5" reason="User" />
+  <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link6" reason="User" />
   <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link7" reason="Adjacent" />
-  <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link6" reason="Adjacent" />
+  <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link4" reason="User" />
+  <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link5" reason="User" />
+  <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link6" reason="User" />
   <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link7" reason="Adjacent" />
 </robot>
