@@ -31,7 +31,9 @@ from typing import Optional
 
 import numpy as np
 
+from retargeting.hand_geometry import endpoint_translations
 from retargeting.optimizer import DexPilotOptimizer
+from retargeting.pinch import PinchConfig
 from retargeting.robot_wrapper import RobotWrapper
 
 
@@ -53,7 +55,14 @@ class RetargetingResult:
 class ROBOTISHandRetargeter:
     """Retarget MediaPipe hand landmarks to the ROBOTIS hand model."""
 
-    def __init__(self, path_to_urdf: str, hand_side: str = 'right') -> None:
+    def __init__(
+        self,
+        path_to_urdf: str,
+        hand_side: str = 'right',
+        hand_revision: str = 'urdf',
+        pinch_config: Optional[PinchConfig] = None,
+        contact_offsets: Optional[np.ndarray] = None,
+    ) -> None:
         """Initialize the retargeter for the requested hand side."""
         self.hand_side = hand_side.lower()
         if self.hand_side not in ['right', 'left']:
@@ -84,12 +93,15 @@ class ROBOTISHandRetargeter:
         if not urdf_path.exists():
             raise ValueError(f'URDF path {urdf_path} does not exist')
 
-        robot = RobotWrapper(str(urdf_path))
+        robot = RobotWrapper(
+            str(urdf_path),
+            fixed_joint_translations=endpoint_translations(self.hand_side, hand_revision),
+        )
         self.robot = robot
         self.robot_finger_lengths = self._compute_robot_finger_lengths(robot)
 
         self.is_calibrated = False
-        self.finger_scaling = np.ones(5, dtype=np.float32)
+        self.finger_scaling = np.ones(5, dtype=np.float64)
 
         self.optimizer = DexPilotOptimizer(
             robot,
@@ -98,13 +110,15 @@ class ROBOTISHandRetargeter:
             wrist_link_name=self.hx_wrist_link_name,
             finger_scaling=self.finger_scaling.tolist(),
             hand_side=self.hand_side,
+            pinch_config=pinch_config,
+            contact_offsets=contact_offsets,
         )
         self.filter = LPFilter(LOW_PASS_ALPHA)
 
         joint_limits = robot.joint_limits[self.optimizer.idx_pin2target]
         self.optimizer.set_joint_limit(joint_limits)
         self.joint_limits = joint_limits
-        self.last_qpos = joint_limits.mean(1).astype(np.float32)
+        self.last_qpos = joint_limits.mean(1)
 
     def retarget(self, mediapipe_pose: np.ndarray) -> RetargetingResult:
         """Convert a MediaPipe hand pose into robot joint targets."""
@@ -115,6 +129,16 @@ class ROBOTISHandRetargeter:
                 f'got {mediapipe_pose.shape}'
             )
 
+        if not np.isfinite(mediapipe_pose).all():
+            raise ValueError('Hand landmarks must be finite')
+        human_dir = (
+            mediapipe_pose[MP_FINGER_TIP_INDICES, :]
+            - mediapipe_pose[MP_DIP_INDICES, :]
+        )
+        direction_lengths = np.linalg.norm(human_dir, axis=1, keepdims=True)
+        if np.any(direction_lengths < 1e-8):
+            raise ValueError('Distal finger segments must have nonzero length')
+
         if not self.is_calibrated:
             self._calibrate_scaling(mediapipe_pose)
 
@@ -123,13 +147,7 @@ class ROBOTISHandRetargeter:
             mediapipe_pose[indices[1], :] - mediapipe_pose[indices[0], :]
         )
 
-        human_dir = (
-            mediapipe_pose[MP_FINGER_TIP_INDICES, :]
-            - mediapipe_pose[MP_DIP_INDICES, :]
-        )
-        human_dir_norm = human_dir / (
-            np.linalg.norm(human_dir, axis=1, keepdims=True) + 1e-6
-        )
+        human_dir_norm = human_dir / direction_lengths
 
         robot_qpos = self._retarget_optimization(
             ref_value=reference,
@@ -158,7 +176,7 @@ class ROBOTISHandRetargeter:
             [robot.get_link_pose(idx)[:3, 3] for idx in tip_indices]
         )
         finger_lengths = np.linalg.norm(tip_positions - wrist_pos, axis=1)
-        return finger_lengths.astype(np.float32)
+        return finger_lengths
 
     def _compute_human_finger_lengths(
         self,
@@ -168,17 +186,16 @@ class ROBOTISHandRetargeter:
         wrist_pos = mediapipe_pose[MP_WRIST_IDX]
         tip_positions = mediapipe_pose[MP_FINGER_TIP_INDICES]
         finger_lengths = np.linalg.norm(tip_positions - wrist_pos, axis=1)
-        return finger_lengths.astype(np.float32)
+        return finger_lengths
 
     def _calibrate_scaling(self, mediapipe_pose: np.ndarray) -> None:
         """Calibrate per-finger scaling from the first observed hand pose."""
         human_lengths = self._compute_human_finger_lengths(mediapipe_pose)
-        self.finger_scaling = (
-            human_lengths / (self.robot_finger_lengths + 1e-6)
-        )
+        if not np.isfinite(human_lengths).all() or np.any(human_lengths < 1e-8):
+            raise ValueError('Calibration requires nonzero wrist-to-tip distances')
+        self.finger_scaling = self.robot_finger_lengths / human_lengths
 
         self.optimizer.finger_scaling = self.finger_scaling
-        self.optimizer.vector_scaling = self.optimizer.build_vector_scaling()
 
         self.is_calibrated = True
         print(f'[Retargeter] Calibrated finger scaling: {self.finger_scaling}')
@@ -195,8 +212,8 @@ class ROBOTISHandRetargeter:
     ) -> np.ndarray:
         """Run the optimizer and update the internal warm-start state."""
         qpos = self.optimizer.retarget(
-            ref_value=ref_value.astype(np.float32),
-            target_dir=target_dir.astype(np.float32),
+            ref_value=ref_value,
+            target_dir=target_dir,
             last_qpos=np.clip(
                 self.last_qpos,
                 self.joint_limits[:, 0],

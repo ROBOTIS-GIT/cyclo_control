@@ -24,6 +24,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from retargeting.pinch import PinchConfig
 from retargeting.seq_retarget import ROBOTISHandRetargeter
 from robotis_interfaces.msg import HandJoints
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -59,13 +60,33 @@ class RetargetingTeleop(Node):
             'hx5_d20_left.urdf',
         )
 
+        hand_revision = self.declare_parameter('hand_revision', 'rev2').value
+        pinch_config = PinchConfig(
+            enabled=self.declare_parameter('pinch_enabled', True).value,
+            contact_weight=self.declare_parameter('pinch_contact_weight', 500.0).value,
+            axis_weight=self.declare_parameter('pinch_axis_weight', 0.175).value,
+            direction_scale=self.declare_parameter('pinch_direction_scale', 0.5).value,
+        )
+        right_contact_offsets = np.asarray(self.declare_parameter(
+            'right_contact_offsets', [0.0] * 15,
+        ).value, dtype=np.float64).reshape(5, 3)
+        left_contact_offsets = np.asarray(self.declare_parameter(
+            'left_contact_offsets', [0.0] * 15,
+        ).value, dtype=np.float64).reshape(5, 3)
+
         self.right_retargeter = ROBOTISHandRetargeter(
             path_to_urdf=right_urdf_path,
             hand_side='right',
+            hand_revision=hand_revision,
+            pinch_config=pinch_config,
+            contact_offsets=right_contact_offsets,
         )
         self.left_retargeter = ROBOTISHandRetargeter(
             path_to_urdf=left_urdf_path,
             hand_side='left',
+            hand_revision=hand_revision,
+            pinch_config=pinch_config,
+            contact_offsets=left_contact_offsets,
         )
 
         self.left_joint_names = [
@@ -149,19 +170,29 @@ class RetargetingTeleop(Node):
 
     def run_teleop_left(self, msg: HandJoints) -> None:
         """Retarget the left hand landmarks and publish a trajectory."""
-        mediapipe_pos = self.convert_msg_to_numpy(msg)
-        retargeting_result = self.left_retargeter.retarget(mediapipe_pos)
+        try:
+            mediapipe_pos = self.convert_msg_to_numpy(msg)
+            retargeting_result = self.left_retargeter.retarget(mediapipe_pos)
+        except ValueError as error:
+            self.get_logger().warning(f'Ignoring invalid left hand: {error}')
+            return
         self.publish_trajectory_left(retargeting_result.robot_qpos)
 
     def run_teleop_right(self, msg: HandJoints) -> None:
         """Retarget the right hand landmarks and publish a trajectory."""
-        mediapipe_pos = self.convert_msg_to_numpy(msg)
-        retargeting_result = self.right_retargeter.retarget(mediapipe_pos)
+        try:
+            mediapipe_pos = self.convert_msg_to_numpy(msg)
+            retargeting_result = self.right_retargeter.retarget(mediapipe_pos)
+        except ValueError as error:
+            self.get_logger().warning(f'Ignoring invalid right hand: {error}')
+            return
         self.publish_trajectory_right(retargeting_result.robot_qpos)
 
     def convert_msg_to_numpy(self, msg: HandJoints) -> np.ndarray:
         """Convert a `HandJoints` message into a `(21, 3)` NumPy array."""
-        pose_array_np = np.zeros((21, 3), dtype=np.float32)
+        if len(msg.joints) != 21:
+            raise ValueError('Expected exactly 21 hand landmarks')
+        pose_array_np = np.zeros((21, 3), dtype=np.float64)
         for index, point in enumerate(msg.joints):
             pose_array_np[index, 0] = point.x
             pose_array_np[index, 1] = point.y

@@ -28,6 +28,9 @@ from typing import Callable, List, Optional, Tuple
 import nlopt
 import numpy as np
 
+from retargeting.pinch import (
+    PinchConfig, pinch_loss_and_gradient, PrecisionPinch,
+)
 from retargeting.robot_wrapper import RobotWrapper
 
 
@@ -52,11 +55,22 @@ class DexPilotOptimizer:
         eta1: float = 1e-4,
         eta2: float = 3e-2,
         orientation_weight: float = 0.5,
+        pinch_config: Optional[PinchConfig] = None,
+        contact_offsets: Optional[np.ndarray] = None,
     ) -> None:
         """Initialize the optimizer and cache robot/link metadata."""
         self.robot = robot
         self.num_fingers = 5
-        self.finger_scaling = np.array(finger_scaling, dtype=np.float32)
+        self.finger_scaling = np.array(finger_scaling, dtype=np.float64)
+        self.pinch_config = pinch_config or PinchConfig()
+        self.pinch = PrecisionPinch(project_dist, escape_dist)
+        self.contact_offsets = np.array(
+            np.zeros((5, 3)) if contact_offsets is None else contact_offsets,
+            dtype=np.float64,
+        )
+        if (self.contact_offsets.shape != (5, 3)
+                or not np.isfinite(self.contact_offsets).all()):
+            raise ValueError('Expected finite contact_offsets with shape (5, 3)')
 
         joint_names = robot.dof_joint_names
         idx_pin2target = []
@@ -71,6 +85,9 @@ class DexPilotOptimizer:
             idx_pin2target.append(joint_names.index(target_joint_name))
         self.target_joint_names = target_joint_names
         self.idx_pin2target = np.array(idx_pin2target)
+        # This solver passes x directly into FK and optimizes the full hand.
+        if target_joint_names != joint_names:
+            raise ValueError('Target joints must match the full robot DOF order')
 
         origin_link_index, task_link_index = self.generate_link_indices(
             self.num_fingers
@@ -120,7 +137,7 @@ class DexPilotOptimizer:
         else:
             raise ValueError(f'Unsupported hand side: {hand_side}')
 
-        self.computed_link_names = list(
+        self.computed_link_names = sorted(
             set(target_origin_link_names)
             .union(set(target_task_link_names))
             .union(set(self.proximal_link_names))
@@ -164,12 +181,10 @@ class DexPilotOptimizer:
             self.projected_dist,
         ) = self.set_dexpilot_cache(self.num_fingers, eta1, eta2)
 
-        self.vector_scaling = self.build_vector_scaling()
-
     def set_joint_limit(
         self,
         joint_limits: np.ndarray,
-        epsilon: float = 1e-3,
+        epsilon: float = 0.0,
     ) -> None:
         """Set optimizer bounds from a `(dof, 2)` joint limit array."""
         if joint_limits.shape != (self.opt_dof, 2):
@@ -177,8 +192,14 @@ class DexPilotOptimizer:
                 f'Expected joint limits shape {(self.opt_dof, 2)}, '
                 f'got {joint_limits.shape}'
             )
-        self.opt.set_lower_bounds((joint_limits[:, 0] - epsilon).tolist())
-        self.opt.set_upper_bounds((joint_limits[:, 1] + epsilon).tolist())
+        if not np.isfinite(joint_limits).all() or epsilon < 0:
+            raise ValueError('Joint limits and inward margin must be valid')
+        lower = joint_limits[:, 0] + epsilon
+        upper = joint_limits[:, 1] - epsilon
+        if np.any(lower > upper):
+            raise ValueError('Joint-limit margin leaves no feasible interval')
+        self.opt.set_lower_bounds(lower.tolist())
+        self.opt.set_upper_bounds(upper.tolist())
 
     @staticmethod
     def generate_link_indices(num_fingers: int) -> Tuple[List[int], List[int]]:
@@ -221,18 +242,17 @@ class DexPilotOptimizer:
             projected_dist,
         )
 
-    def build_vector_scaling(self) -> np.ndarray:
-        """Build per-vector scaling factors from per-finger multipliers."""
-        factors = np.ones(len(self.origin_finger_indices), dtype=np.float32)
-        for idx in range(len(self.origin_finger_indices)):
-            indices = []
-            if self.origin_finger_indices[idx] > 0:
-                indices.append(self.origin_finger_indices[idx] - 1)
-            if self.task_finger_indices[idx] > 0:
-                indices.append(self.task_finger_indices[idx] - 1)
-            if indices:
-                factors[idx] = float(np.mean(self.finger_scaling[indices]))
-        return factors
+    def scale_reference_vectors(self, target_vector: np.ndarray) -> np.ndarray:
+        """Scale wrist-relative tips first so all pairwise targets agree."""
+        scales = np.asarray(self.finger_scaling, dtype=np.float64)
+        if (scales.shape != (5,) or not np.isfinite(scales).all()
+                or np.any(scales <= 0)):
+            raise ValueError('Expected five finite positive finger scales')
+        scaled_points = np.vstack((np.zeros((1, 3)), target_vector[-5:] * scales[:, None]))
+        return (
+            scaled_points[self.task_finger_indices]
+            - scaled_points[self.origin_finger_indices]
+        )
 
     def retarget(
         self,
@@ -243,17 +263,17 @@ class DexPilotOptimizer:
         """Solve for the next robot joint configuration."""
         objective_fn = self.get_objective_function(
             ref_value,
-            np.array(last_qpos).astype(np.float32),
+            np.array(last_qpos, dtype=np.float64),
             target_dir,
         )
 
         self.opt.set_min_objective(objective_fn)
         try:
             qpos = self.opt.optimize(last_qpos)
-            return np.array(qpos, dtype=np.float32)
+            return np.array(qpos, dtype=np.float64)
         except RuntimeError as error:
             print(error)
-            return np.array(last_qpos, dtype=np.float32)
+            return np.array(last_qpos, dtype=np.float64)
 
     def get_objective_function(
         self,
@@ -263,12 +283,26 @@ class DexPilotOptimizer:
     ) -> Callable[[np.ndarray, np.ndarray], float]:
         """Build the NLopt objective for the current hand target."""
         target_vector = np.asarray(target_vector, dtype=np.float64)
+        if target_vector.shape != (15, 3) or not np.isfinite(target_vector).all():
+            raise ValueError('Expected finite target vectors with shape (15, 3)')
+        if target_dir is not None:
+            target_dir = np.asarray(target_dir, dtype=np.float64)
+            if target_dir.shape != (5, 3) or not np.isfinite(target_dir).all():
+                raise ValueError('Expected finite finger directions with shape (5, 3)')
+            lengths = np.linalg.norm(target_dir, axis=1, keepdims=True)
+            if np.any(lengths < 1e-8):
+                raise ValueError('Finger directions must be nonzero')
+            target_dir = target_dir / lengths
 
         len_proj = self.num_fingers * (self.num_fingers - 1) // 2
         len_s2 = len(self.s2_project_index_task)
         len_s1 = len_proj - len_s2
 
         target_vec_dist = np.linalg.norm(target_vector[:len_proj], axis=1)
+        partner, pinch_activation = (None, 0.0)
+        if self.pinch_config.enabled:
+            # generate_link_indices puts the four thumb pairs first.
+            partner, pinch_activation = self.pinch.update(target_vec_dist[:len_s1])
         self.projected[:len_s1][
             target_vec_dist[:len_s1] < self.project_dist
         ] = True
@@ -289,37 +323,53 @@ class DexPilotOptimizer:
             [200] * len_s1 + [400] * len_s2,
             dtype=np.float64,
         )
-        weight_proj = np.where(self.projected, high_weight, normal_weight)
+        projection_alpha = self.projected.astype(np.float64)
+        if self.pinch_config.enabled:
+            # Only one precision pinch gets attachment/projection priority.
+            # Other pairs retain normal tracking rather than competing for
+            # the same thumb contact point.
+            projection_alpha[:] = 0.0
+            if partner is not None:
+                projection_alpha[partner - 1] = pinch_activation
+        weight_proj = normal_weight + projection_alpha * (high_weight - normal_weight)
+        if partner is not None:
+            # Contact offsets can require distinct endpoint origins. Replace
+            # this pair's endpoint-coincidence loss with the contact loss.
+            weight_proj[partner - 1] = 1.0 - pinch_activation
         weight = np.concatenate(
             [
                 weight_proj,
-                np.ones(self.num_fingers, dtype=np.float32)
+                np.ones(self.num_fingers, dtype=np.float64)
                 * (len_proj + self.num_fingers),
             ]
         )
 
-        normal_vec = target_vector * self.vector_scaling[:, None]
+        normal_vec = self.scale_reference_vectors(target_vector)
         dir_vec = target_vector[:len_proj] / (target_vec_dist[:, None] + 1e-6)
         projected_vec = dir_vec * self.projected_dist[:, None]
 
-        reference_vec_proj = np.where(
-            self.projected[:, None],
-            projected_vec,
-            normal_vec[:len_proj],
+        reference_vec_proj = (
+            projection_alpha[:, None] * projected_vec
+            + (1.0 - projection_alpha[:, None]) * normal_vec[:len_proj]
         )
         reference_vec = np.concatenate(
             [reference_vec_proj, normal_vec[len_proj:]],
             axis=0,
         ).astype(np.float64)
-        target_vec = reference_vec.astype(np.float32)
+        target_vec = reference_vec
 
         num_vec = reference_vec.shape[0]
-        weight_array = weight.astype(np.float32)
+        weight_array = weight
         target_dir_array = (
-            np.asarray(target_dir, dtype=np.float32)
+            np.asarray(target_dir, dtype=np.float64)
             if target_dir is not None
             else None
         )
+        direction_weights = np.ones(self.num_fingers, dtype=np.float64)
+        if partner is not None:
+            direction_weights[[0, partner]] = (
+                1.0 - pinch_activation * (1.0 - self.pinch_config.direction_scale)
+            )
 
         def huber_loss(x: np.ndarray, y: np.ndarray, delta: float) -> np.ndarray:
             """Compute Huber loss (Smooth L1 loss) element-wise."""
@@ -340,7 +390,7 @@ class DexPilotOptimizer:
             body_pos = np.stack(
                 [pose[:3, 3] for pose in target_link_poses],
                 axis=0,
-            ).astype(np.float32)
+            )
 
             origin_pos = body_pos[self.origin_link_indices, :]
             task_pos = body_pos[self.task_link_indices, :]
@@ -359,12 +409,19 @@ class DexPilotOptimizer:
                 r_dir_norm_val = np.clip(r_dir_norm_val, a_min=1e-6, a_max=None)
                 r_dir_norm = r_dir / r_dir_norm_val
                 cos_sim = (r_dir_norm * target_dir_array).sum(axis=1)
-                dir_loss = (1.0 - cos_sim).sum() * self.orientation_weight
+                dir_loss = (
+                    (1.0 - cos_sim) * direction_weights
+                ).sum() * self.orientation_weight
             else:
                 dir_loss = 0.0
 
+            tip_poses = np.stack([target_link_poses[i] for i in self.tip_indices])
+            pinch_loss, pinch_linear, pinch_angular = pinch_loss_and_gradient(
+                tip_poses, self.contact_offsets, partner, pinch_activation,
+                self.pinch_config,
+            )
             reg_loss = self.norm_delta * ((qpos - last_qpos) ** 2).sum()
-            total_loss = pos_loss + dir_loss + reg_loss
+            total_loss = pos_loss + dir_loss + reg_loss + pinch_loss
             result = float(total_loss)
 
             if grad_out.size > 0:
@@ -379,7 +436,7 @@ class DexPilotOptimizer:
                 )
 
                 # Gradient w.r.t. vec_diff
-                vec_dist_normalized = vec_dist + 1e-8
+                vec_dist_normalized = np.maximum(vec_dist, 1e-12)
                 vec_diff_grad = (
                     vec_dist_grad[:, None] * vec_diff / vec_dist_normalized[:, None]
                 )
@@ -420,29 +477,38 @@ class DexPilotOptimizer:
                         cos_sim_grad = norm_grad @ target_dir_i
 
                         # Gradient w.r.t. body_pos
-                        grad_pos[tip_idx, :] -= cos_sim_grad * self.orientation_weight
-                        grad_pos[prox_idx, :] += cos_sim_grad * self.orientation_weight
+                        dir_weight = self.orientation_weight * direction_weights[i]
+                        grad_pos[tip_idx, :] -= cos_sim_grad * dir_weight
+                        grad_pos[prox_idx, :] += cos_sim_grad * dir_weight
+
+                grad_pos[self.tip_indices] += pinch_linear
 
                 # Reshape grad_pos for jacobian multiplication
                 grad_pos = grad_pos[:, None, :]
 
                 jacobians = []
+                angular_jacobians = []
                 for index, link_id in enumerate(self.computed_link_indices):
                     link_jacobian = (
                         self.robot.compute_single_link_local_jacobian(
                             qpos,
                             link_id,
-                        )[:3, ...]
+                        )
                     )
                     link_pose = target_link_poses[index]
                     link_rot = link_pose[:3, :3]
-                    jacobians.append(link_rot @ link_jacobian)
+                    jacobians.append(link_rot @ link_jacobian[:3])
+                    angular_jacobians.append(link_rot @ link_jacobian[3:6])
 
                 jacobians = np.stack(jacobians, axis=0)
                 if jacobians.shape[2] > self.opt_dof:
                     jacobians = jacobians[:, :, self.idx_pin2target]
 
                 grad_qpos = np.matmul(grad_pos, jacobians).sum(axis=0).ravel()
+                grad_qpos += np.einsum(
+                    'fi,fij->j', pinch_angular,
+                    np.stack(angular_jacobians)[self.tip_indices],
+                )
                 grad_qpos += 2 * self.norm_delta * (x - last_qpos)
                 grad_out[:] = np.asarray(grad_qpos, dtype=np.float64)
 

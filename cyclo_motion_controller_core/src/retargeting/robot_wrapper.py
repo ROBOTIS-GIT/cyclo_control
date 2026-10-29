@@ -23,7 +23,8 @@
 
 """Thin Pinocchio-based robot wrapper used by the retargeting code."""
 
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import numpy.typing as npt
@@ -38,9 +39,27 @@ class RobotWrapper:
         urdf_path: str,
         use_collision: bool = False,
         use_visual: bool = False,
+        fixed_joint_translations: Optional[Dict[str, Tuple[float, float, float]]] = None,
     ) -> None:
         """Create the robot model and allocate its runtime data."""
-        self.model: pin.Model = pin.buildModelFromUrdf(urdf_path)
+        if fixed_joint_translations:
+            # Kinematic endpoint overrides only; never rewrite the source URDF.
+            root = ET.parse(urdf_path).getroot()
+            for name, xyz in fixed_joint_translations.items():
+                joint = next(
+                    (j for j in root.findall('joint') if j.get('name') == name), None
+                )
+                if joint is None or joint.get('type') != 'fixed':
+                    raise ValueError(f'Expected fixed endpoint joint {name}')
+                if len(xyz) != 3 or not np.isfinite(xyz).all():
+                    raise ValueError(f'Invalid translation for {name}')
+                origin = joint.find('origin')
+                if origin is None:
+                    origin = ET.SubElement(joint, 'origin')
+                origin.set('xyz', ' '.join(str(value) for value in xyz))
+            self.model = pin.buildModelFromXML(ET.tostring(root, encoding='unicode'))
+        else:
+            self.model = pin.buildModelFromUrdf(urdf_path)
         self.data: pin.Data = self.model.createData()
 
         if use_visual or use_collision:
