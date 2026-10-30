@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version='1.0' encoding='utf-8'?>
 <robot name="ffw_sh5_follower">
   <group name="arm_l">
     <joint name="arm_l_joint1" />
@@ -127,8 +127,10 @@
   <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link5" reason="User" />
   <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link6" reason="User" />
   <disable_collisions link1="hx5_d20_left_base" link2="arm_l_link7" reason="Adjacent" />
+  <disable_collisions link1="hx5_d20_left_base" link2="camera_left_link" reason="User" />
   <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link4" reason="User" />
   <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link5" reason="User" />
   <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link6" reason="User" />
   <disable_collisions link1="hx5_d20_right_base" link2="arm_r_link7" reason="Adjacent" />
+  <disable_collisions link1="hx5_d20_right_base" link2="camera_right_link" reason="User" />
 </robot>

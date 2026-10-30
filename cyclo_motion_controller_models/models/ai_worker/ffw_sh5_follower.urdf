@@ -1,6 +1,10 @@
-<?xml version="1.0"?>
+<?xml version='1.0' encoding='utf-8'?>
 <robot name="ffw_sh5_follower">
-  <!--Calculation model: measured lift + 14 arm DOFs; no hardware or finger DOFs.-->
+  <link name="world" />
+  <joint name="world_fixed" type="fixed">
+    <parent link="world" />
+    <child link="base_link" />
+  </joint>
   <link name="base_link">
     <collision>
       <origin rpy="0 0 0" xyz="-0.15 0 0.2" />
@@ -38,6 +42,15 @@
         <sphere radius="0.15" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/base_mobile_assy.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
   </link>
   <link name="arm_base_link">
     <collision>
@@ -70,8 +83,27 @@
         <box size="0.2 0.1 0.63" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/body_arm_assy.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
   </link>
-  <link name="arm_l_link1" />
+  <link name="arm_l_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_l_link2">
     <collision>
       <origin rpy="0 1.5708 0" xyz="0 0 0" />
@@ -91,8 +123,27 @@
         <sphere radius="0.07" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
-  <link name="arm_l_link3" />
+  <link name="arm_l_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_l_link4">
     <collision>
       <origin rpy="0 0 0" xyz="-0.04 0 0" />
@@ -112,10 +163,48 @@
         <sphere radius="0.07" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
-  <link name="arm_l_link5" />
-  <link name="arm_l_link6" />
+  <link name="arm_l_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link5.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="arm_l_link6">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link6.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_l_link7">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_l_link7.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
     <collision name="camera_l_envelope">
       <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0" />
       <geometry>
@@ -141,7 +230,17 @@
       </geometry>
     </collision>
   </link>
-  <link name="arm_r_link1" />
+  <link name="arm_r_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_r_link2">
     <collision>
       <origin rpy="0 1.5708 0" xyz="0 0 0" />
@@ -161,8 +260,27 @@
         <sphere radius="0.07" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
-  <link name="arm_r_link3" />
+  <link name="arm_r_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_r_link4">
     <collision>
       <origin rpy="0 0 0" xyz="-0.04 0 0" />
@@ -182,10 +300,48 @@
         <sphere radius="0.07" />
       </geometry>
     </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
-  <link name="arm_r_link5" />
-  <link name="arm_r_link6" />
+  <link name="arm_r_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link5.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="arm_r_link6">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link6.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
   <link name="arm_r_link7">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/arm_r_link7.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
     <collision name="camera_r_envelope">
       <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0" />
       <geometry>
@@ -212,80 +368,38 @@
     </collision>
   </link>
   <link name="hx5_d20_left_base">
-    <collision name="hand_l_envelope_0">
-      <origin xyz="0.116 -0.004 0.096" rpy="0 0 0" />
+    <collision name="hand_l_envelope">
+      <origin xyz="0.00003378 0.00120753 0.12151500" rpy="0 0 0" />
       <geometry>
-        <sphere radius="0.089" />
+        <box size="0.06093245 0.11672498 0.24903000" />
       </geometry>
     </collision>
-    <collision name="hand_l_envelope_1">
-      <origin xyz="0.047 -0.043 0.180" rpy="0 0 0" />
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <sphere radius="0.095" />
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
-    <collision name="hand_l_envelope_2">
-      <origin xyz="0.043 -0.071 0.078" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.095" />
-      </geometry>
-    </collision>
-    <collision name="hand_l_envelope_3">
-      <origin xyz="0.055 -0.076 0.006" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.104" />
-      </geometry>
-    </collision>
-    <collision name="hand_l_envelope_4">
-      <origin xyz="0.054 0.053 0.170" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.095" />
-      </geometry>
-    </collision>
-    <collision name="hand_l_envelope_5">
-      <origin xyz="0.029 0.026 0.064" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.097" />
-      </geometry>
-    </collision>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <link name="hx5_d20_right_base">
-    <collision name="hand_r_envelope_0">
-      <origin xyz="0.116 0.004 0.096" rpy="0 0 0" />
+    <collision name="hand_r_envelope">
+      <origin xyz="0.00003881 -0.00120753 0.12151500" rpy="0 0 0" />
       <geometry>
-        <sphere radius="0.089" />
+        <box size="0.06092238 0.11672498 0.24903000" />
       </geometry>
     </collision>
-    <collision name="hand_r_envelope_1">
-      <origin xyz="0.047 0.043 0.180" rpy="0 0 0" />
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <sphere radius="0.095" />
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
       </geometry>
-    </collision>
-    <collision name="hand_r_envelope_2">
-      <origin xyz="0.043 0.071 0.078" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.095" />
-      </geometry>
-    </collision>
-    <collision name="hand_r_envelope_3">
-      <origin xyz="0.055 0.076 0.006" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.104" />
-      </geometry>
-    </collision>
-    <collision name="hand_r_envelope_4">
-      <origin xyz="0.054 -0.053 0.170" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.095" />
-      </geometry>
-    </collision>
-    <collision name="hand_r_envelope_5">
-      <origin xyz="0.029 -0.026 0.064" rpy="0 0 0" />
-      <geometry>
-        <sphere radius="0.097" />
-      </geometry>
-    </collision>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
   </link>
   <joint name="lift_joint" type="prismatic">
     <parent link="base_link" />
@@ -416,5 +530,1080 @@
     <parent link="arm_r_link7" />
     <child link="hx5_d20_right_base" />
     <origin rpy="0 3.14159265359 -1.5708" xyz="0 0 -0.078" />
+  </joint>
+  <link name="lidar_l_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.03" radius="0.03" />
+      </geometry>
+    </visual>
+  </link>
+  <link name="lidar_r_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.03" radius="0.03" />
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="imu_link" />
+  <link name="lift_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/lift_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="head_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/head_link1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="head_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw/head_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 -0.02" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="zed_camera_link" />
+  <link name="zed_camera_center">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/zedm.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="zedm_mat">
+        <color rgba="0.25 0.25 0.25 1.0" />
+      </material>
+    </visual>
+  </link>
+  <link name="zed_left_camera_frame" />
+  <link name="zed_left_camera_optical_frame" />
+  <link name="zed_right_camera_frame" />
+  <link name="zed_right_camera_optical_frame" />
+  <link name="camera_left_bottom_screw_frame" />
+  <link name="camera_left_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0 1.5707963267948966" xyz="0.0038 -0.009 0" />
+      <geometry>
+        <mesh filename="package://realsense2_description/meshes/d405.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="aluminum" />
+    </visual>
+  </link>
+  <link name="camera_right_bottom_screw_frame" />
+  <link name="camera_right_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0 1.5707963267948966" xyz="0.0038 -0.009 0" />
+      <geometry>
+        <mesh filename="package://realsense2_description/meshes/d405.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="aluminum" />
+    </visual>
+  </link>
+  <link name="finger_l_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link4">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_l_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link6">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link7">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link8">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_l_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link9">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link10">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link11">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link12">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_l_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link13">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link14">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link15">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link16">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_l_link4">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link17">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link18">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link19">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_l_link20">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_l_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link4">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_r_link1">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link6">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link7">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link8">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_r_link2">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link9">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link10">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link11">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link12">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_r_link3">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link13">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link14">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link15">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link16">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_r_link4">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link17">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link18">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link19">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_r_link20">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/hx5_d20/hx5_d20_right/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="grey">
+        <color rgba="0.2 0.2 0.2 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="finger_end_r_link5">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="red">
+        <color rgba="1.0 0.0 0.0 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="left_wheel_steer_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/left_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="left_wheel_drive_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/left_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="right_wheel_steer_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/right_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="right_wheel_drive_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/right_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="rear_wheel_steer_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/rear_wheel_steer_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <link name="rear_wheel_drive_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://ffw_description/meshes/common/follower/ffw_swerve/rear_wheel_drive_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver">
+        <color rgba="0.75 0.75 0.75 1" />
+      </material>
+    </visual>
+  </link>
+  <material name="aluminum">
+    <color rgba="0.5 0.5 0.5 1" />
+  </material>
+  <material name="plastic">
+    <color rgba="0.1 0.1 0.1 1" />
+  </material>
+  <joint name="lidar_l_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="lidar_l_link" />
+    <origin rpy="0 0 1.57079632679" xyz="-0.111881 0.240 0.34432" />
+  </joint>
+  <joint name="lidar_r_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="lidar_r_link" />
+    <origin rpy="0 0 -1.57079632679" xyz="-0.111881 -0.240 0.34432" />
+  </joint>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="imu_link" />
+    <origin rpy="0 0 0" xyz="-0.1464 0.0 0.26" />
+  </joint>
+  <joint name="lift_fixed_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="lift_link" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+  </joint>
+  <joint name="head_joint1" type="fixed">
+    <parent link="arm_base_link" />
+    <child link="head_link1" />
+    <origin rpy="0 0 0" xyz="0.049483 0 0.102130" />
+  </joint>
+  <joint name="head_joint2" type="fixed">
+    <parent link="head_link1" />
+    <child link="head_link2" />
+    <origin rpy="0 0 0" xyz="0.040 0 0.054" />
+  </joint>
+  <joint name="zed_camera_center_joint" type="fixed">
+    <parent link="zed_camera_link" />
+    <child link="zed_camera_center" />
+    <origin rpy="0 0 0" xyz="0 0 0.01325" />
+  </joint>
+  <joint name="zed_left_camera_joint" type="fixed">
+    <parent link="zed_camera_center" />
+    <child link="zed_left_camera_frame" />
+    <origin rpy="0 0 0" xyz="0 0.0315 0" />
+  </joint>
+  <joint name="zed_left_camera_optical_joint" type="fixed">
+    <parent link="zed_left_camera_frame" />
+    <child link="zed_left_camera_optical_frame" />
+    <origin rpy="-1.57079632679 0.0 -1.57079632679" xyz="0 0 0" />
+  </joint>
+  <joint name="zed_right_camera_joint" type="fixed">
+    <parent link="zed_camera_center" />
+    <child link="zed_right_camera_frame" />
+    <origin rpy="0 0 0" xyz="0 -0.0315 0" />
+  </joint>
+  <joint name="zed_right_camera_optical_joint" type="fixed">
+    <parent link="zed_right_camera_frame" />
+    <child link="zed_right_camera_optical_frame" />
+    <origin rpy="-1.57079632679 0.0 -1.57079632679" xyz="0 0 0" />
+  </joint>
+  <joint name="zed_joint" type="fixed">
+    <parent link="head_link2" />
+    <child link="zed_camera_link" />
+    <origin rpy="0 0 0" xyz="0.0238122 -0.00651797 -0.0242094" />
+  </joint>
+  <joint name="camera_left_joint" type="fixed">
+    <parent link="arm_l_link7" />
+    <child link="camera_left_bottom_screw_frame" />
+    <origin rpy="-1.57079632679 1.66678943569 0" xyz="0.108236 -0.021 -0.062552" />
+  </joint>
+  <joint name="camera_left_link_joint" type="fixed">
+    <parent link="camera_left_bottom_screw_frame" />
+    <child link="camera_left_link" />
+    <origin rpy="0 0 0" xyz="0.01085 0.009 0.021" />
+  </joint>
+  <joint name="camera_right_joint" type="fixed">
+    <parent link="arm_r_link7" />
+    <child link="camera_right_bottom_screw_frame" />
+    <origin rpy="-1.57079632679 1.66678943569 0" xyz="0.108236 -0.021 -0.062552" />
+  </joint>
+  <joint name="camera_right_link_joint" type="fixed">
+    <parent link="camera_right_bottom_screw_frame" />
+    <child link="camera_right_link" />
+    <origin rpy="0 0 0" xyz="0.01085 0.009 0.021" />
+  </joint>
+  <joint name="finger_l_joint1" type="fixed">
+    <parent link="hx5_d20_left_base" />
+    <child link="finger_l_link1" />
+    <origin rpy="0 0 0" xyz="-0.0125 -0.03493 0.04475" />
+  </joint>
+  <joint name="finger_l_joint2" type="fixed">
+    <parent link="finger_l_link1" />
+    <child link="finger_l_link2" />
+    <origin rpy="0 0 0" xyz="0.039 0.0 0.0" />
+  </joint>
+  <joint name="finger_l_joint3" type="fixed">
+    <parent link="finger_l_link2" />
+    <child link="finger_l_link3" />
+    <origin rpy="0 0 0" xyz="0.0 -0.028 0.0" />
+  </joint>
+  <joint name="finger_l_joint4" type="fixed">
+    <parent link="finger_l_link3" />
+    <child link="finger_l_link4" />
+    <origin rpy="0 0 0" xyz="0.0 -0.0355 0.0" />
+  </joint>
+  <joint name="finger_end_l_joint1" type="fixed">
+    <parent link="finger_l_link4" />
+    <child link="finger_end_l_link1" />
+    <origin rpy="0 0 0" xyz="0.0 -0.03975 0.0" />
+  </joint>
+  <joint name="finger_l_joint5" type="fixed">
+    <parent link="hx5_d20_left_base" />
+    <child link="finger_l_link5" />
+    <origin rpy="0 0 0" xyz="-0.0015 -0.03608 0.10275" />
+  </joint>
+  <joint name="finger_l_joint6" type="fixed">
+    <parent link="finger_l_link5" />
+    <child link="finger_l_link6" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_l_joint7" type="fixed">
+    <parent link="finger_l_link6" />
+    <child link="finger_l_link7" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_l_joint8" type="fixed">
+    <parent link="finger_l_link7" />
+    <child link="finger_l_link8" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_l_joint2" type="fixed">
+    <parent link="finger_l_link8" />
+    <child link="finger_end_l_link2" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_l_joint9" type="fixed">
+    <parent link="hx5_d20_left_base" />
+    <child link="finger_l_link9" />
+    <origin rpy="0 0 0" xyz="-0.0015 -0.00908 0.11053" />
+  </joint>
+  <joint name="finger_l_joint10" type="fixed">
+    <parent link="finger_l_link9" />
+    <child link="finger_l_link10" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_l_joint11" type="fixed">
+    <parent link="finger_l_link10" />
+    <child link="finger_l_link11" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_l_joint12" type="fixed">
+    <parent link="finger_l_link11" />
+    <child link="finger_l_link12" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_l_joint3" type="fixed">
+    <parent link="finger_l_link12" />
+    <child link="finger_end_l_link3" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_l_joint13" type="fixed">
+    <parent link="hx5_d20_left_base" />
+    <child link="finger_l_link13" />
+    <origin rpy="0 0 0" xyz="-0.0015 0.01792 0.10475" />
+  </joint>
+  <joint name="finger_l_joint14" type="fixed">
+    <parent link="finger_l_link13" />
+    <child link="finger_l_link14" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_l_joint15" type="fixed">
+    <parent link="finger_l_link14" />
+    <child link="finger_l_link15" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_l_joint16" type="fixed">
+    <parent link="finger_l_link15" />
+    <child link="finger_l_link16" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_l_joint4" type="fixed">
+    <parent link="finger_l_link16" />
+    <child link="finger_end_l_link4" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_l_joint17" type="fixed">
+    <parent link="hx5_d20_left_base" />
+    <child link="finger_l_link17" />
+    <origin rpy="0 0 0" xyz="-0.0015 0.04492 0.08575" />
+  </joint>
+  <joint name="finger_l_joint18" type="fixed">
+    <parent link="finger_l_link17" />
+    <child link="finger_l_link18" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_l_joint19" type="fixed">
+    <parent link="finger_l_link18" />
+    <child link="finger_l_link19" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_l_joint20" type="fixed">
+    <parent link="finger_l_link19" />
+    <child link="finger_l_link20" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_l_joint5" type="fixed">
+    <parent link="finger_l_link20" />
+    <child link="finger_end_l_link5" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_r_joint1" type="fixed">
+    <parent link="hx5_d20_right_base" />
+    <child link="finger_r_link1" />
+    <origin rpy="0 0 0" xyz="-0.0125 0.03493 0.04475" />
+  </joint>
+  <joint name="finger_r_joint2" type="fixed">
+    <parent link="finger_r_link1" />
+    <child link="finger_r_link2" />
+    <origin rpy="0 0 0" xyz="0.039 0.0 0.0" />
+  </joint>
+  <joint name="finger_r_joint3" type="fixed">
+    <parent link="finger_r_link2" />
+    <child link="finger_r_link3" />
+    <origin rpy="0 0 0" xyz="0.0 0.028 0.0" />
+  </joint>
+  <joint name="finger_r_joint4" type="fixed">
+    <parent link="finger_r_link3" />
+    <child link="finger_r_link4" />
+    <origin rpy="0 0 0" xyz="0.0 0.0355 0.0" />
+  </joint>
+  <joint name="finger_end_r_joint1" type="fixed">
+    <parent link="finger_r_link4" />
+    <child link="finger_end_r_link1" />
+    <origin rpy="0 0 0" xyz="0.0 0.03975 0.0" />
+  </joint>
+  <joint name="finger_r_joint5" type="fixed">
+    <parent link="hx5_d20_right_base" />
+    <child link="finger_r_link5" />
+    <origin rpy="0 0 0" xyz="-0.0015 0.03608 0.10275" />
+  </joint>
+  <joint name="finger_r_joint6" type="fixed">
+    <parent link="finger_r_link5" />
+    <child link="finger_r_link6" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_r_joint7" type="fixed">
+    <parent link="finger_r_link6" />
+    <child link="finger_r_link7" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_r_joint8" type="fixed">
+    <parent link="finger_r_link7" />
+    <child link="finger_r_link8" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_r_joint2" type="fixed">
+    <parent link="finger_r_link8" />
+    <child link="finger_end_r_link2" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_r_joint9" type="fixed">
+    <parent link="hx5_d20_right_base" />
+    <child link="finger_r_link9" />
+    <origin rpy="0 0 0" xyz="-0.0015 0.00908 0.11053" />
+  </joint>
+  <joint name="finger_r_joint10" type="fixed">
+    <parent link="finger_r_link9" />
+    <child link="finger_r_link10" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_r_joint11" type="fixed">
+    <parent link="finger_r_link10" />
+    <child link="finger_r_link11" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_r_joint12" type="fixed">
+    <parent link="finger_r_link11" />
+    <child link="finger_r_link12" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_r_joint3" type="fixed">
+    <parent link="finger_r_link12" />
+    <child link="finger_end_r_link3" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_r_joint13" type="fixed">
+    <parent link="hx5_d20_right_base" />
+    <child link="finger_r_link13" />
+    <origin rpy="0 0 0" xyz="-0.0015 -0.01792 0.10475" />
+  </joint>
+  <joint name="finger_r_joint14" type="fixed">
+    <parent link="finger_r_link13" />
+    <child link="finger_r_link14" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_r_joint15" type="fixed">
+    <parent link="finger_r_link14" />
+    <child link="finger_r_link15" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_r_joint16" type="fixed">
+    <parent link="finger_r_link15" />
+    <child link="finger_r_link16" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_r_joint4" type="fixed">
+    <parent link="finger_r_link16" />
+    <child link="finger_end_r_link4" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="finger_r_joint17" type="fixed">
+    <parent link="hx5_d20_right_base" />
+    <child link="finger_r_link17" />
+    <origin rpy="0 0 0" xyz="-0.0015 -0.04492 0.08575" />
+  </joint>
+  <joint name="finger_r_joint18" type="fixed">
+    <parent link="finger_r_link17" />
+    <child link="finger_r_link18" />
+    <origin rpy="0 0 0" xyz="0.0165 0.0 0.0235" />
+  </joint>
+  <joint name="finger_r_joint19" type="fixed">
+    <parent link="finger_r_link18" />
+    <child link="finger_r_link19" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_r_joint20" type="fixed">
+    <parent link="finger_r_link19" />
+    <child link="finger_r_link20" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0355" />
+  </joint>
+  <joint name="finger_end_r_joint5" type="fixed">
+    <parent link="finger_r_link20" />
+    <child link="finger_end_r_link5" />
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.02425" />
+  </joint>
+  <joint name="left_wheel_steer" type="fixed">
+    <parent link="base_link" />
+    <child link="left_wheel_steer_link" />
+    <origin rpy="0 0 0" xyz="0.1371 0.2554 0.27555" />
+  </joint>
+  <joint name="left_wheel_drive" type="fixed">
+    <parent link="left_wheel_steer_link" />
+    <child link="left_wheel_drive_link" />
+    <origin rpy="0 0 0" xyz="0 0 -0.18905" />
+  </joint>
+  <joint name="right_wheel_steer" type="fixed">
+    <parent link="base_link" />
+    <child link="right_wheel_steer_link" />
+    <origin rpy="0 0 0" xyz="0.1371 -0.2554 0.27555" />
+  </joint>
+  <joint name="right_wheel_drive" type="fixed">
+    <parent link="right_wheel_steer_link" />
+    <child link="right_wheel_drive_link" />
+    <origin rpy="0 0 0" xyz="0 0 -0.18905" />
+  </joint>
+  <joint name="rear_wheel_steer" type="fixed">
+    <parent link="base_link" />
+    <child link="rear_wheel_steer_link" />
+    <origin rpy="0 0 0" xyz="-0.2899 0 0.27555" />
+  </joint>
+  <joint name="rear_wheel_drive" type="fixed">
+    <parent link="rear_wheel_steer_link" />
+    <child link="rear_wheel_drive_link" />
+    <origin rpy="0 0 0" xyz="0 0 -0.18905" />
   </joint>
 </robot>
