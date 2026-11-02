@@ -4,7 +4,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -13,7 +13,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_base_unit.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -40,7 +40,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -49,7 +49,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -75,7 +75,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -84,7 +84,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_mcp2.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -110,7 +110,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -119,7 +119,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_ip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -145,7 +145,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -154,7 +154,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_thumb_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -197,7 +197,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -206,7 +206,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -232,7 +232,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -241,7 +241,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -267,7 +267,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -276,7 +276,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -302,7 +302,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -311,7 +311,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -354,7 +354,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -363,7 +363,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -389,7 +389,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -398,7 +398,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -424,7 +424,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -433,7 +433,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -459,7 +459,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -468,7 +468,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -511,7 +511,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -520,7 +520,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -546,7 +546,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -555,7 +555,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -581,7 +581,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -590,7 +590,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -616,7 +616,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -625,7 +625,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -668,7 +668,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -677,7 +677,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_mcp.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -703,7 +703,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -712,7 +712,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_pip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -738,7 +738,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -747,7 +747,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_dip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -773,7 +773,7 @@
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
@@ -782,7 +782,7 @@
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <mesh filename="package://robotis_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
+            <mesh filename="package://cyclo_motion_controller_models/models/hx5_d20/meshes/hx5_d20_left/hx5_d20_finger_tip.stl" scale="0.001 0.001 0.001" />
          </geometry>
          <material name="grey">
             <color rgba="0.2 0.2 0.2 1" />
