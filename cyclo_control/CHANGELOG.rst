@@ -2,6 +2,13 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.3 (2026-11-02)
+------------------
+* Refined AI Worker gripper, hand, wrist-camera, and head collision models and SRDF policies
+* Restored BH5 and SH5 visuals and added BH5, SH5, and HX5-D20 model viewers
+* Standardized F1 and F2 viewer names and corrected HX5-D20 mesh paths
+* Contributors: Yeonguk Kim
+
 0.5.2 (2026-10-27)
 ------------------
 * Corrected A1 leader kinematics and synchronized end-effector positions with AI Worker

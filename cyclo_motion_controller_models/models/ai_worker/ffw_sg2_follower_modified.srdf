@@ -153,6 +153,15 @@
     <disable_collisions link1="arm_r_link6" link2="arm_r_link7" reason="Adjacent"/>
     <disable_collisions link1="arm_r_link6" link2="camera_r_link" reason="Never"/>
     <disable_collisions link1="arm_r_link7" link2="camera_r_link" reason="Adjacent"/>
-    <!-- Disable collision between left and right gripper for handover operation -->
-    <disable_collisions link1="arm_l_link7" link2="arm_r_link7" reason="Adjacent"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="arm_l_link4" reason="User"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="arm_l_link5" reason="User"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="arm_l_link6" reason="User"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="arm_l_link7" reason="Adjacent"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="camera_l_link" reason="User"/>
+    <disable_collisions link1="gripper_r_rh_p12_rn_base" link2="arm_r_link4" reason="User"/>
+    <disable_collisions link1="gripper_r_rh_p12_rn_base" link2="arm_r_link5" reason="User"/>
+    <disable_collisions link1="gripper_r_rh_p12_rn_base" link2="arm_r_link6" reason="User"/>
+    <disable_collisions link1="gripper_r_rh_p12_rn_base" link2="arm_r_link7" reason="Adjacent"/>
+    <disable_collisions link1="gripper_r_rh_p12_rn_base" link2="camera_r_link" reason="User"/>
+    <disable_collisions link1="gripper_l_rh_p12_rn_base" link2="gripper_r_rh_p12_rn_base" reason="User"/>
 </robot>

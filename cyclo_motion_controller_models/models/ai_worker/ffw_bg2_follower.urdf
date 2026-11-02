@@ -367,6 +367,12 @@
     <dynamics damping="0.1"/>
   </joint>
   <link name="arm_l_link7">
+    <collision name="camera_l_envelope">
+      <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0"/>
+      <geometry>
+        <box size="0.023 0.042 0.042"/>
+      </geometry>
+    </collision>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -383,13 +389,13 @@
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.06"/>
+      <origin rpy="0 0 0" xyz="0 0 -0.03"/>
       <geometry>
-        <cylinder length="0.12" radius="0.085"/>
+        <cylinder length="0.06" radius="0.085"/>
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.12"/>
+      <origin rpy="0 0 0" xyz="0 0 -0.06"/>
       <geometry>
         <sphere radius="0.085"/>
       </geometry>
@@ -630,6 +636,12 @@
     <dynamics damping="0.1"/>
   </joint>
   <link name="arm_r_link7">
+    <collision name="camera_r_envelope">
+      <origin xyz="0.10794367 0 -0.06558796" rpy="-1.57079632679 1.66678943569 0"/>
+      <geometry>
+        <box size="0.023 0.042 0.042"/>
+      </geometry>
+    </collision>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -646,13 +658,13 @@
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.06"/>
+      <origin rpy="0 0 0" xyz="0 0 -0.03"/>
       <geometry>
-        <cylinder length="0.12" radius="0.085"/>
+        <cylinder length="0.06" radius="0.085"/>
       </geometry>
     </collision>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.12"/>
+      <origin rpy="0 0 0" xyz="0 0 -0.06"/>
       <geometry>
         <sphere radius="0.085"/>
       </geometry>
@@ -710,6 +722,12 @@
     <child link="gripper_l_rh_p12_rn_base"/>
   </joint>
   <link name="gripper_l_rh_p12_rn_base">
+    <collision name="gripper_l_envelope">
+      <origin xyz="0 0 0.071" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.085"/>
+      </geometry>
+    </collision>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -834,6 +852,12 @@
     <child link="gripper_r_rh_p12_rn_base"/>
   </joint>
   <link name="gripper_r_rh_p12_rn_base">
+    <collision name="gripper_r_envelope">
+      <origin xyz="0 0 0.071" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.085"/>
+      </geometry>
+    </collision>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>

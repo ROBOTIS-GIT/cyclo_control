@@ -2,6 +2,10 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.3 (2026-11-02)
+------------------
+* None
+
 0.5.2 (2026-10-27)
 ------------------
 * Added an anchored Cartesian translation-gain overload while preserving orientation
