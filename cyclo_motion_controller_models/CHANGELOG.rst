@@ -2,6 +2,17 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.3 (2026-11-02)
+------------------
+* Shortened wrist collision capsules and added dedicated two-finger gripper collision spheres
+* Replaced BH5 and SH5 hand collision envelopes with palm and four-finger boxes
+* Restored BH5 and SH5 visual meshes and fixed head collision models
+* Updated wrist-camera collision geometry and same-arm gripper collision exclusions
+* Kept inter-gripper and inter-hand collision exclusions specific to modified SRDF files
+* Added BH5, SH5, and left/right HX5-D20 RViz launch files
+* Renamed F1 and F2 viewers with the ffw prefix and corrected HX5-D20 left mesh package paths
+* Contributors: Yeonguk Kim
+
 0.5.2 (2026-10-27)
 ------------------
 * Updated A1 arm geometry and joint axes for physical DHI joint states
