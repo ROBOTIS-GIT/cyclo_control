@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <utility>
 #include <chrono>
+#include <cmath>
 #include "cyclo_teleoperation/core/runtime_ownership.hpp"
 
 namespace cyclo_teleoperation
@@ -35,14 +36,31 @@ const char * controlSourceLogName(const ControlSource source)
 }
 }  // namespace
 
-CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, Switch validate)
+CommandSourceManager::CommandSourceManager(
+  rclcpp::Node & node, Switch change, Switch validate, std::function<void()> leader_lost)
 : logger_(node.get_logger()), change_(std::move(change)), validate_(std::move(validate)),
+  leader_lost_(std::move(leader_lost)),
   ownership_(std::make_unique<RuntimeOwnership>(node, "/source"))
 {
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.read_only = true;
+  const auto topic = node.declare_parameter<std::string>(
+    "leader_heartbeat_topic", "/leader/heartbeat", descriptor);
+  leader_heartbeat_timeout_ = node.declare_parameter<double>(
+    "leader_heartbeat_timeout", 1.0, descriptor);
+  if (!std::isfinite(leader_heartbeat_timeout_) || leader_heartbeat_timeout_ <= 0.0) {
+    throw std::invalid_argument("leader_heartbeat_timeout must be finite and positive");
+  }
+  leader_heartbeat_ = node.create_subscription<std_msgs::msg::Empty>(
+    topic, rclcpp::QoS(1).best_effort(), [this](std_msgs::msg::Empty::ConstSharedPtr) {
+      leader_last_seen_ = std::chrono::steady_clock::now();
+      leader_seen_ = true;
+    });
   publisher_ = node.create_publisher<std_msgs::msg::String>(
     "/source", rclcpp::QoS(1).reliable().transient_local());
   heartbeat_ = node.create_wall_timer(std::chrono::milliseconds(100), [this]() {
         ownership_->check();
+        checkLeader();
         publish(transitioning() ? "switching" : source_ ==
         ControlSource::kTeleoperation ? "teleop" :
       source_ == ControlSource::kModelAction ? "model_action" : "none");
@@ -75,6 +93,36 @@ CommandSourceManager::CommandSourceManager(rclcpp::Node & node, Switch change, S
 }
 
 CommandSourceManager::~CommandSourceManager() = default;
+
+bool CommandSourceManager::leaderFresh() const
+{
+  return leader_seen_ && std::chrono::duration<double>(
+    std::chrono::steady_clock::now() - leader_last_seen_).count() < leader_heartbeat_timeout_;
+}
+
+void CommandSourceManager::checkLeader()
+{
+  if (leaderFresh() || (active_source_ != ControlSource::kTeleoperation &&
+    pending_ != ControlSource::kTeleoperation))
+  {
+    return;
+  }
+  RCLCPP_WARN(logger_,
+    "Leader heartbeat lost for %.2f s; stopping teleoperation and returning source to external",
+    leader_heartbeat_timeout_);
+  suspendModelOutput();
+  exit_pending_ = false;
+  source_ = ControlSource::kNone;
+  pending_ = ControlSource::kModelAction;
+  publish("switching");
+  try {
+    leader_lost_();
+    complete(ControlSource::kModelAction);
+  } catch (const std::exception & error) {
+    RCLCPP_ERROR(logger_, "Leader disconnect handoff failed: %s", error.what());
+    fail();
+  }
+}
 
 void CommandSourceManager::startDirect()
 {
@@ -127,6 +175,9 @@ void CommandSourceManager::publish(const std::string & value)
 
 void CommandSourceManager::select(const ControlSource source)
 {
+  if (source == ControlSource::kTeleoperation && !leaderFresh()) {
+    throw std::runtime_error("Leader heartbeat is unavailable; start or reconnect the leader");
+  }
   if (transitioning()) {
     throw std::runtime_error("A source transition is already in progress");
   }

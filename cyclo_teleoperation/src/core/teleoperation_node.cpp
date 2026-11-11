@@ -75,7 +75,8 @@ public:
     // Claim ownership before creating robot publishers or mode services.
     source_manager_ = std::make_unique<CommandSourceManager>(*this,
         [this](ControlSource source) {beginSourceSwitch(source);},
-        [this](ControlSource) {validateSourceSwitch();});
+        [this](ControlSource) {validateSourceSwitch();},
+        [this]() {handleLeaderDisconnect();});
     const auto robot_plugin = get_parameter("robot.plugin").as_string();
     if (robot_plugin.empty() || !robot_loader_.isClassAvailable(robot_plugin)) {
       throw std::runtime_error(
@@ -194,6 +195,17 @@ public:
   }
 
 private:
+  void handleLeaderDisconnect()
+  {
+    // Bypass normal exit poses and transition guards when the operator is disconnected.
+    setLeaderActionEnabled(false);
+    modes_.deactivate();
+    modes_.cancelTransition(*pose_sequences_);
+    pose_sequences_->cancelPresets(allGroups());
+    pose_sequences_->cancelFinalInitialPoses(allGroups());
+    switchSource(ControlSource::kModelAction);
+  }
+
   void validateSourceSwitch()
   {
     if (source() == ControlSource::kTeleoperation && modes_.ready() &&
