@@ -2,6 +2,10 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.4 (2026-11-11)
+------------------
+* None
+
 0.5.3 (2026-11-02)
 ------------------
 * Shortened wrist collision capsules and added dedicated two-finger gripper collision spheres

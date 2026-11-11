@@ -2,6 +2,11 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.4 (2026-11-11)
+------------------
+* Return teleoperation control to external when the leader disconnects
+* Contributors: Yeonguk Kim
+
 0.5.3 (2026-11-02)
 ------------------
 * Refined AI Worker gripper, hand, wrist-camera, and head collision models and SRDF policies

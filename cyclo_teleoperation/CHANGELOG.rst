@@ -2,6 +2,13 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.4 (2026-11-11)
+------------------
+* Monitor leader heartbeats using steady time and require a live leader to acquire teleoperation
+* Cancel teleoperation pose sequences and return to external on disconnect without waiting for feedback or exit poses
+* Keep external control selected after leader reconnection until explicitly requested
+* Contributors: Yeonguk Kim
+
 0.5.3 (2026-11-02)
 ------------------
 * None
