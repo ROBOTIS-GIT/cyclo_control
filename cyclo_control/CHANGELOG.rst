@@ -4,7 +4,9 @@ Changelog for package cyclo_control
 
 0.5.4 (2026-11-11)
 ------------------
-* Return teleoperation control to external when the leader disconnects
+* Stop teleoperation and return to external control when the leader disconnects
+* Hold current arm and gripper positions if fresh feedback is available
+* Update active-arm status during external EEF control
 * Contributors: Yeonguk Kim
 
 0.5.3 (2026-11-02)
