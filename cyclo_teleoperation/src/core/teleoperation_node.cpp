@@ -75,7 +75,8 @@ public:
     // Claim ownership before creating robot publishers or mode services.
     source_manager_ = std::make_unique<CommandSourceManager>(*this,
         [this](ControlSource source) {beginSourceSwitch(source);},
-        [this](ControlSource) {validateSourceSwitch();});
+        [this](ControlSource) {validateSourceSwitch();},
+        [this]() {handleLeaderDisconnect();});
     const auto robot_plugin = get_parameter("robot.plugin").as_string();
     if (robot_plugin.empty() || !robot_loader_.isClassAvailable(robot_plugin)) {
       throw std::runtime_error(
@@ -194,6 +195,21 @@ public:
   }
 
 private:
+  void handleLeaderDisconnect()
+  {
+    // Bypass normal exit poses and transition guards when the operator is disconnected.
+    if (feedbackFresh()) {
+      robot_teleoperation_->publish(robot_teleoperation_->followerPosition(),
+        robot_teleoperation_->followerAuxiliaryPosition());
+    }
+    setLeaderActionEnabled(false);
+    modes_.deactivate();
+    modes_.cancelTransition(*pose_sequences_);
+    pose_sequences_->cancelPresets(allGroups());
+    pose_sequences_->cancelFinalInitialPoses(allGroups());
+    switchSource(ControlSource::kModelAction);
+  }
+
   void validateSourceSwitch()
   {
     if (source() == ControlSource::kTeleoperation && modes_.ready() &&
@@ -386,6 +402,9 @@ private:
         syncGroupCommandToFeedback(changed);
         active_groups_ = desired;
         if (enabled != 0) {modes_.plugin()->onGroupsEnabled(enabled, makeContext(active_groups_));}
+        publishStatus(active_groups_ == 0 ? ControlStatus::kHolding : ControlStatus::kActive,
+          active_groups_ == 0 ? "External pose input expired; holding control groups" :
+          "External pose input updated");
       }
       const auto context = makeContext(active_groups_);
       const auto owned = modes_.plugin()->controlledGroups(context);

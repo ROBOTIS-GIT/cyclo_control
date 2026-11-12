@@ -2,6 +2,15 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.4 (2026-11-11)
+------------------
+* Require a connected leader to start teleoperation
+* Stop all teleoperation moves and return to external control on leader disconnect
+* Hold current arm and gripper positions if fresh feedback is available
+* Require a new teleoperation request after leader reconnection
+* Update active-arm status during external EEF control
+* Contributors: Yeonguk Kim
+
 0.5.3 (2026-11-02)
 ------------------
 * None
