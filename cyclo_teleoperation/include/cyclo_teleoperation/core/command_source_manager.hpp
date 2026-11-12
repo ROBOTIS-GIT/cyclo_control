@@ -16,8 +16,10 @@
 #include <functional>
 #include <string>
 #include <memory>
+#include <chrono>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/empty.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -32,7 +34,8 @@ class CommandSourceManager
 {
 public:
   using Switch = std::function<void(ControlSource)>;
-  CommandSourceManager(rclcpp::Node & node, Switch change, Switch validate);
+  CommandSourceManager(
+    rclcpp::Node & node, Switch change, Switch validate, std::function<void()> leader_lost);
   ~CommandSourceManager();
   void select(ControlSource source);
   void complete(ControlSource source);
@@ -55,9 +58,16 @@ public:
 
 private:
   void publish(const std::string & value);
+  bool leaderFresh() const;
+  void checkLeader();
   rclcpp::Logger logger_;
   Switch change_;
   Switch validate_;
+  std::function<void()> leader_lost_;
+  std::chrono::steady_clock::time_point leader_last_seen_{};
+  double leader_heartbeat_timeout_ = 1.0;
+  bool leader_seen_ = false;
+  rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr leader_heartbeat_;
   std::unique_ptr<RuntimeOwnership> ownership_;
   ControlSource active_source_ = ControlSource::kNone;
   ControlSource exit_target_ = ControlSource::kNone;

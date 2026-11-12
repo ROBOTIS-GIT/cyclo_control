@@ -2,6 +2,13 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.4 (2026-11-11)
+------------------
+* Stop teleoperation and return to external control when the leader disconnects
+* Hold current arm and gripper positions if fresh feedback is available
+* Update active-arm status during external EEF control
+* Contributors: Yeonguk Kim
+
 0.5.3 (2026-11-02)
 ------------------
 * Refined AI Worker gripper, hand, wrist-camera, and head collision models and SRDF policies
