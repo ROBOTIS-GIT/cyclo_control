@@ -20,12 +20,12 @@ AI Worker selects follower profiles in `config/ffw_sg2_rev1_follower/`:
 
 A2 input/model settings live in `config/ffw_a2_leader/ffw_a2_leader_input.yaml`.
 Only the leader bringup loads this file into the common Leader JTCB. Follower
-bringups load only their own `ffw_<model>_teleoperation.yaml`, declare the
-Cyclo node directly, and resolve
+bringups load only their own profile, such as `ffw_sg2_teleoperation.yaml` or
+`w2_teleoperation.yaml`, declare the Cyclo node directly, and resolve
 `$(find-pkg-share ...)` model paths. Model paths are configured in YAML, not repeated
 as launch arguments. `launch_utils.py` only shares command routing and successful
 startup sequencing; it does not launch hidden nodes.
-SG2 rev1, BG2 rev4, F1, F2, SH5 rev1 and BH5 rev1 hardware/Gazebo bringups are integrated.
+SG2 rev1, BG2 rev4, W1, W2, SH5 rev1 and BH5 rev1 hardware/Gazebo bringups are integrated.
 
 The follower bringup is the launch entry point. The intermediate
 `ffw_control.launch.py`, `ffw_teleoperation.launch.py`, and
@@ -84,7 +84,7 @@ feedback and emits seven arm joints per side. Leader triggers remain optional
 inputs (`leader_left_gripper_joint` / `leader_right_gripper_joint`); they are not
 forwarded to a hand controller. Hands can be controlled independently on their
 existing hand trajectory topics. Arm presets contain only their seven positions.
-Keep the gripper names unchanged on SG2/BG2/F1/F2 to retain combined arm/gripper output.
+Keep the gripper names unchanged on SG2/BG2/W1/W2 to retain combined arm/gripper output.
 
 `/action/{left,right}/pose` always represents a desired EEF target, while
 `/state/{left,right}/pose` is computed from actual follower feedback. In joint teleop,
@@ -310,7 +310,7 @@ The exported `cyclo_teleoperation_leader_reference` target provides pure FK and
 relative-to-absolute pose math without ROS connections. The leader bridge handles
 ROS subscriptions, measured follower TF, mode metadata and per-arm anchors outside
 the ros2_control update thread. Only the leader loads a leader calculation URDF.
-F1/F2 may supply `input_reference_urdf_path` as a portable calculation-model hint;
+W1/W2 may supply `input_reference_urdf_path` as a portable calculation-model hint;
 the follower never constructs or executes a leader model from it. The A2 input
 profile enables `leader_use_follower_reference_model` to preserve its existing
 follower-sized geometry for these models. Such FK uses the configured arm anchor

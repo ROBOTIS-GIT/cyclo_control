@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="ffw_f1_follower">
+<robot name="w1_follower">
   <!--Different arm lengths: cross-arm Never exemptions are not inherited from SG2.-->
   <group name="arm_l">
     <joint name="arm_l_joint1" />
