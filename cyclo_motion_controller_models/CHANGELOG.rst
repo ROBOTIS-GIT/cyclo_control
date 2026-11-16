@@ -2,6 +2,12 @@
 Changelog for package cyclo_motion_controller_models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.5 (2026-11-16)
+------------------
+* Renamed F1 and F2 calculation models, collision policies, and viewers to W1 and W2
+* Updated shared mesh references to the renamed AI Worker paths
+* Contributors: Yeonguk Kim
+
 0.5.4 (2026-11-11)
 ------------------
 * None

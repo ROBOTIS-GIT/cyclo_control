@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="ffw_f1_follower">
+<robot name="w1_follower">
   <!--Calculation model: measured lift + 14 arm DOFs; head collision fixed at neutral, as in BG2/SG2.-->
   <!--No hardware or finger DOFs.-->
   <!--Visual meshes from ffw_description; accessory visuals are folded into parent links at neutral joint positions.-->
@@ -7,7 +7,7 @@
     <visual name="base_link_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_base/base_mobile_assy.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w_base/base_mobile_assy.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="silver">
         <color rgba="0.75 0.75 0.75 1" />
@@ -16,7 +16,7 @@
     <visual name="lift_link_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f_base/lift_link.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w_base/lift_link.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="silver">
         <color rgba="0.75 0.75 0.75 1" />
@@ -63,7 +63,7 @@
     <visual name="arm_base_link_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/body_arm_assy.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/body_arm_assy.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="white">
         <color rgba="1 1 1 1" />
@@ -111,7 +111,7 @@
     <visual name="head_link1_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/head_link1.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/head_link1.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="grey">
         <color rgba="0.2 0.2 0.2 1" />
@@ -127,7 +127,7 @@
     <visual name="head_link2_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/head_link2.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/head_link2.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="white">
         <color rgba="1 1 1 1" />
@@ -153,7 +153,7 @@
     <visual name="arm_l_link1_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link1.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link1.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -164,7 +164,7 @@
     <visual name="arm_l_link2_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link2.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link2.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -194,7 +194,7 @@
     <visual name="arm_l_link3_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link3.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link3.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -205,7 +205,7 @@
     <visual name="arm_l_link4_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link4.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link4.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -235,7 +235,7 @@
     <visual name="arm_l_link5_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link5.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link5.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -246,7 +246,7 @@
     <visual name="arm_l_link6_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link6.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link6.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -263,7 +263,7 @@
     <visual name="arm_l_link7_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_l_link7.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_l_link7.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -347,7 +347,7 @@
     <visual name="arm_r_link1_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link1.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link1.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -358,7 +358,7 @@
     <visual name="arm_r_link2_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link2.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link2.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -388,7 +388,7 @@
     <visual name="arm_r_link3_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link3.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link3.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -399,7 +399,7 @@
     <visual name="arm_r_link4_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link4.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link4.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -429,7 +429,7 @@
     <visual name="arm_r_link5_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link5.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link5.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -440,7 +440,7 @@
     <visual name="arm_r_link6_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link6.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link6.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />
@@ -457,7 +457,7 @@
     <visual name="arm_r_link7_visual_0">
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://ffw_description/meshes/common/follower/ffw_f/arm_r_link7.stl" scale="0.001 0.001 0.001" />
+        <mesh filename="package://ffw_description/meshes/common/follower/w/arm_r_link7.stl" scale="0.001 0.001 0.001" />
       </geometry>
       <material name="black">
         <color rgba="0.2 0.2 0.2 1" />

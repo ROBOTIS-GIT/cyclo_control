@@ -35,11 +35,14 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     """Create the launch description for AI worker controllers."""
     model = LaunchConfiguration('model')
+    model_prefix = PythonExpression([
+        "'' if '", model, "' in ('w1', 'w2') else 'ffw_'",
+    ])
     declared_arguments = [
         DeclareLaunchArgument(
             'model',
             default_value='sg2',
-            choices=['sg2', 'bg2', 'f1', 'f2'],
+            choices=['sg2', 'bg2', 'w1', 'w2'],
             description='Follower model used for the default URDF and SRDF paths.',
         ),
         DeclareLaunchArgument(
@@ -114,7 +117,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    ['ffw_', model, '_follower.urdf'],
+                    [model_prefix, model, '_follower.urdf'],
                 ]
             ),
             description='Path to robot URDF file.',
@@ -126,7 +129,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    ['ffw_', model, '_follower_default.srdf'],
+                    [model_prefix, model, '_follower_default.srdf'],
                 ]
             ),
             description='Path to robot SRDF file.',
@@ -138,7 +141,7 @@ def generate_launch_description():
                     FindPackageShare('cyclo_motion_controller_models'),
                     'models',
                     'ai_worker',
-                    ['ffw_', model, '_follower_modified.srdf'],
+                    [model_prefix, model, '_follower_modified.srdf'],
                 ]
             ),
             description='Path to robot SRDF file with hand collision disabled.',

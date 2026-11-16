@@ -17,7 +17,7 @@
 # Author: Yeonguk Kim
 
 
-"""Launch RViz and state publishers for the FFW F2 follower model."""
+"""Launch RViz and state publishers for the W2 follower model."""
 
 import os
 
@@ -32,7 +32,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Create the launch description for the FFW F2 follower viewer."""
+    """Create the launch description for the W2 follower viewer."""
     use_gui = LaunchConfiguration('use_gui')
     use_sim_time = LaunchConfiguration('use_sim_time')
 
@@ -41,7 +41,7 @@ def generate_launch_description():
         pkg_share,
         'models',
         'ai_worker',
-        'ffw_f2_follower.urdf',
+        'w2_follower.urdf',
     )
     rviz_config_file = os.path.join(pkg_share, 'rviz', 'ffw_follower.rviz')
 
