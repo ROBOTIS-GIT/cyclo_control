@@ -2,6 +2,11 @@
 Changelog for package cyclo_control
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.5 (2026-11-16)
+------------------
+* Renamed F1 and F2 calculation models and controller selections to W1 and W2
+* Contributors: Yeonguk Kim
+
 0.5.4 (2026-11-11)
 ------------------
 * Stop teleoperation and return to external control when the leader disconnects

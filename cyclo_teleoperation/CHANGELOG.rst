@@ -2,6 +2,11 @@
 Changelog for package cyclo_teleoperation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.5 (2026-11-16)
+------------------
+* Updated teleoperation examples and configuration paths to use W1 and W2
+* Contributors: Yeonguk Kim
+
 0.5.4 (2026-11-11)
 ------------------
 * Require a connected leader to start teleoperation
